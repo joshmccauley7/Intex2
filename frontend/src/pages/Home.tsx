@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Heart, Users, Home, Shield } from 'lucide-react'
 import { apiFetch } from '../api'
-import heroImg from '../assets/hero.png'
+import heroImg from '../images/home page.jpg'
 
 interface ImpactSummary {
   latestSnapshot: {
@@ -24,7 +24,7 @@ export default function HomePage() {
     <div className="min-h-screen flex flex-col font-sans">
 
       {/* Navbar */}
-      <nav className="bg-navy-DEFAULT text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50">
+      <nav className="bg-[#0f172a] text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50">
         <div className="flex items-center gap-2 font-bold text-xl">
           <Heart className="text-safira-blue fill-safira-blue" size={22} />
           Safira
@@ -50,7 +50,7 @@ export default function HomePage() {
         className="relative text-white text-center py-28 px-6 bg-cover bg-center"
         style={{ backgroundImage: `url(${heroImg})` }}
       >
-        <div className="absolute inset-0 bg-navy-DEFAULT/70" />
+        <div className="absolute inset-0 bg-[#0f172a]/70" />
         <div className="relative z-10 max-w-2xl mx-auto">
           <h1 className="text-5xl font-bold leading-tight mb-4">
             Every Child Deserves Safety
@@ -120,7 +120,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="bg-navy-DEFAULT text-slate-400 py-8 px-6 mt-auto text-center text-sm">
+      <footer className="bg-[#0f172a] text-slate-400 py-8 px-6 mt-auto text-center text-sm">
         <p>&copy; 2026 Safira. All rights reserved.</p>
         <a href="/impact" className="hover:text-white transition-colors mt-1 inline-block">Privacy Policy</a>
       </footer>
