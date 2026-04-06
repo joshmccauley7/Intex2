@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Heart, Users, Home, Shield } from 'lucide-react'
 import { apiFetch } from '../api'
-import heroImg from '../images/home page.jpg'
+import heroImg from '../images/home.jpg'
 
 interface ImpactSummary {
   latestSnapshot: {
