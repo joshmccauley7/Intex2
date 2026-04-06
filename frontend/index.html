@@ -4,7 +4,32 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>frontend</title>
+    <title>Safira</title>
+    <script>
+      (function () {
+        function getCookie(name) {
+          var m = document.cookie.match(
+            new RegExp(
+              '(?:^|; )' +
+                name.replace(/([.$?*|{}()[\]\\/+^])/g, '\\$1') +
+                '=([^;]*)'
+            )
+          );
+          return m ? decodeURIComponent(m[1]) : null;
+        }
+        try {
+          var raw = getCookie('cookie_consent');
+          if (!raw) return;
+          var c = JSON.parse(raw);
+          if (c && c.consentGiven === true && c.preferences === true) {
+            var th = getCookie('theme_preference');
+            if (th === 'dark' || th === 'light') {
+              document.documentElement.setAttribute('data-theme', th);
+            }
+          }
+        } catch (e) {}
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

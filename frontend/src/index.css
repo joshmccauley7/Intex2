@@ -10,11 +10,25 @@
   padding: 0;
 }
 
+:root,
+[data-theme='light'] {
+  color-scheme: light;
+  --page-bg: #f8fafc;
+  --page-fg: #0f172a;
+}
+
+[data-theme='dark'] {
+  color-scheme: dark;
+  --page-bg: #020617;
+  --page-fg: #f1f5f9;
+}
+
 body {
   font-family: 'Inter', system-ui, sans-serif;
-  background: #f8fafc;
-  color: #0f172a;
+  background: var(--page-bg);
+  color: var(--page-fg);
   -webkit-font-smoothing: antialiased;
+  transition: background-color 0.2s ease, color 0.2s ease;
 }
 
 #root {
