@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import '../App.css'
 import { Heart, Users, Home, Shield } from 'lucide-react'
 import { apiFetch } from '../api'
 import heroImg from '../images/home.jpg'
@@ -48,23 +49,34 @@ export default function HomePage() {
       {/* Hero */}
       <section
         className="relative text-white text-center py-28 px-6 bg-cover bg-center"
-        style={{ backgroundImage: `url(${heroImg})` }}
+        style={{ backgroundImage: `url(${heroImg})`, backgroundPosition: 'center 15%' }}
       >
         <div className="absolute inset-0 bg-[#0f172a]/70" />
-        <div className="relative z-10 max-w-2xl mx-auto">
-          <h1 className="text-5xl font-bold leading-tight mb-4">
+        <div
+          className="relative z-10 max-w-2xl mx-auto px-8 py-10 rounded-2xl hero-animate"
+          style={{ background: 'rgba(0,0,0,0.35)', backdropFilter: 'blur(6px)', WebkitBackdropFilter: 'blur(6px)' }}
+        >
+          <h1
+            className="text-5xl font-bold leading-tight mb-4 text-white hero-animate"
+            style={{ textShadow: '0 2px 16px rgba(0,0,0,0.7)' }}
+          >
             Every Child Deserves Safety
           </h1>
-          <p className="text-lg text-slate-300 mb-8">
+          <p
+            className="text-lg text-white/95 mb-8 leading-relaxed hero-animate-delay"
+            style={{ textShadow: '0 1px 8px rgba(0,0,0,0.6)' }}
+          >
             Safira protects children who are victims of sexual abuse in Brazil, providing shelter, healing, and a path to a brighter future.
           </p>
-          <a
-            href="/donate"
-            className="inline-flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white font-semibold px-8 py-3 rounded-lg transition-colors text-base"
-          >
-            <Heart size={18} className="fill-white" />
-            Donate Now
-          </a>
+          <div className="hero-animate-delay-2">
+            <a
+              href="/donate"
+              className="inline-flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white font-semibold px-8 py-3 rounded-lg transition-colors text-base shadow-lg"
+            >
+              <Heart size={18} className="fill-white" />
+              Donate Now
+            </a>
+          </div>
         </div>
       </section>
 

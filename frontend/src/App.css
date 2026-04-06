@@ -12,13 +12,13 @@
 }
 
 .hero-animate {
-  animation: fadeSlideUp 0.8s ease-out both;
+  animation: fadeSlideUp 0.9s ease-out 1s both;
 }
 
 .hero-animate-delay {
-  animation: fadeSlideUp 0.8s ease-out 0.2s both;
+  animation: fadeSlideUp 0.9s ease-out 1.2s both;
 }
 
 .hero-animate-delay-2 {
-  animation: fadeSlideUp 0.8s ease-out 0.4s both;
+  animation: fadeSlideUp 0.9s ease-out 1.4s both;
 }
