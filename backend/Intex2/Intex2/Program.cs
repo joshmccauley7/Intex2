@@ -17,9 +17,22 @@ if (builder.Environment.IsDevelopment())
     }
 }
 
-var connectionString = Environment.GetEnvironmentVariable("DATABASE_URL")
+var rawUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("DATABASE_URL environment variable is not set.");
+
+// Convert postgresql:// URI to Npgsql key=value format
+string connectionString;
+if (rawUrl.StartsWith("postgresql://") || rawUrl.StartsWith("postgres://"))
+{
+    var uri = new Uri(rawUrl);
+    var userInfo = uri.UserInfo.Split(':');
+    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]}";
+}
+else
+{
+    connectionString = rawUrl;
+}
 
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
