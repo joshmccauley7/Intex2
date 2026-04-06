@@ -1,1 +1,24 @@
 /* Component-specific styles go here. Most styling uses Tailwind utility classes. */
+
+@keyframes fadeSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(28px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.hero-animate {
+  animation: fadeSlideUp 0.8s ease-out both;
+}
+
+.hero-animate-delay {
+  animation: fadeSlideUp 0.8s ease-out 0.2s both;
+}
+
+.hero-animate-delay-2 {
+  animation: fadeSlideUp 0.8s ease-out 0.4s both;
+}
