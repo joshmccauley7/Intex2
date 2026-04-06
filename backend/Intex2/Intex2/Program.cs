@@ -10,7 +10,10 @@ if (builder.Environment.IsDevelopment())
     {
         foreach (var line in File.ReadAllLines(envPath))
         {
-            var parts = line.Split('=', 2);
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
+                continue;
+            var parts = trimmed.Split('=', 2);
             if (parts.Length == 2)
                 Environment.SetEnvironmentVariable(parts[0].Trim(), parts[1].Trim());
         }
@@ -26,8 +29,19 @@ string connectionString;
 if (rawUrl.StartsWith("postgresql://") || rawUrl.StartsWith("postgres://"))
 {
     var uri = new Uri(rawUrl);
-    var userInfo = uri.UserInfo.Split(':');
-    connectionString = $"Host={uri.Host};Port={uri.Port};Database={uri.AbsolutePath.TrimStart('/')};Username={userInfo[0]};Password={userInfo[1]}";
+    var userInfo = uri.UserInfo;
+    var colon = userInfo.IndexOf(':');
+    var username = colon >= 0 ? userInfo[..colon] : userInfo;
+    var password = colon >= 0 ? userInfo[(colon + 1)..] : "";
+    var port = uri.Port > 0 ? uri.Port : 5432;
+    var database = uri.AbsolutePath.TrimStart('/');
+    connectionString = $"Host={uri.Host};Port={port};Database={database};Username={username};Password={password}";
+
+    // Railway and most hosted Postgres require TLS from local dev machines
+    var local = uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
+        || uri.Host.Equals("127.0.0.1");
+    if (!local)
+        connectionString += ";SSL Mode=Require;Trust Server Certificate=true";
 }
 else
 {
