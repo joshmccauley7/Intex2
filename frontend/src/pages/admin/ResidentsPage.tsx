@@ -68,6 +68,71 @@ interface ResidentDetail {
 }
 
 const SAFEHOUSES = [1,2,3,4,5,6,7,8,9].map(i => ({ id: i, name: `Lighthouse Safehouse ${i}` }))
+const BIRTH_STATUS_OPTIONS = ['Marital', 'Non-Marital']
+const INITIAL_CASE_ASSESSMENT_OPTIONS = [
+  'For Adoption',
+  'For Continued Care',
+  'For Foster Care',
+  'For Independent Living',
+  'For Reunification',
+]
+const REFERRAL_SOURCE_OPTIONS = [
+  'Community',
+  'Court Order',
+  'Government Agency',
+  'NGO',
+  'Police',
+  'Self-Referral',
+]
+const REFERRING_AGENCY_PERSON_OPTIONS = [
+  'Ana Cruz',
+  'Ana Dizon',
+  'Ana Reyes',
+  'Ana Santos',
+  'Elena Cruz',
+  'Elena Flores',
+  'Elena Reyes',
+  'Elena Santos',
+  'Grace Flores',
+  'Grace Reyes',
+  'Joy Cruz',
+  'Joy Dizon',
+  'Lina Cruz',
+  'Lina Flores',
+  'Lina Santos',
+  'Maria Dizon',
+  'Mark Dizon',
+  'Mark Flores',
+  'Noel Reyes',
+  'Noel Santos',
+  'Ramon Cruz',
+  'Ramon Flores',
+  'Ramon Garcia',
+  'Ramon Reyes',
+  'Ramon Santos',
+  'Sofia Dizon',
+  'Sofia Reyes',
+]
+const ASSIGNED_SOCIAL_WORKER_OPTIONS = [
+  'SW-01',
+  'SW-02',
+  'SW-03',
+  'SW-04',
+  'SW-05',
+  'SW-06',
+  'SW-07',
+  'SW-08',
+  'SW-09',
+  'SW-10',
+  'SW-11',
+  'SW-13',
+  'SW-14',
+  'SW-15',
+  'SW-16',
+  'SW-17',
+  'SW-19',
+  'SW-20',
+]
 
 const STATUS_BADGE: Record<string, string> = {
   Active: 'bg-green-100 text-green-700',
@@ -83,6 +148,28 @@ const RISK_BADGE: Record<string, string> = {
 }
 
 const PAGE_SIZE = 20
+
+function generateResidentCodesFromExisting(residents: Array<{ caseControlNo: string | null; internalCode: string | null }>) {
+  const maxInternal = residents.reduce((max, r) => {
+    const match = r.internalCode?.match(/^LS-(\d+)$/i)
+    if (!match) return max
+    return Math.max(max, parseInt(match[1], 10))
+  }, 0)
+
+  const maxCaseControl = residents.reduce((max, r) => {
+    const match = r.caseControlNo?.match(/^C(\d+)$/i)
+    if (!match) return max
+    return Math.max(max, parseInt(match[1], 10))
+  }, 0)
+
+  const nextInternal = maxInternal + 1
+  const nextCaseControl = maxCaseControl + 1
+
+  return {
+    caseControlNo: `C${String(nextCaseControl).padStart(4, '0')}`,
+    internalCode: `LS-${String(nextInternal).padStart(4, '0')}`,
+  }
+}
 
 const blankForm = (): Partial<ResidentDetail> => ({
   caseStatus: 'Active',
@@ -521,6 +608,18 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  useEffect(() => {
+    if (existing) return
+    if (form.caseControlNo || form.internalCode) return
+
+    apiFetch('/api/residents')
+      .then((rows: Array<{ caseControlNo: string | null; internalCode: string | null }>) => {
+        const generated = generateResidentCodesFromExisting(rows)
+        setForm((f) => ({ ...f, ...generated }))
+      })
+      .catch(() => null)
+  }, [existing, form.caseControlNo, form.internalCode])
+
   const set = (field: keyof ResidentDetail, value: unknown) =>
     setForm(f => ({ ...f, [field]: value }))
 
@@ -533,6 +632,17 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
   const dateField = (label: string, field: keyof ResidentDetail) => (
     <FormField label={label}>
       <input className={inputClass} type="date" value={(form[field] as string) ?? ''} onChange={(e) => set(field, e.target.value)} />
+    </FormField>
+  )
+
+  const selectField = (label: string, field: keyof ResidentDetail, options: string[]) => (
+    <FormField label={label}>
+      <select className={inputClass} value={(form[field] as string) ?? ''} onChange={(e) => set(field, e.target.value || null)}>
+        <option value="">Select</option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
     </FormField>
   )
 
@@ -598,7 +708,7 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
           </select>
         </FormField>
         {dateField('Date of Birth', 'dateOfBirth')}
-        {textField('Birth Status', 'birthStatus')}
+        {selectField('Birth Status', 'birthStatus', BIRTH_STATUS_OPTIONS)}
         {textField('Place of Birth', 'placeOfBirth')}
         {textField('Religion', 'religion')}
 
@@ -637,7 +747,7 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
             </select>
           </FormField>
         </div>
-        {textField('Initial Case Assessment', 'initialCaseAssessment')}
+        {selectField('Initial Case Assessment', 'initialCaseAssessment', INITIAL_CASE_ASSESSMENT_OPTIONS)}
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 mt-2">Subcategories</p>
         <div className="grid grid-cols-2">
@@ -681,8 +791,8 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
         <FormField label="Length of Stay">
           <input className={inputClass} value={form.lengthOfStay ?? ''} onChange={(e) => set('lengthOfStay', e.target.value || null)} placeholder="e.g. 2 Years 3 months" />
         </FormField>
-        {textField('Referral Source', 'referralSource')}
-        {textField('Referring Agency/Person', 'referringAgencyPerson')}
+        {selectField('Referral Source', 'referralSource', REFERRAL_SOURCE_OPTIONS)}
+        {selectField('Referring Agency/Person', 'referringAgencyPerson', REFERRING_AGENCY_PERSON_OPTIONS)}
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 mt-2">Legal</p>
         <div className="grid grid-cols-2 gap-3">
@@ -691,7 +801,7 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
         </div>
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 mt-2">Social Worker</p>
-        {textField('Assigned Social Worker', 'assignedSocialWorker')}
+        {selectField('Assigned Social Worker', 'assignedSocialWorker', ASSIGNED_SOCIAL_WORKER_OPTIONS)}
         {dateField('Case Study Prepared', 'dateCaseStudyPrepared')}
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 mt-2">Reintegration</p>
