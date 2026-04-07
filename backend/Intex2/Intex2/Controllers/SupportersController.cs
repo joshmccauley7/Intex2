@@ -43,7 +43,22 @@ public class SupportersController : ControllerBase
                     x.s.Status,
                     x.s.Region,
                     x.s.Email,
-                    x.s.FirstDonationDate,
+                    MostRecentDonationDate = _db.Donations
+                        .Where(d => d.SupporterId == x.s.SupporterId)
+                        .Select(d => (DateOnly?)d.DonationDate)
+                        .Max(),
+                    DonationType = _db.Donations.Any(d => d.SupporterId == x.s.SupporterId)
+                        ? (
+                            _db.Donations.Any(d => d.SupporterId == x.s.SupporterId && d.IsRecurring) &&
+                            _db.Donations.Any(d => d.SupporterId == x.s.SupporterId && !d.IsRecurring)
+                                ? "Mixed"
+                                : (
+                                    _db.Donations.Any(d => d.SupporterId == x.s.SupporterId && d.IsRecurring)
+                                        ? "Recurring"
+                                        : "Not recurring"
+                                )
+                        )
+                        : null,
                     ChurnRiskLevel = p != null ? p.RiskLevel : null,
                     ChurnProbability = p != null ? (decimal?)p.ChurnProbability : null
                 })
