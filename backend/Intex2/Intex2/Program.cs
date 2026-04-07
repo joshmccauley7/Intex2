@@ -135,8 +135,37 @@ using (var scope = app.Services.CreateScope())
 if (app.Environment.IsDevelopment())
     app.MapOpenApi();
 
+// ─── HSTS (production only) ───────────────────────────────────────────────────
+if (!app.Environment.IsDevelopment())
+    app.UseHsts();
+
 app.UseCors();
 app.UseHttpsRedirection();
+
+// ─── Security headers ─────────────────────────────────────────────────────────
+app.Use(async (ctx, next) =>
+{
+    // Content-Security-Policy — skip in dev so Vite HMR and Swagger still work
+    if (!app.Environment.IsDevelopment())
+    {
+        ctx.Response.Headers["Content-Security-Policy"] =
+            "default-src 'self'; " +
+            "script-src 'self'; " +
+            "style-src 'self' 'unsafe-inline'; " +
+            "img-src 'self' data:; " +
+            "font-src 'self'; " +
+            "connect-src 'self'; " +
+            "frame-ancestors 'none';";
+    }
+
+    ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
+    ctx.Response.Headers["X-Frame-Options"] = "DENY";
+    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
+    ctx.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
+
+    await next();
+});
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
