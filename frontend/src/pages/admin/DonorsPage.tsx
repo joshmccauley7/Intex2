@@ -9,7 +9,7 @@ interface Supporter {
   status: string
   region: string | null
   email: string | null
-  firstDonationDate: string | null
+  mostRecentDonationDate: string | null
   churnRiskLevel: string | null
   churnProbability: number | null
 }
@@ -153,7 +153,7 @@ export default function DonorsPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Region</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">First Donation</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Most Recent Donation</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Churn Risk</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                   </tr>
@@ -170,7 +170,7 @@ export default function DonorsPage() {
                       </td>
                       <td className="px-4 py-3 text-slate-600">{s.region ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{s.email ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{s.firstDonationDate ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{s.mostRecentDonationDate ?? '—'}</td>
                       <td className="px-4 py-3">
                         {s.churnRiskLevel ? (
                           <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${CHURN_BADGE[s.churnRiskLevel] ?? 'bg-slate-100 text-slate-500'}`}>
@@ -233,7 +233,13 @@ export default function DonorsPage() {
                 <DetailRow label="Region" value={selectedSupporter.region} />
                 <DetailRow label="Country" value={selectedSupporter.country} />
                 <DetailRow label="Acquisition Channel" value={selectedSupporter.acquisitionChannel} />
-                <DetailRow label="First Donation" value={selectedSupporter.firstDonationDate} />
+                <DetailRow
+                  label="Most Recent Donation"
+                  value={selectedSupporter.donations?.reduce<string | null>(
+                    (latest, donation) => (!latest || donation.donationDate > latest ? donation.donationDate : latest),
+                    null
+                  )}
+                />
               </div>
 
               <div className="border-t border-slate-100 pt-4 mb-4">
@@ -251,7 +257,9 @@ export default function DonorsPage() {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {selectedSupporter.donations.map((d) => (
+                        {[...selectedSupporter.donations]
+                          .sort((a, b) => b.donationDate.localeCompare(a.donationDate))
+                          .map((d) => (
                           <tr key={d.donationId}>
                             <td className="px-3 py-2 text-slate-700">{d.donationType}</td>
                             <td className="px-3 py-2 text-slate-600">{d.donationDate}</td>

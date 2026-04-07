@@ -1,5 +1,4 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Link } from 'react-router-dom';
 import {
   Activity,
   CheckCircle2,
@@ -8,7 +7,7 @@ import {
 } from 'lucide-react';
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
-import ThemeToggle from '../components/theme/ThemeToggle';
+import SiteNav from '../components/layout/SiteNav';
 
 const PHP_TO_USD = 56;
 
@@ -435,28 +434,7 @@ export default function ImpactDashboard() {
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
-      <nav className="bg-[#0f172a] dark:bg-slate-950 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800/80">
-        <div className="mx-auto flex w-full items-center justify-between">
-          <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-            <Heart className="text-safira-blue fill-safira-blue" size={22} />
-            Safira
-          </Link>
-          <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-            <Link to="/" className="hover:text-white transition-colors">Home</Link>
-            <Link to="/impact" className="text-white hover:text-blue-400 transition-colors">Impact</Link>
-            <a href="/donate" className="hover:text-white transition-colors">Donate</a>
-          </div>
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Link
-              to="/login"
-              className="text-sm font-semibold text-white bg-safira-blue hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
-            >
-              Login
-            </Link>
-          </div>
-        </div>
-      </nav>
+      <SiteNav />
 
       <main className="flex-1">
         <section className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900/70 dark:to-slate-950 py-14 px-6 border-b border-slate-100 dark:border-slate-800">

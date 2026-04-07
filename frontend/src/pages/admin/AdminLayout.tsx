@@ -1,6 +1,7 @@
-import { Outlet, NavLink, Link } from 'react-router-dom'
-import { Heart, Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard } from 'lucide-react'
+import { Outlet, NavLink } from 'react-router-dom'
+import { Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
+import SiteNav from '../../components/layout/SiteNav'
 
 export default function AdminLayout() {
   const { session, logout } = useAuth()
@@ -13,18 +14,11 @@ export default function AdminLayout() {
     }`
 
   return (
-    <div className="flex min-h-screen font-sans">
+    <div className="flex flex-col min-h-screen font-sans">
+      <SiteNav />
+      <div className="flex flex-1">
       {/* Sidebar */}
       <aside className="w-56 bg-[#0f172a] text-white flex flex-col shrink-0">
-        {/* Logo — links back to home */}
-        <Link
-          to="/"
-          className="flex items-center gap-2 font-bold text-xl px-4 py-5 border-b border-slate-700 hover:opacity-80 transition-opacity"
-        >
-          <Heart className="text-safira-blue fill-safira-blue" size={20} />
-          Safira
-        </Link>
-
         {/* Nav */}
         <nav className="flex flex-col gap-1 p-3 flex-1">
           <NavLink to="/admin/dashboard" className={navClass}>
@@ -74,6 +68,7 @@ export default function AdminLayout() {
       <main className="flex-1 bg-slate-50 p-8 overflow-auto">
         <Outlet />
       </main>
+    </div>
     </div>
   )
 }
