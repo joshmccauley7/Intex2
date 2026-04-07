@@ -455,8 +455,6 @@ export default function ImpactDashboard() {
       .sort((a, b) => b.pct - a.pct);
   }, [data?.safehouses]);
 
-  const recentHighlights = useMemo(() => (data?.snapshotSeries ?? []).slice(-3).reverse(), [data?.snapshotSeries]);
-
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
       <SiteNav />
