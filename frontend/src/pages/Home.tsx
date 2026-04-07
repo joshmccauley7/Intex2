@@ -428,7 +428,7 @@ export default function HomePage() {
                 className="text-blue-100"
                 style={{ fontSize: '1.25rem', lineHeight: '1.75' }}
               >
-                <em>Safira</em> is the Portuguese word for <strong style={{ color: '#fff' }}>sapphire</strong> — a symbol of protection and dignity. Every child who walks through our doors carries that same inherent worth. <strong style={{ color: '#fff' }}>Safira is our promise</strong> to guard and reflect that truth.
+                <em>Safira</em> is the Portuguese word for <strong style={{ color: '#fff' }}>sapphire</strong> — a symbol of protection and dignity. Safety and dignity aren’t privileges—they’re fundamental rights. <strong style={{ color: '#fff' }}>Safira exists as a promise:</strong> to safeguard these principles and stand by those we serve.
               </p>
             </div>
           </div>
