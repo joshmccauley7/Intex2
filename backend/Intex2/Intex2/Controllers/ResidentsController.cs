@@ -1,0 +1,157 @@
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+
+[ApiController]
+[Route("api/residents")]
+public class ResidentsController : ControllerBase
+{
+    private readonly AppDbContext _db;
+
+    public ResidentsController(AppDbContext db)
+    {
+        _db = db;
+    }
+
+    // GET /api/residents?status=Active&safehouseId=1&category=Neglected&socialWorker=Jane&riskLevel=High&search=code
+    [HttpGet]
+    public async Task<IActionResult> GetAll(
+        [FromQuery] string? status,
+        [FromQuery] int? safehouseId,
+        [FromQuery] string? category,
+        [FromQuery] string? socialWorker,
+        [FromQuery] string? riskLevel,
+        [FromQuery] string? search)
+    {
+        var query = _db.Residents.AsQueryable();
+
+        if (!string.IsNullOrEmpty(status))
+            query = query.Where(r => r.CaseStatus == status);
+
+        if (safehouseId.HasValue)
+            query = query.Where(r => r.SafehouseId == safehouseId);
+
+        if (!string.IsNullOrEmpty(category))
+            query = query.Where(r => r.CaseCategory == category);
+
+        if (!string.IsNullOrEmpty(socialWorker))
+            query = query.Where(r => r.AssignedSocialWorker == socialWorker);
+
+        if (!string.IsNullOrEmpty(riskLevel))
+            query = query.Where(r => r.CurrentRiskLevel == riskLevel);
+
+        if (!string.IsNullOrEmpty(search))
+            query = query.Where(r =>
+                (r.InternalCode != null && r.InternalCode.Contains(search)) ||
+                (r.CaseControlNo != null && r.CaseControlNo.Contains(search)));
+
+        var residents = await query
+            .OrderBy(r => r.InternalCode)
+            .Select(r => new
+            {
+                r.ResidentId,
+                r.InternalCode,
+                r.CaseControlNo,
+                r.CaseCategory,
+                r.CaseStatus,
+                r.SafehouseId,
+                r.AssignedSocialWorker,
+                r.PresentAge,
+                r.CurrentRiskLevel,
+                r.ReintegrationStatus,
+                r.DateOfAdmission
+            })
+            .ToListAsync();
+
+        return Ok(residents);
+    }
+
+    // GET /api/residents/:id
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetById(int id)
+    {
+        var resident = await _db.Residents.FindAsync(id);
+        if (resident == null) return NotFound();
+        return Ok(resident);
+    }
+
+    // POST /api/residents
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] Resident resident)
+    {
+        resident.CreatedAt = DateTime.UtcNow;
+        _db.Residents.Add(resident);
+        await _db.SaveChangesAsync();
+        return CreatedAtAction(nameof(GetById), new { id = resident.ResidentId }, resident);
+    }
+
+    // PUT /api/residents/:id
+    [HttpPut("{id}")]
+    public async Task<IActionResult> Update(int id, [FromBody] Resident updated)
+    {
+        var resident = await _db.Residents.FindAsync(id);
+        if (resident == null) return NotFound();
+
+        resident.CaseControlNo = updated.CaseControlNo;
+        resident.InternalCode = updated.InternalCode;
+        resident.SafehouseId = updated.SafehouseId;
+        resident.CaseStatus = updated.CaseStatus;
+        resident.Sex = updated.Sex;
+        resident.DateOfBirth = updated.DateOfBirth;
+        resident.BirthStatus = updated.BirthStatus;
+        resident.PlaceOfBirth = updated.PlaceOfBirth;
+        resident.Religion = updated.Religion;
+        resident.CaseCategory = updated.CaseCategory;
+        resident.SubCatOrphaned = updated.SubCatOrphaned;
+        resident.SubCatTrafficked = updated.SubCatTrafficked;
+        resident.SubCatChildLabor = updated.SubCatChildLabor;
+        resident.SubCatPhysicalAbuse = updated.SubCatPhysicalAbuse;
+        resident.SubCatSexualAbuse = updated.SubCatSexualAbuse;
+        resident.SubCatOsaec = updated.SubCatOsaec;
+        resident.SubCatCicl = updated.SubCatCicl;
+        resident.SubCatAtRisk = updated.SubCatAtRisk;
+        resident.SubCatStreetChild = updated.SubCatStreetChild;
+        resident.SubCatChildWithHiv = updated.SubCatChildWithHiv;
+        resident.IsPwd = updated.IsPwd;
+        resident.PwdType = updated.PwdType;
+        resident.HasSpecialNeeds = updated.HasSpecialNeeds;
+        resident.SpecialNeedsDiagnosis = updated.SpecialNeedsDiagnosis;
+        resident.FamilyIs4ps = updated.FamilyIs4ps;
+        resident.FamilySoloParent = updated.FamilySoloParent;
+        resident.FamilyIndigenous = updated.FamilyIndigenous;
+        resident.FamilyParentPwd = updated.FamilyParentPwd;
+        resident.FamilyInformalSettler = updated.FamilyInformalSettler;
+        resident.DateOfAdmission = updated.DateOfAdmission;
+        resident.AgeUponAdmission = updated.AgeUponAdmission;
+        resident.PresentAge = updated.PresentAge;
+        resident.LengthOfStay = updated.LengthOfStay;
+        resident.ReferralSource = updated.ReferralSource;
+        resident.ReferringAgencyPerson = updated.ReferringAgencyPerson;
+        resident.DateColbRegistered = updated.DateColbRegistered;
+        resident.DateColbObtained = updated.DateColbObtained;
+        resident.AssignedSocialWorker = updated.AssignedSocialWorker;
+        resident.InitialCaseAssessment = updated.InitialCaseAssessment;
+        resident.DateCaseStudyPrepared = updated.DateCaseStudyPrepared;
+        resident.ReintegrationType = updated.ReintegrationType;
+        resident.ReintegrationStatus = updated.ReintegrationStatus;
+        resident.InitialRiskLevel = updated.InitialRiskLevel;
+        resident.CurrentRiskLevel = updated.CurrentRiskLevel;
+        resident.DateEnrolled = updated.DateEnrolled;
+        resident.DateClosed = updated.DateClosed;
+        resident.NotesRestricted = updated.NotesRestricted;
+
+        await _db.SaveChangesAsync();
+        return Ok(resident);
+    }
+
+    // DELETE /api/residents/:id
+    [HttpDelete("{id}")]
+    public async Task<IActionResult> Delete(int id)
+    {
+        var resident = await _db.Residents.FindAsync(id);
+        if (resident == null) return NotFound();
+
+        _db.Residents.Remove(resident);
+        await _db.SaveChangesAsync();
+        return NoContent();
+    }
+}
