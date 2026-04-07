@@ -53,7 +53,7 @@ export default function ProfilePage() {
           <div className="space-y-3">
             {isAdmin && (
               <button
-                onClick={() => navigate('/admin/donors')}
+                onClick={() => navigate('/admin/dashboard')}
                 className="w-full bg-safira-blue hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
               >
                 Go to Admin Portal
