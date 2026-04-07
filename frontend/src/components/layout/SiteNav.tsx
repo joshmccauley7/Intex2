@@ -39,7 +39,7 @@ export default function SiteNav() {
         <NavLink to="/" end className={linkClass}>Home</NavLink>
         <NavLink to="/impact" className={linkClass}>Impact</NavLink>
         <NavLink to="/donate" className={linkClass}>Donate</NavLink>
-        {isDonor && !isAdmin && (
+        {session.isAuthenticated && (
           <NavLink to="/my-donations" className={linkClass}>My Donations</NavLink>
         )}
         {isAdmin && (
@@ -52,12 +52,6 @@ export default function SiteNav() {
         <ThemeToggle />
         {session.isAuthenticated ? (
           <>
-            <Link
-              to="/my-donations"
-              className="text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
-            >
-              My Donations
-            </Link>
             <Link
               to="/profile"
               className="flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
