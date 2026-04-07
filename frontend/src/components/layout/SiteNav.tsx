@@ -40,7 +40,7 @@ export default function SiteNav() {
           <NavLink to="/my-donations" className={linkClass}>My Donations</NavLink>
         )}
         {isAdmin && (
-          <NavLink to="/admin/dashboard" className={linkClass}>Admin</NavLink>
+          <NavLink to="/admin/dashboard" className={linkClass}>Admin Tools</NavLink>
         )}
       </div>
 
