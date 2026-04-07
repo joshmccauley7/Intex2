@@ -22,11 +22,7 @@ const EMPTY_FORM: UserFormState = { email: '', password: '', confirmPassword: ''
 function PasswordStrengthHint({ password }: { password: string }) {
   if (!password) return null;
   const reqs = [
-    { met: password.length >= 12, label: '12+ chars' },
-    { met: /[A-Z]/.test(password), label: 'uppercase' },
-    { met: /[a-z]/.test(password), label: 'lowercase' },
-    { met: /[0-9]/.test(password), label: 'number' },
-    { met: /[^A-Za-z0-9]/.test(password), label: 'special char' },
+    { met: password.length >= 14, label: '14+ chars' },
   ];
   return (
     <div className="flex flex-wrap gap-1 mt-1">

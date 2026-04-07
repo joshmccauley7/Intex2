@@ -17,11 +17,7 @@ function PasswordRequirement({ met, label }: { met: boolean; label: string }) {
 
 function checkPassword(pw: string) {
   return {
-    length: pw.length >= 12,
-    upper: /[A-Z]/.test(pw),
-    lower: /[a-z]/.test(pw),
-    digit: /[0-9]/.test(pw),
-    special: /[^A-Za-z0-9]/.test(pw),
+    length: pw.length >= 14,
   };
 }
 
@@ -130,11 +126,7 @@ export default function RegisterPage() {
             />
             {password.length > 0 && (
               <ul className="mt-2 space-y-1">
-                <PasswordRequirement met={reqs.length} label="At least 12 characters" />
-                <PasswordRequirement met={reqs.upper} label="One uppercase letter" />
-                <PasswordRequirement met={reqs.lower} label="One lowercase letter" />
-                <PasswordRequirement met={reqs.digit} label="One number" />
-                <PasswordRequirement met={reqs.special} label="One special character (!@#$...)" />
+                <PasswordRequirement met={reqs.length} label="At least 14 characters (passphrase recommended)" />
               </ul>
             )}
           </div>
