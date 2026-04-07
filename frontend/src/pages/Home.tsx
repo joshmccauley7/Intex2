@@ -1,15 +1,25 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Link } from 'react-router-dom';
 import '../App.css';
-import { Heart, Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import {
+  Heart,
+  Users,
+  Home,
+  Shield,
+  ChevronLeft,
+  ChevronRight,
+} from 'lucide-react';
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
 import ThemeToggle from '../components/theme/ThemeToggle';
 
 // Dynamically import all images from the homepage folder
-const imageModules = import.meta.glob('../images/homepage/*.{jpg,jpeg,png,webp}', {
-  eager: true,
-}) as Record<string, { default: string }>;
+const imageModules = import.meta.glob(
+  '../images/homepage/*.{jpg,jpeg,png,webp}',
+  {
+    eager: true,
+  }
+) as Record<string, { default: string }>;
 
 const heroImages = Object.values(imageModules).map((m) => m.default);
 
@@ -49,17 +59,14 @@ export default function HomePage() {
     });
   }, []);
 
-  const goTo = useCallback(
-    (index: number) => {
-      if (heroImages.length <= 1) return;
-      setFading(true);
-      setTimeout(() => {
-        setCurrentImg((index + heroImages.length) % heroImages.length);
-        setFading(false);
-      }, 350);
-    },
-    []
-  );
+  const goTo = useCallback((index: number) => {
+    if (heroImages.length <= 1) return;
+    setFading(true);
+    setTimeout(() => {
+      setCurrentImg((index + heroImages.length) % heroImages.length);
+      setFading(false);
+    }, 350);
+  }, []);
 
   useEffect(() => {
     if (heroImages.length <= 1) return;
@@ -78,7 +85,10 @@ export default function HomePage() {
           Safira
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-          <Link to="/" className="text-white hover:text-blue-400 transition-colors">
+          <Link
+            to="/"
+            className="text-white hover:text-blue-400 transition-colors"
+          >
             Home
           </Link>
           <a href="/about" className="hover:text-white transition-colors">
@@ -118,7 +128,13 @@ export default function HomePage() {
           }}
         />
         {/* Very subtle darkening only at edges, keeping center bright */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.18) 100%)' }} />
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(to right, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.18) 100%)',
+          }}
+        />
 
         {/* Text card — left side */}
         <div className="relative z-10 h-full flex items-center px-10 md:px-16">
@@ -135,8 +151,9 @@ export default function HomePage() {
               Every Child Deserves Safety
             </h1>
             <p className="text-slate-600 mb-6 leading-relaxed text-sm hero-animate-delay">
-              Safira protects children who are victims of sexual abuse in Brazil, providing
-              shelter, healing, and a path to a brighter future.
+              Safira protects children who are victims of sexual abuse in
+              Brazil, providing shelter, healing, and a path to a brighter
+              future.
             </p>
             <div className="hero-animate-delay-2">
               <a
@@ -225,9 +242,10 @@ export default function HomePage() {
             Our Mission
           </h2>
           <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-            Safira exists to rescue, shelter, and rehabilitate children who have suffered
-            sexual abuse in Brazil. We provide safe housing, trauma-informed care, educational
-            support, and legal advocacy — empowering survivors to heal and reclaim their futures.
+            Safira exists to rescue, shelter, and rehabilitate children who have
+            suffered sexual abuse in Brazil. We provide safe housing,
+            trauma-informed care, educational support, and legal advocacy —
+            empowering survivors to heal and reclaim their futures.
           </p>
         </div>
       </section>
