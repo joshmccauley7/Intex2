@@ -119,7 +119,21 @@ const RISK_BADGE: Record<string, string> = {
 
 const PAGE_SIZE = 20
 
+function generateResidentCodes() {
+  const now = new Date()
+  const y = now.getFullYear()
+  const m = String(now.getMonth() + 1).padStart(2, '0')
+  const d = String(now.getDate()).padStart(2, '0')
+  const stamp = `${y}${m}${d}`
+  const unique = `${Date.now()}`.slice(-4)
+  return {
+    caseControlNo: `CCN-${stamp}-${unique}`,
+    internalCode: `RES-${y}-${unique}`,
+  }
+}
+
 const blankForm = (): Partial<ResidentDetail> => ({
+  ...generateResidentCodes(),
   caseStatus: 'Active',
   caseCategory: '',
   currentRiskLevel: 'Medium',
