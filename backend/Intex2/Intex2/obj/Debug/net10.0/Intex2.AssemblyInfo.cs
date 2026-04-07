@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("Intex2")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+8a3222425261fe1928fa628faa7cf46565135802")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+a4ab2685f54ba3e746bac755c78a59275e0709f4")]
 [assembly: System.Reflection.AssemblyProductAttribute("Intex2")]
 [assembly: System.Reflection.AssemblyTitleAttribute("Intex2")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
