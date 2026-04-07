@@ -304,9 +304,11 @@ export default function HomePage() {
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
           <Link to="/" className="text-white hover:text-blue-400 transition-colors">
-          <Link to="/" className="text-white hover:text-blue-400 transition-colors">
             Home
           </Link>
+          <a href="/about" className="hover:text-white transition-colors">
+            About
+          </a>
           <Link to="/impact" className="hover:text-white transition-colors">
             Impact
           </Link>
@@ -586,34 +588,4 @@ export default function HomePage() {
           <p
             style={{
               fontFamily: "'Lora', serif",
-              fontSize: 'clamp(1rem, 2.2vw, 1.2rem)',
-              lineHeight: '1.75',
-              color: '#1e293b',
-              margin: '0 0 1.25rem',
-              fontStyle: 'italic',
-            }}
-          >
-            Every child who walks through our doors carries a story of survival.
-            Our job is to make sure their next chapter is one of hope, healing, and belonging.
-          </p>
-          <p style={{ fontSize: '0.8rem', fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: '#2563eb', margin: 0 }}>
-            — Maria Santos, Founder of Safira
-          </p>
-        </div>
-      </div>
-
-      {/* ── About / Tabbed Content ── */}
-      <section className="bg-slate-50 dark:bg-slate-900 pt-10 pb-4 px-6">
-        <SafiraTabbedContent />
-      </section>
-
-      {/* ── FAQ ── */}
-      <section className="bg-white dark:bg-slate-900 py-4 px-6 border-t border-slate-100 dark:border-slate-800">
-        <FAQAccordion />
-      </section>
-
-      {/* ── Footer ── */}
-      <SiteFooter />
-    </div>
-  );
-}
+    
