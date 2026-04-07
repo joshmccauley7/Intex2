@@ -149,6 +149,27 @@ const RISK_BADGE: Record<string, string> = {
 
 const PAGE_SIZE = 20
 
+function formatAgeFromDates(startDateRaw: string | null | undefined, endDateRaw: string | null | undefined) {
+  if (!startDateRaw || !endDateRaw) return ''
+  const startDate = new Date(startDateRaw)
+  const endDate = new Date(endDateRaw)
+  if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime()) || endDate < startDate) return ''
+
+  let years = endDate.getFullYear() - startDate.getFullYear()
+  let months = endDate.getMonth() - startDate.getMonth()
+  const days = endDate.getDate() - startDate.getDate()
+
+  if (days < 0) months -= 1
+  if (months < 0) {
+    years -= 1
+    months += 12
+  }
+
+  years = Math.max(0, years)
+  months = Math.max(0, months)
+  return `${years} Years ${months} months`
+}
+
 function generateResidentCodesFromExisting(residents: Array<{ caseControlNo: string | null; internalCode: string | null }>) {
   const maxInternal = residents.reduce((max, r) => {
     const match = r.internalCode?.match(/^LS-(\d+)$/i)
@@ -619,6 +640,19 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
       })
       .catch(() => null)
   }, [existing, form.caseControlNo, form.internalCode])
+
+  useEffect(() => {
+    if (!form.dateOfBirth) return
+
+    const presentAge = formatAgeFromDates(form.dateOfBirth, new Date().toISOString().slice(0, 10))
+    const ageUponAdmission = formatAgeFromDates(form.dateOfBirth, form.dateOfAdmission ?? null)
+
+    setForm((f) => ({
+      ...f,
+      presentAge,
+      ageUponAdmission,
+    }))
+  }, [form.dateOfBirth, form.dateOfAdmission])
 
   const set = (field: keyof ResidentDetail, value: unknown) =>
     setForm(f => ({ ...f, [field]: value }))
