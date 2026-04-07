@@ -80,6 +80,14 @@ public class ResidentsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] Resident resident)
     {
+        // Some environments use an imported residents table where resident_id is NOT NULL
+        // but not configured as identity/serial. Ensure a value is always provided.
+        if (resident.ResidentId <= 0)
+        {
+            var maxId = await _db.Residents.MaxAsync(r => (int?)r.ResidentId) ?? 0;
+            resident.ResidentId = maxId + 1;
+        }
+
         resident.CreatedAt = DateTime.UtcNow;
         _db.Residents.Add(resident);
         await _db.SaveChangesAsync();
