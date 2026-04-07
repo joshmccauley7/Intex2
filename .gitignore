@@ -11,6 +11,11 @@ obj/
 .vs/
 *.log
 
+# SQLite identity database
+*.db
+*.db-shm
+*.db-wal
+
 # Node / React
 node_modules/
 dist/

@@ -443,20 +443,17 @@ export default function ImpactDashboard() {
           </Link>
           <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
             <Link to="/" className="hover:text-white transition-colors">Home</Link>
-            <a href="/about" className="hover:text-white transition-colors">About</a>
             <Link to="/impact" className="text-white hover:text-blue-400 transition-colors">Impact</Link>
             <a href="/donate" className="hover:text-white transition-colors">Donate</a>
-            <a href="/contact" className="hover:text-white transition-colors">Contact</a>
           </div>
           <div className="flex items-center gap-3">
             <ThemeToggle />
-            <a
-              href="/donate"
-              className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+            <Link
+              to="/login"
+              className="text-sm font-semibold text-white bg-safira-blue hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
             >
-              <Heart size={16} className="fill-white" />
-              <span className="hidden sm:inline">Donate Now</span>
-            </a>
+              Login
+            </Link>
           </div>
         </div>
       </nav>

@@ -1,19 +1,16 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import '../App.css';
 import { Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import faviconImg from '/favicon.ico';
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
-import ThemeToggle from '../components/theme/ThemeToggle';
+import SiteNav from '../components/layout/SiteNav';
 import SafiraTabbedContent from '../components/SafiraTabbedContent';
 
 // Dynamically import all images from the homepage folder
 const imageModules = import.meta.glob(
   '../images/homepage/*.{jpg,jpeg,png,webp}',
-  {
-    eager: true,
-  }
+  { eager: true }
 ) as Record<string, { default: string }>;
 
 const heroImages = Object.values(imageModules).map((m) => m.default);
@@ -267,7 +264,6 @@ export default function HomePage() {
       .catch(() => null);
   }, []);
 
-  // Preload all carousel images before revealing the hero
   useEffect(() => {
     if (heroImages.length === 0) return;
     let loaded = 0;
@@ -296,40 +292,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
 
-      {/* ── Navbar ── */}
-      <nav className="bg-[#0f172a] dark:bg-slate-950 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800/80">
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-          <img src={faviconImg} alt="Safira logo" style={{ width: 22, height: 22 }} />
-          Safira
-        </Link>
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-          <Link
-            to="/"
-            className="text-white hover:text-blue-400 transition-colors"
-          >
-            Home
-          </Link>
-          <Link to="/impact" className="hover:text-white transition-colors">
-            Impact
-          </Link>
-          <a href="/donate" className="hover:text-white transition-colors">
-            Donate
-          </a>
-          <Link to="/admin/dashboard" className="hover:text-white transition-colors">
-            Admin
-          </Link>
-        </div>
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <a
-            href="/donate"
-            className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            <img src={faviconImg} alt="" style={{ width: 16, height: 16 }} />
-            <span className="hidden sm:inline">Donate Now</span>
-          </a>
-        </div>
-      </nav>
+      <SiteNav />
 
       {/* ── Hero Carousel ── */}
       <section className="relative overflow-hidden" style={{ height: '560px' }}>
@@ -344,7 +307,6 @@ export default function HomePage() {
             }}
           />
         ))}
-        {/* Edge darkening */}
         <div
           className="absolute inset-0"
           style={{
@@ -353,7 +315,7 @@ export default function HomePage() {
           }}
         />
 
-        {/* Text card — left side */}
+        {/* Text card */}
         <div className="relative z-10 h-full flex items-center px-10 md:px-16">
           <div
             className="w-[480px] max-w-[55%] rounded-lg px-8 py-4 hero-animate"
@@ -400,7 +362,6 @@ export default function HomePage() {
             >
               <ChevronRight size={20} />
             </button>
-            {/* Dot indicators */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
               {heroImages.map((_, i) => (
                 <button
@@ -420,50 +381,110 @@ export default function HomePage() {
         )}
       </section>
 
-      {/* ── Stats ── */}
-      <section className="bg-white dark:bg-slate-900 py-12 px-6 border-y border-slate-100 dark:border-slate-800">
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-slate-50 dark:bg-slate-800/80 rounded-xl p-8 text-center border border-slate-100 dark:border-slate-700">
-            <Users className="mx-auto mb-3 text-safira-blue" size={28} />
-            <div className="text-4xl font-bold text-navy-DEFAULT dark:text-slate-100 mb-1">
-              {impact ? `${impact.totalResidents}+` : '—'}
-            </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-              Children Served
-            </div>
+      {/* ── Core Values ── */}
+      <section className="px-6 pt-16 pb-12" style={{ background: '#ffffff' }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-10">
+            <p className="text-xs font-semibold tracking-widest uppercase text-safira-blue mb-2">What we stand for</p>
+            <h2 className="text-3xl font-bold text-[#0f172a] dark:text-white">Our Core Values</h2>
           </div>
-          <div className="bg-slate-50 dark:bg-slate-800/80 rounded-xl p-8 text-center border border-slate-100 dark:border-slate-700">
-            <Home className="mx-auto mb-3 text-safira-blue" size={28} />
-            <div className="text-4xl font-bold text-navy-DEFAULT dark:text-slate-100 mb-1">
-              {impact ? impact.activeSafehouses : '—'}
-            </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-              Safe Homes
-            </div>
-          </div>
-          <div className="bg-slate-50 dark:bg-slate-800/80 rounded-xl p-8 text-center border border-slate-100 dark:border-slate-700">
-            <Shield className="mx-auto mb-3 text-safira-blue" size={28} />
-            <div className="text-4xl font-bold text-navy-DEFAULT dark:text-slate-100 mb-1">
-              100%
-            </div>
-            <div className="text-sm text-slate-500 dark:text-slate-400 font-medium">
-              Mission-Focused
-            </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+            {[
+              { title: 'Safety', desc: 'A stable, nurturing home is the first step. Every child who comes to us is safe from harm from day one.' },
+              { title: 'Restoration', desc: 'We walk alongside each child through their healing journey — at their pace, on their terms, with full dignity.' },
+              { title: 'Justice', desc: 'We support survivors in pursuing what justice means to them — without pressure, with unwavering advocacy.' },
+              { title: 'Empowerment', desc: 'Our goal is to help each child move from surviving to thriving — becoming leaders and advocates for themselves.' },
+            ].map(({ title, desc }) => (
+              <div key={title} className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center border border-slate-100 dark:border-slate-700 shadow-sm">
+                <div
+                  className="mx-auto mb-5 rounded-xl flex items-center justify-center"
+                  style={{ width: 88, height: 88, background: '#f1f5f9', border: '2px dashed #cbd5e1' }}
+                >
+                  <span className="text-slate-300 text-xs select-none">img</span>
+                </div>
+                <h3 className="font-bold text-lg text-[#0f172a] dark:text-white mb-2">{title}</h3>
+                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{desc}</p>
+              </div>
+            ))}
           </div>
         </div>
       </section>
 
-      {/* ── About / Tabbed Content ── */}
-      <section className="bg-slate-50 dark:bg-slate-900 py-4 px-6">
-        <SafiraTabbedContent />
+      {/* ── Motto ── */}
+      <section style={{ background: '#eef4ff' }}>
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row" style={{ minHeight: '440px' }}>
+          <div
+            className="flex-shrink-0 flex items-center justify-center"
+            style={{ width: '100%', maxWidth: '480px', minHeight: '440px', background: '#dce8f7', border: '2px dashed #93c5fd' }}
+          >
+            <span className="text-blue-200 text-sm italic select-none">[ Photo coming soon ]</span>
+          </div>
+          <div className="flex flex-col justify-center px-12 py-14" style={{ flex: 1 }}>
+            <p style={{ fontFamily: "'Lora', serif", fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#2563eb', marginBottom: '1.25rem' }}>
+              Safira Motto
+            </p>
+            <p style={{ fontFamily: "'Lora', serif", fontSize: 'clamp(1.1rem, 2.2vw, 1.4rem)', lineHeight: '1.85', color: '#1e293b', marginBottom: '2rem' }}>
+              We are Safira: full of hope, love, and new beginnings. Our focus is progress
+              in all aspects of life. We treat each other as family where each individual is
+              seen, heard, and loved. We create fun memories, we fight for justice, and we
+              acknowledge God in all we do.
+            </p>
+            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.05em' }}>
+              — The Safira Community
+            </p>
+          </div>
+        </div>
       </section>
+
+      {/* ── Impact Stats ── */}
+      <section
+        className="relative px-6 pt-16 pb-40"
+        style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0e2a5c 55%, #2563eb 100%)' }}
+      >
+        <div className="max-w-4xl mx-auto text-center mb-10">
+          <p className="text-xs font-semibold tracking-widest uppercase text-blue-300 mb-2">By the numbers</p>
+          <h2 className="text-3xl font-bold text-white">Our impact so far</h2>
+        </div>
+        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="rounded-xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <Users className="mx-auto mb-3 text-blue-300" size={28} />
+            <div className="text-4xl font-bold text-white mb-1">{impact ? `${impact.totalResidents}+` : '—'}</div>
+            <div className="text-sm text-blue-200 font-medium">Children Served</div>
+          </div>
+          <div className="rounded-xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <Home className="mx-auto mb-3 text-blue-300" size={28} />
+            <div className="text-4xl font-bold text-white mb-1">{impact ? impact.activeSafehouses : '—'}</div>
+            <div className="text-sm text-blue-200 font-medium">Safe Homes</div>
+          </div>
+          <div className="rounded-xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
+            <Shield className="mx-auto mb-3 text-blue-300" size={28} />
+            <div className="text-4xl font-bold text-white mb-1">100%</div>
+            <div className="text-sm text-blue-200 font-medium">Mission-Focused</div>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Founder Quote (intersecting card) ── */}
+      <div className="relative z-10 px-6" style={{ marginTop: '-6rem', marginBottom: '3rem' }}>
+        <div
+          className="max-w-2xl mx-auto rounded-2xl px-10 py-8 text-center"
+          style={{ background: '#ffffff', boxShadow: '0 8px 40px rgba(15, 23, 42, 0.18)' }}
+        >
+          <span style={{ fontSize: '3rem', lineHeight: 1, color: '#2563eb', fontFamily: 'Georgia, serif', display: 'block', marginBottom: '0.25rem' }}>&ldquo;</span>
+          <p style={{ fontFamily: "'Lora', serif", fontSize: 'clamp(1rem, 2vw, 1.25rem)', lineHeight: '1.8', color: '#1e293b', margin: '0 0 1.5rem' }}>
+            Every child deserves to feel safe, valued, and full of possibility.
+            That is not a dream — it is a right we fight for every single day.
+          </p>
+          <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.05em' }}>— Safira Founders</p>
+        </div>
+      </div>
+
+      {/* ── About Tabs ── */}
+      <SafiraTabbedContent />
 
       {/* ── FAQ ── */}
-      <section className="bg-white dark:bg-slate-900 py-4 px-6 border-t border-slate-100 dark:border-slate-800">
-        <FAQAccordion />
-      </section>
+      <FAQAccordion />
 
-      {/* ── Footer ── */}
       <SiteFooter />
     </div>
   );
