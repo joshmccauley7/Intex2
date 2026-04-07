@@ -1,12 +1,15 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { LogOut } from 'lucide-react';
 import faviconImg from '/favicon.ico';
 import ThemeToggle from '../theme/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
+import ConfirmDialog from '../ui/ConfirmDialog';
 
 export default function SiteNav() {
   const { session, isAdmin, isDonor, logout } = useAuth();
   const navigate = useNavigate();
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   async function handleLogout() {
     await logout();
@@ -40,7 +43,7 @@ export default function SiteNav() {
           <NavLink to="/my-donations" className={linkClass}>My Donations</NavLink>
         )}
         {isAdmin && (
-          <NavLink to="/admin/dashboard" className={linkClass}>Admin</NavLink>
+          <NavLink to="/admin/dashboard" className={linkClass}>Admin Tools</NavLink>
         )}
       </div>
 
@@ -49,6 +52,12 @@ export default function SiteNav() {
         <ThemeToggle />
         {session.isAuthenticated ? (
           <>
+            <Link
+              to="/my-donations"
+              className="text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
+            >
+              My Donations
+            </Link>
             <Link
               to="/profile"
               className="flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
@@ -61,7 +70,7 @@ export default function SiteNav() {
               )}
             </Link>
             <button
-              onClick={handleLogout}
+              onClick={() => setLogoutConfirmOpen(true)}
               title="Sign out"
               className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
             >
@@ -77,6 +86,18 @@ export default function SiteNav() {
           </Link>
         )}
       </div>
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Sign out?"
+        message="Are you sure you want to sign out of your account?"
+        confirmLabel="Sign Out"
+        isDanger={false}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={async () => {
+          setLogoutConfirmOpen(false);
+          await handleLogout();
+        }}
+      />
     </nav>
   );
 }

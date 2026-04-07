@@ -1,12 +1,15 @@
 import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { User, Shield, LogOut } from 'lucide-react';
 import SiteNav from '../components/layout/SiteNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import { useAuth } from '../context/AuthContext';
+import ConfirmDialog from '../components/ui/ConfirmDialog';
 
 export default function ProfilePage() {
   const { session, isAdmin, logout } = useAuth();
   const navigate = useNavigate();
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
 
   async function handleLogout() {
     await logout();
@@ -53,14 +56,14 @@ export default function ProfilePage() {
           <div className="space-y-3">
             {isAdmin && (
               <button
-                onClick={() => navigate('/admin/donors')}
+                onClick={() => navigate('/admin/dashboard')}
                 className="w-full bg-safira-blue hover:bg-blue-700 text-white text-sm font-semibold py-2.5 rounded-lg transition-colors"
               >
                 Go to Admin Portal
               </button>
             )}
             <button
-              onClick={handleLogout}
+              onClick={() => setLogoutConfirmOpen(true)}
               className="w-full flex items-center justify-center gap-2 border border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800 text-slate-600 dark:text-slate-300 text-sm font-medium py-2.5 rounded-lg transition-colors"
             >
               <LogOut size={16} />
@@ -71,6 +74,18 @@ export default function ProfilePage() {
       </main>
 
       <SiteFooter />
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Sign out?"
+        message="Are you sure you want to sign out of your account?"
+        confirmLabel="Sign Out"
+        isDanger={false}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={async () => {
+          setLogoutConfirmOpen(false);
+          await handleLogout();
+        }}
+      />
     </div>
   );
 }
