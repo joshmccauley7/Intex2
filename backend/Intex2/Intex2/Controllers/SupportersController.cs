@@ -122,9 +122,49 @@ public class SupportersController : ControllerBase
         var supporter = await _db.Supporters.FindAsync(id);
         if (supporter == null) return NotFound();
 
-        _db.Supporters.Remove(supporter);
-        await _db.SaveChangesAsync();
-        return NoContent();
+        await using var tx = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            // Remove dependent rows first to avoid FK violations on supporter delete.
+            var donationIds = await _db.Donations
+                .Where(d => d.SupporterId == id)
+                .Select(d => d.DonationId)
+                .ToListAsync();
+
+            if (donationIds.Count > 0)
+            {
+                var inKindItems = await _db.InKindDonationItems
+                    .Where(i => donationIds.Contains(i.DonationId))
+                    .ToListAsync();
+                if (inKindItems.Count > 0)
+                    _db.InKindDonationItems.RemoveRange(inKindItems);
+
+                var donations = await _db.Donations
+                    .Where(d => d.SupporterId == id)
+                    .ToListAsync();
+                _db.Donations.RemoveRange(donations);
+            }
+
+            var churnPredictions = await _db.DonorChurnPredictions
+                .Where(p => p.SupporterId == id)
+                .ToListAsync();
+            if (churnPredictions.Count > 0)
+                _db.DonorChurnPredictions.RemoveRange(churnPredictions);
+
+            _db.Supporters.Remove(supporter);
+            await _db.SaveChangesAsync();
+            await tx.CommitAsync();
+            return NoContent();
+        }
+        catch (DbUpdateException ex)
+        {
+            await tx.RollbackAsync();
+            return Conflict(new
+            {
+                message = "Unable to delete supporter because related records still exist.",
+                detail = ex.InnerException?.Message ?? ex.Message
+            });
+        }
     }
 
     // POST /api/supporters/:id/donations
