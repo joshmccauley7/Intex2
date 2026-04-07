@@ -1,0 +1,9 @@
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\Intex2.csproj.AssemblyReference.cache
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\rpswa.dswa.cache.json
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\Intex2.GeneratedMSBuildEditorConfig.editorconfig
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\Intex2.AssemblyInfoInputs.cache
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\Intex2.AssemblyInfo.cs
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\Intex2.csproj.CoreCompileInputs.cache
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\Intex2.MvcApplicationPartsAssemblyInfo.cs
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\Intex2.MvcApplicationPartsAssemblyInfo.cache
+C:\Users\joshm\Desktop\BYU\Intex2\Intex2\backend\Intex2\Intex2\tempobj\Debug\net10.0\Intex2.sourcelink.json

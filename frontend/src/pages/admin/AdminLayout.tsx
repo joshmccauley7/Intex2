@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { Heart, Users, Home, FileText, MapPin } from 'lucide-react'
+import { Heart, Users, Home, FileText, MapPin, KeyRound } from 'lucide-react'
 
 export default function AdminLayout() {
   const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -36,6 +36,10 @@ export default function AdminLayout() {
           <NavLink to="/admin/home-visitations" className={navClass}>
             <MapPin size={18} />
             Home Visitations
+          </NavLink>
+          <NavLink to="/admin/stripe" className={navClass}>
+            <KeyRound size={18} />
+            Stripe
           </NavLink>
         </nav>
 
