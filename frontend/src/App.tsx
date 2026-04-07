@@ -11,6 +11,7 @@ import AdminLayout from './pages/admin/AdminLayout';
 import DonorsPage from './pages/admin/DonorsPage';
 import ResidentsPage from './pages/admin/ResidentsPage';
 import ProcessRecordingsPage from './pages/admin/ProcessRecordingsPage';
+import HomeVisitationsPage from './pages/admin/HomeVisitationsPage';
 
 export default function App() {
   return (
@@ -28,6 +29,7 @@ export default function App() {
               <Route path="donors" element={<DonorsPage />} />
               <Route path="residents" element={<ResidentsPage />} />
               <Route path="process-recordings" element={<ProcessRecordingsPage />} />
+              <Route path="home-visitations" element={<HomeVisitationsPage />} />
             </Route>
           </Routes>
         </BrowserRouter>
