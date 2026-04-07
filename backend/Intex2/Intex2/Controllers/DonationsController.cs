@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using Stripe;
@@ -5,6 +6,7 @@ using Stripe.Checkout;
 
 [ApiController]
 [Route("api/donations")]
+[Authorize]
 public class DonationsController : ControllerBase
 {
     private readonly AppDbContext _db;
