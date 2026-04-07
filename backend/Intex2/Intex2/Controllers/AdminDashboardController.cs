@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 [ApiController]
 [Route("api/admin/dashboard")]
+[Authorize(Policy = "AdminOnly")]
 public class AdminDashboardController : ControllerBase
 {
     private readonly AppDbContext _db;

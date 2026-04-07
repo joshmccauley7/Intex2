@@ -4,6 +4,7 @@ import { getAuthSession, logoutUser, type AuthSession } from '../api/auth';
 interface AuthContextValue {
   session: AuthSession;
   isAdmin: boolean;
+  isDonor: boolean;
   isLoading: boolean;
   refreshSession: () => Promise<void>;
   logout: () => Promise<void>;
@@ -31,9 +32,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => { refreshSession(); }, [refreshSession]);
 
   const isAdmin = session.isAuthenticated && session.roles.includes('admin');
+  const isDonor = session.isAuthenticated && session.roles.includes('donor');
 
   return (
-    <AuthContext.Provider value={{ session, isAdmin, isLoading, refreshSession, logout }}>
+    <AuthContext.Provider value={{ session, isAdmin, isDonor, isLoading, refreshSession, logout }}>
       {children}
     </AuthContext.Provider>
   );

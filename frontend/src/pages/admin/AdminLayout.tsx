@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard } from 'lucide-react'
+import { Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard, UserCog } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import SiteNav from '../../components/layout/SiteNav'
 
@@ -44,6 +44,10 @@ export default function AdminLayout() {
           <NavLink to="/admin/stripe" className={navClass}>
             <KeyRound size={18} />
             Stripe
+          </NavLink>
+          <NavLink to="/admin/users" className={navClass}>
+            <UserCog size={18} />
+            User Management
           </NavLink>
         </nav>
 

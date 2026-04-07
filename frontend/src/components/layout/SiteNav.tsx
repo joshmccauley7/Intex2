@@ -5,7 +5,7 @@ import ThemeToggle from '../theme/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
 
 export default function SiteNav() {
-  const { session, isAdmin, logout } = useAuth();
+  const { session, isAdmin, isDonor, logout } = useAuth();
   const navigate = useNavigate();
 
   async function handleLogout() {
@@ -17,6 +17,11 @@ export default function SiteNav() {
     isActive
       ? 'text-white hover:text-blue-400 transition-colors'
       : 'text-slate-300 hover:text-white transition-colors';
+
+  const roleLabel = isAdmin ? 'Admin' : isDonor ? 'Donor' : null;
+  const roleBadgeClass = isAdmin
+    ? 'bg-blue-600 text-white'
+    : 'bg-emerald-600 text-white';
 
   return (
     <nav className="bg-[#0f172a] dark:bg-slate-950 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800/80">
@@ -31,6 +36,9 @@ export default function SiteNav() {
         <NavLink to="/" end className={linkClass}>Home</NavLink>
         <NavLink to="/impact" className={linkClass}>Impact</NavLink>
         <NavLink to="/donate" className={linkClass}>Donate</NavLink>
+        {isDonor && !isAdmin && (
+          <NavLink to="/my-donations" className={linkClass}>My Donations</NavLink>
+        )}
         {isAdmin && (
           <NavLink to="/admin/dashboard" className={linkClass}>Admin</NavLink>
         )}
@@ -43,9 +51,14 @@ export default function SiteNav() {
           <>
             <Link
               to="/profile"
-              className="text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
+              className="flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
             >
               {session.userName}
+              {roleLabel && (
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${roleBadgeClass}`}>
+                  {roleLabel}
+                </span>
+              )}
             </Link>
             <button
               onClick={handleLogout}

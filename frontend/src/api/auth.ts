@@ -42,6 +42,23 @@ export async function loginUser(
   return res.json();
 }
 
+export async function registerUser(
+  email: string,
+  password: string,
+  confirmPassword: string,
+  fullName?: string
+): Promise<AuthSession> {
+  const res = await authFetch('/api/auth/register', {
+    method: 'POST',
+    body: JSON.stringify({ email, password, confirmPassword, fullName }),
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body?.message ?? 'Registration failed.');
+  }
+  return res.json();
+}
+
 export async function logoutUser(): Promise<void> {
   await authFetch('/api/auth/logout', { method: 'POST' });
 }

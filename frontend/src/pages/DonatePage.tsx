@@ -1,27 +1,72 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import { Heart } from 'lucide-react';
+import { Link, useSearchParams } from 'react-router-dom';
+import { Heart, LogIn } from 'lucide-react';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
 import SiteNav from '../components/layout/SiteNav';
+import { useAuth } from '../context/AuthContext';
+
+const FORM_STORAGE_KEY = 'safira_donate_form';
+
+interface SavedFormState {
+  fullName: string;
+  email: string;
+  phone: string;
+  amount: string;
+  message: string;
+  frequency: 'one_time' | 'monthly';
+}
+
+function loadSavedForm(): Partial<SavedFormState> {
+  try {
+    const raw = sessionStorage.getItem(FORM_STORAGE_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function saveForm(state: SavedFormState) {
+  try {
+    sessionStorage.setItem(FORM_STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // sessionStorage unavailable
+  }
+}
+
+function clearSavedForm() {
+  try {
+    sessionStorage.removeItem(FORM_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+}
 
 function DonationForm() {
   const stripe = useStripe();
   const elements = useElements();
+  const { session } = useAuth();
 
-  const [fullName, setFullName] = useState('');
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [amount, setAmount] = useState('50');
-  const [message, setMessage] = useState('');
-  const [frequency, setFrequency] = useState<'one_time' | 'monthly'>('one_time');
+  const saved = useMemo(() => loadSavedForm(), []);
+
+  const [fullName, setFullName] = useState(saved.fullName ?? '');
+  const [email, setEmail] = useState(saved.email ?? session.userName ?? '');
+  const [phone, setPhone] = useState(saved.phone ?? '');
+  const [amount, setAmount] = useState(saved.amount ?? '50');
+  const [message, setMessage] = useState(saved.message ?? '');
+  const [frequency, setFrequency] = useState<'one_time' | 'monthly'>(saved.frequency ?? 'one_time');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const amountValue = useMemo(() => Number(amount), [amount]);
+
+  // Clear saved form once we've loaded it on the donate page (user is authenticated)
+  useEffect(() => {
+    clearSavedForm();
+  }, []);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -237,6 +282,333 @@ function DonationForm() {
   );
 }
 
+function AuthGateBanner({
+  fullName, email, phone, amount, message, frequency,
+}: {
+  fullName: string; email: string; phone: string; amount: string; message: string;
+  frequency: 'one_time' | 'monthly';
+}) {
+  function handleSaveAndRedirect(path: string) {
+    saveForm({ fullName, email, phone, amount, message, frequency });
+    window.location.href = path;
+  }
+
+  return (
+    <div className="rounded-xl border border-blue-200 bg-blue-50 dark:bg-blue-950/40 dark:border-blue-800 p-5 flex flex-col gap-3">
+      <div className="flex items-start gap-3">
+        <LogIn size={20} className="text-safira-blue mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-[#0f172a] dark:text-white">
+            Sign in to complete your donation
+          </p>
+          <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">
+            You need a free account to donate. Your form details will be saved and
+            restored when you return.
+          </p>
+        </div>
+      </div>
+      <div className="flex gap-2 flex-wrap">
+        <button
+          type="button"
+          onClick={() => handleSaveAndRedirect(`/register?returnTo=${encodeURIComponent('/donate')}`)}
+          className="bg-safira-blue text-white text-sm font-semibold px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
+        >
+          Create Account
+        </button>
+        <button
+          type="button"
+          onClick={() => handleSaveAndRedirect(`/login?returnTo=${encodeURIComponent('/donate')}`)}
+          className="border border-safira-blue text-safira-blue text-sm font-semibold px-4 py-2 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900 transition-colors"
+        >
+          Sign In
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DonationFormWithGate() {
+  const { session, isLoading } = useAuth();
+  const stripe = useStripe();
+  const elements = useElements();
+
+  const saved = useMemo(() => loadSavedForm(), []);
+
+  const [fullName, setFullName] = useState(saved.fullName ?? '');
+  const [email, setEmail] = useState(saved.email ?? '');
+  const [phone, setPhone] = useState(saved.phone ?? '');
+  const [amount, setAmount] = useState(saved.amount ?? '50');
+  const [message, setMessage] = useState(saved.message ?? '');
+  const [frequency, setFrequency] = useState<'one_time' | 'monthly'>(saved.frequency ?? 'one_time');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [status, setStatus] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [showGate, setShowGate] = useState(false);
+
+  const amountValue = useMemo(() => Number(amount), [amount]);
+
+  const isAuthenticated = session.isAuthenticated;
+
+  // Pre-fill email from logged-in session once available
+  useEffect(() => {
+    if (session.isAuthenticated && session.userName && !email) {
+      setEmail(session.userName);
+    }
+  }, [session.isAuthenticated, session.userName, email]);
+
+  // Clear saved form once user is authenticated and on this page
+  useEffect(() => {
+    if (session.isAuthenticated) {
+      clearSavedForm();
+    }
+  }, [session.isAuthenticated]);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    setStatus(null);
+
+    if (!isAuthenticated) {
+      setShowGate(true);
+      return;
+    }
+
+    if (!stripe || !elements) {
+      setError('Payment service is still loading. Please try again.');
+      return;
+    }
+    if (!fullName.trim() || !email.trim() || !phone.trim() || !amountValue || amountValue <= 0) {
+      setError('Please enter your full name, email, phone, and a valid amount.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      if (frequency === 'monthly') {
+        const base = `${window.location.origin}/donate`;
+        const createSession = await apiFetch('/api/donations/create-recurring-session', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            amountUsd: amountValue,
+            fullName: fullName.trim(),
+            email: email.trim(),
+            phone: phone.trim(),
+            message: message.trim(),
+            successUrl: `${base}?success=1&mode=monthly&session_id={CHECKOUT_SESSION_ID}`,
+            cancelUrl: `${base}?canceled=1&mode=monthly`,
+          }),
+        });
+        if (!createSession.checkoutUrl) {
+          throw new Error('Unable to open Stripe checkout.');
+        }
+        window.location.href = createSession.checkoutUrl as string;
+        return;
+      }
+
+      const create = await apiFetch('/api/donations/create-payment-intent', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amountUsd: amountValue,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          message: message.trim(),
+        }),
+      });
+
+      const card = elements.getElement(CardElement);
+      if (!card) throw new Error('Card input is not ready.');
+
+      const result = await stripe.confirmCardPayment(create.clientSecret, {
+        payment_method: {
+          card,
+          billing_details: {
+            name: fullName.trim(),
+            email: email.trim(),
+          },
+        },
+      });
+
+      if (result.error) {
+        throw new Error(result.error.message ?? 'Payment failed.');
+      }
+      if (result.paymentIntent?.status !== 'succeeded') {
+        throw new Error('Payment did not complete. Please try again.');
+      }
+
+      await apiFetch('/api/donations/record-success', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          paymentIntentId: result.paymentIntent.id,
+          amountUsd: amountValue,
+          isRecurring: false,
+          fullName: fullName.trim(),
+          email: email.trim(),
+          phone: phone.trim(),
+          message: message.trim(),
+        }),
+      });
+
+      setStatus('Thank you! Your donation was successful.');
+      setMessage('');
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Donation failed. Please try again.';
+      setError(msg);
+    } finally {
+      setIsSubmitting(false);
+    }
+  }
+
+  if (isLoading) {
+    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>;
+  }
+
+  return (
+    <div className="space-y-4">
+      {!isAuthenticated && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50 dark:bg-amber-950/30 dark:border-amber-800 p-4 text-sm text-amber-800 dark:text-amber-200">
+          <span className="font-semibold">Account required to donate.</span>{' '}
+          <Link to={`/register?returnTo=/donate`} className="underline font-medium">Create a free account</Link>
+          {' '}or{' '}
+          <Link to={`/login?returnTo=/donate`} className="underline font-medium">sign in</Link>
+          {' '}— your form will be saved.
+        </div>
+      )}
+
+      {showGate && (
+        <AuthGateBanner
+          fullName={fullName}
+          email={email}
+          phone={phone}
+          amount={amount}
+          message={message}
+          frequency={frequency}
+        />
+      )}
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <label className="block text-sm font-medium mb-1">Full name</label>
+          <input
+            value={fullName}
+            onChange={(e) => setFullName(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
+            placeholder="Jane Doe"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Email</label>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
+            placeholder="you@example.com"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Phone number</label>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
+            placeholder="+1 (555) 123-4567"
+            required
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Donation type</label>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setFrequency('one_time')}
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                frequency === 'one_time'
+                  ? 'border-safira-blue bg-cyan-50 text-safira-blue'
+                  : 'border-slate-300 dark:border-slate-700'
+              }`}
+            >
+              One-time
+            </button>
+            <button
+              type="button"
+              onClick={() => setFrequency('monthly')}
+              className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
+                frequency === 'monthly'
+                  ? 'border-safira-blue bg-cyan-50 text-safira-blue'
+                  : 'border-slate-300 dark:border-slate-700'
+              }`}
+            >
+              Recurring Monthly
+            </button>
+          </div>
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Donation amount (USD)</label>
+          <input
+            type="number"
+            min="1"
+            step="1"
+            value={amount}
+            onChange={(e) => setAmount(e.target.value)}
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
+            required
+          />
+        </div>
+        {frequency === 'one_time' && (
+          <div>
+            <label className="block text-sm font-medium mb-1">Card details</label>
+            <div className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-3">
+              <CardElement
+                options={{
+                  style: {
+                    base: {
+                      fontSize: '16px',
+                      color: '#0f172a',
+                    },
+                  },
+                }}
+              />
+            </div>
+          </div>
+        )}
+        <div>
+          <label className="block text-sm font-medium mb-1">Message (optional)</label>
+          <textarea
+            value={message}
+            onChange={(e) => setMessage(e.target.value)}
+            rows={3}
+            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
+            placeholder="In honor of..."
+          />
+        </div>
+
+        {error && <p className="text-sm text-rose-600">{error}</p>}
+        {status && <p className="text-sm text-emerald-600">{status}</p>}
+
+        <button
+          type="submit"
+          disabled={isSubmitting || (!isAuthenticated ? false : !stripe)}
+          className="inline-flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark disabled:opacity-60 text-white font-semibold px-6 py-3 rounded-lg transition-colors"
+        >
+          <Heart size={16} className="fill-white" />
+          {isSubmitting
+            ? 'Processing...'
+            : frequency === 'monthly'
+            ? `Start Monthly $${amountValue || 0}`
+            : `Donate $${amountValue || 0}`}
+        </button>
+      </form>
+    </div>
+  );
+}
+
 export default function DonatePage() {
   const [searchParams] = useSearchParams();
   const [stripePromise, setStripePromise] = useState<ReturnType<typeof loadStripe> | null>(null);
@@ -301,7 +673,7 @@ export default function DonatePage() {
             <p className="text-sm text-slate-500 dark:text-slate-400">Loading secure payment form...</p>
           ) : (
             <Elements stripe={stripePromise}>
-              <DonationForm />
+              <DonationFormWithGate />
             </Elements>
           )}
         </section>

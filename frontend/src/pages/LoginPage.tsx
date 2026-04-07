@@ -1,12 +1,17 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { loginUser } from '../api/auth';
 import { useAuth } from '../context/AuthContext';
+import SiteNav from '../components/layout/SiteNav';
+import SiteFooter from '../components/layout/SiteFooter';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { refreshSession } = useAuth();
+  const [searchParams] = useSearchParams();
+  const { refreshSession, isAdmin } = useAuth();
+
+  const returnTo = searchParams.get('returnTo');
 
   const [userName, setUserName] = useState('');
   const [password, setPassword] = useState('');
@@ -21,7 +26,14 @@ export default function LoginPage() {
     try {
       await loginUser(userName, password, rememberMe);
       await refreshSession();
-      navigate('/admin/donors');
+
+      if (returnTo) {
+        navigate(returnTo, { replace: true });
+      } else if (isAdmin) {
+        navigate('/admin/dashboard', { replace: true });
+      } else {
+        navigate('/', { replace: true });
+      }
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Login failed.');
     } finally {
@@ -30,8 +42,10 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
-      <div className="w-full max-w-sm bg-white rounded-2xl shadow-lg p-8">
+    <div className="min-h-screen flex flex-col bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      <SiteNav />
+      <main className="flex-1 flex items-center justify-center p-4">
+      <div className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-2xl shadow-lg p-8">
         {/* Logo */}
         <div className="flex items-center justify-center gap-2 mb-8">
           <Heart className="text-safira-blue fill-safira-blue" size={24} />
@@ -39,16 +53,16 @@ export default function LoginPage() {
         </div>
 
         <h1 className="text-2xl font-semibold text-[#0f172a] text-center mb-1">
-          Staff Login
+          Sign In
         </h1>
         <p className="text-sm text-slate-500 text-center mb-6">
-          Admin access only. New accounts are created by an administrator.
+          Sign in to your Safira account.
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Username
+              Email / Username
             </label>
             <input
               type="text"
@@ -102,12 +116,19 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center mt-6">
-          <a href="/" className="text-sm text-slate-400 hover:text-slate-600 transition-colors">
-            ← Back to site
-          </a>
+        <p className="text-center mt-5 text-sm text-slate-500">
+          Don't have an account?{' '}
+          <Link
+            to={returnTo ? `/register?returnTo=${encodeURIComponent(returnTo)}` : '/register'}
+            className="text-safira-blue hover:underline font-medium"
+          >
+            Create one free
+          </Link>
         </p>
+
       </div>
+      </main>
+      <SiteFooter />
     </div>
   );
 }
