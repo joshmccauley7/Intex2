@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api'
-import { Users, Home, Heart, AlertTriangle, Calendar, TrendingUp, Activity, BookOpen, MessageSquare, ShieldAlert } from 'lucide-react'
+import { Users, Home, Heart, AlertTriangle, Calendar, TrendingUp, Activity, BookOpen, MessageSquare, ShieldAlert, Percent } from 'lucide-react'
 
 interface DashboardData {
   activeResidents: number
@@ -38,6 +38,9 @@ interface DashboardData {
   enrollmentCounts: { status: string | null; count: number }[]
   counselingCounts: { sessionType: string | null; count: number }[]
   activeRiskCounts: { riskLevel: string | null; count: number }[]
+  /** % of active donors with ≥1 donation in the rolling last 3 months; null if there are no active donors. */
+  donorOkrPercent: number | null
+  donorOkrRecentCount: number
 }
 
 const CHURN_BADGE: Record<string, string> = {
@@ -76,6 +79,38 @@ export default function AdminDashboardPage() {
       <div>
         <h1 className="text-2xl font-bold text-[#0f172a]">Dashboard</h1>
         <p className="text-sm text-slate-500 mt-1">Operations overview for Safira staff</p>
+      </div>
+
+      {/* Primary OKR — same card shell and hierarchy as StatCard (label → value → sub), plus context below */}
+      <div className="bg-white rounded-xl border border-slate-200 p-5">
+        <div className="flex items-center gap-2 mb-3">
+          <Percent size={20} className="text-safira-blue" />
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+            Donors active in last 3 mo.
+          </span>
+        </div>
+        {data.donorOkrPercent != null ? (
+          <>
+            <div className="text-3xl font-bold tabular-nums text-[#0f172a]">
+              {data.donorOkrPercent.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+              <span className="text-xl font-bold text-slate-600">%</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Primary OKR — {data.donorOkrRecentCount} of {data.activeDonors} active donor
+              {data.activeDonors === 1 ? '' : 's'} with a donation in the last 3 months
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="text-3xl font-bold text-slate-400">—</div>
+            <p className="text-xs text-slate-400 mt-1">No active donors to measure yet.</p>
+          </>
+        )}
+        <p className="text-xs text-slate-600 mt-3 leading-relaxed border-t border-slate-100 pt-3">
+          <span className="font-medium text-[#0f172a]">Why this matters most:</span> Mission delivery depends on steady
+          funding. The share of donors who gave recently reflects engagement and predictable support better than total
+          donor count alone—so we prioritize keeping supporters connected, not just growing the list.
+        </p>
       </div>
 
       {/* ── Stat cards ── */}
