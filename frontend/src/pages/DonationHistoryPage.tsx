@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { Fragment, useEffect, useState } from 'react';
 import { Heart } from 'lucide-react';
 import SiteNav from '../components/layout/SiteNav';
 import SiteFooter from '../components/layout/SiteFooter';
@@ -14,6 +14,16 @@ interface Donation {
   campaignName: string | null;
   channelSource: string | null;
   notes: string | null;
+  allocations: DonationAllocation[];
+}
+
+interface DonationAllocation {
+  allocationId: number;
+  safehouseId: number | null;
+  programArea: string | null;
+  amountAllocated: number | null;
+  allocationDate: string | null;
+  allocationNotes: string | null;
 }
 
 interface Supporter {
@@ -44,6 +54,7 @@ export default function DonationHistoryPage() {
   const [data, setData] = useState<MyDonationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const firstDonationDate = data?.supporter?.firstDonationDate ?? null;
 
   useEffect(() => {
     apiFetch('/api/auth/my-donations')
@@ -122,34 +133,58 @@ export default function DonationHistoryPage() {
                     </thead>
                     <tbody>
                       {data.donations.map((d) => (
-                        <tr
-                          key={d.donationId}
-                          className="border-b border-slate-100 dark:border-slate-800 last:border-0 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                        >
-                          <td className="px-4 py-3 text-[#0f172a] dark:text-white font-medium whitespace-nowrap">
-                            {formatDate(d.donationDate)}
-                          </td>
-                          <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
-                            {d.donationType}
-                          </td>
-                          <td className="px-4 py-3 font-semibold text-safira-blue">
-                            {formatAmount(d.amount, d.currencyCode)}
-                          </td>
-                          <td className="px-4 py-3 text-slate-500 dark:text-slate-400 hidden sm:table-cell">
-                            {d.campaignName ?? '—'}
-                          </td>
-                          <td className="px-4 py-3 hidden md:table-cell">
-                            {d.isRecurring ? (
-                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
-                                Monthly
-                              </span>
-                            ) : (
-                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
-                                One-time
-                              </span>
-                            )}
-                          </td>
-                        </tr>
+                        <Fragment key={d.donationId}>
+                          <tr
+                            className="border-b border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                          >
+                            <td className="px-4 py-3 text-[#0f172a] dark:text-white font-medium whitespace-nowrap">
+                              {formatDate(d.donationDate)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-600 dark:text-slate-300">
+                              {d.donationType}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-safira-blue">
+                              {formatAmount(d.amount, d.currencyCode)}
+                            </td>
+                            <td className="px-4 py-3 text-slate-500 dark:text-slate-400 hidden sm:table-cell">
+                              {d.campaignName ?? '—'}
+                            </td>
+                            <td className="px-4 py-3 hidden md:table-cell">
+                              {d.isRecurring ? (
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300">
+                                  Monthly
+                                </span>
+                              ) : (
+                                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400">
+                                  One-time
+                                </span>
+                              )}
+                            </td>
+                          </tr>
+                          <tr className="border-b border-slate-100 dark:border-slate-800 last:border-0">
+                            <td colSpan={5} className="px-4 pb-3 pt-0">
+                              {d.allocations.length === 0 ? (
+                                <p className="text-xs text-slate-400 dark:text-slate-500">No recorded allocations for this donation.</p>
+                              ) : (
+                                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/40 p-3 mt-1">
+                                  <p className="text-xs font-semibold text-slate-500 dark:text-slate-400 mb-2">Allocations</p>
+                                  <div className="space-y-2">
+                                    {d.allocations.map((a) => (
+                                      <div key={a.allocationId} className="text-xs text-slate-600 dark:text-slate-300">
+                                        <span className="font-semibold">{a.programArea ?? 'General'}</span>
+                                        {' · '}
+                                        <span>{formatAmount(a.amountAllocated, d.currencyCode)}</span>
+                                        {a.safehouseId != null && <span>{` · Safehouse #${a.safehouseId}`}</span>}
+                                        {a.allocationDate && <span>{` · ${formatDate(a.allocationDate)}`}</span>}
+                                        {a.allocationNotes && <span>{` · ${a.allocationNotes}`}</span>}
+                                      </div>
+                                    ))}
+                                  </div>
+                                </div>
+                              )}
+                            </td>
+                          </tr>
+                        </Fragment>
                       ))}
                     </tbody>
                   </table>
@@ -176,11 +211,11 @@ export default function DonationHistoryPage() {
                       )}
                     </p>
                   </div>
-                  {data.supporter.firstDonationDate && (
+                  {firstDonationDate && (
                     <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 px-5 py-4">
                       <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">First donation</p>
                       <p className="text-xl font-bold text-[#0f172a] dark:text-white">
-                        {formatDate(data.supporter.firstDonationDate)}
+                        {formatDate(firstDonationDate)}
                       </p>
                     </div>
                   )}
