@@ -20,19 +20,27 @@ public static class AdminSeeder
         // Seed admin user from config (or defaults)
         var username = config["AdminSeed:UserName"] ?? "admin";
         var email    = config["AdminSeed:Email"]    ?? "admin@safira.org";
-        var password = config["AdminSeed:Password"] ?? "Admin1234!admin";
+        var password = config["AdminSeed:Password"] ?? "adminadminadmin";
 
         var existing = await userManager.FindByNameAsync(username);
         if (existing == null)
         {
             var user = new ApplicationUser { UserName = username, Email = email };
             var result = await userManager.CreateAsync(user, password);
-            if (result.Succeeded)
-                await userManager.AddToRoleAsync(user, AdminRole);
+            if (!result.Succeeded)
+                throw new Exception($"AdminSeeder failed to create admin user: {string.Join(", ", result.Errors.Select(e => e.Description))}");
+            await userManager.AddToRoleAsync(user, AdminRole);
         }
-        else if (!await userManager.IsInRoleAsync(existing, AdminRole))
+        else
         {
-            await userManager.AddToRoleAsync(existing, AdminRole);
+            // Always reset password on startup so config changes take effect
+            var token = await userManager.GeneratePasswordResetTokenAsync(existing);
+            var resetResult = await userManager.ResetPasswordAsync(existing, token, password);
+            if (!resetResult.Succeeded)
+                throw new Exception($"AdminSeeder failed to reset admin password: {string.Join(", ", resetResult.Errors.Select(e => e.Description))}");
+
+            if (!await userManager.IsInRoleAsync(existing, AdminRole))
+                await userManager.AddToRoleAsync(existing, AdminRole);
         }
     }
 }

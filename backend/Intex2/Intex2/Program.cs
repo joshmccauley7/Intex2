@@ -50,21 +50,19 @@ else
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
-// ─── Identity database (SQLite) ──────────────────────────────────────────────
-var identityDb = builder.Configuration.GetConnectionString("IdentityConnection")
-    ?? "Data Source=identity.db";
-
+// ─── Identity database (PostgreSQL — same server as app DB) ──────────────────
 builder.Services.AddDbContext<AuthIdentityDbContext>(options =>
-    options.UseSqlite(identityDb));
+    options.UseNpgsql(connectionString));
 
 // ─── ASP.NET Core Identity ───────────────────────────────────────────────────
 builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 {
-    options.Password.RequiredLength = 12;
-    options.Password.RequireUppercase = true;
-    options.Password.RequireDigit = true;
-    options.Password.RequireLowercase = true;
-    options.Password.RequireNonAlphanumeric = true;
+    // Passphrase policy per IS 414 Video 7 — length only, no complexity rules
+    options.Password.RequiredLength = 14;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireNonAlphanumeric = false;
 })
 .AddEntityFrameworkStores<AuthIdentityDbContext>()
 .AddDefaultTokenProviders();
