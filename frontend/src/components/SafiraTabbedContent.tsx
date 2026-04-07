@@ -82,7 +82,7 @@ const tabs: Tab[] = [
 export default function SafiraTabbedContent() {
   const [activeId, setActiveId] = useState<string>("about");
   const active = tabs.find((t) => t.id === activeId) as Tab;
-  const { heading, body, accent, accentLight, image, imageAlt } =
+  const { heading, body, accent, image, imageAlt } =
     active.content;
 
   return (
