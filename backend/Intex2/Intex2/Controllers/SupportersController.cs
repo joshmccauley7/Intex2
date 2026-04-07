@@ -43,7 +43,10 @@ public class SupportersController : ControllerBase
                     x.s.Status,
                     x.s.Region,
                     x.s.Email,
-                    x.s.FirstDonationDate,
+                    MostRecentDonationDate = _db.Donations
+                        .Where(d => d.SupporterId == x.s.SupporterId)
+                        .Select(d => (DateOnly?)d.DonationDate)
+                        .Max(),
                     ChurnRiskLevel = p != null ? p.RiskLevel : null,
                     ChurnProbability = p != null ? (decimal?)p.ChurnProbability : null
                 })
