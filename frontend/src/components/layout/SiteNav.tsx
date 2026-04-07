@@ -53,6 +53,12 @@ export default function SiteNav() {
         {session.isAuthenticated ? (
           <>
             <Link
+              to="/my-donations"
+              className="text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
+            >
+              My Donations
+            </Link>
+            <Link
               to="/profile"
               className="flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
             >
