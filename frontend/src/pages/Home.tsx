@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import '../App.css';
-import { Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import safiraLogoImg from '../images/safira cropped.png';
 import faviconImg from '/favicon.ico';
 import valuesSafetyImg from '../images/values/safety.jpg';
 import valuesRestorationImg from '../images/values/restoration.jpg';
 import valuesJusticeImg from '../images/values/justice.png';
 import valuesEmpowermentImg from '../images/values/empowerment.jpg';
-import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
 import SiteNav from '../components/layout/SiteNav';
 import SafiraTabbedContent from '../components/SafiraTabbedContent';
@@ -18,19 +18,6 @@ const imageModules = import.meta.glob(
 ) as Record<string, { default: string }>;
 
 const heroImages = Object.values(imageModules).map((m) => m.default);
-
-// ─────────────────────────────────────────────
-// Types
-// ─────────────────────────────────────────────
-interface ImpactSummary {
-  latestSnapshot: {
-    snapshotId: number;
-    snapshotDate: string;
-    summaryText: string;
-  } | null;
-  activeSafehouses: number;
-  totalResidents: number;
-}
 
 // ─────────────────────────────────────────────
 // FAQ Data
@@ -258,15 +245,8 @@ function FAQAccordion() {
 // Home Page
 // ─────────────────────────────────────────────
 export default function HomePage() {
-  const [impact, setImpact] = useState<ImpactSummary | null>(null);
   const [currentImg, setCurrentImg] = useState(0);
   const [imagesReady, setImagesReady] = useState(heroImages.length === 0);
-
-  useEffect(() => {
-    apiFetch('/api/impact/summary')
-      .then(setImpact)
-      .catch(() => null);
-  }, []);
 
   useEffect(() => {
     if (heroImages.length === 0) return;
@@ -386,55 +366,78 @@ export default function HomePage() {
       </section>
 
       {/* ── Core Values ── */}
-      <section className="px-6 pt-16 pb-12" style={{ background: '#ffffff' }}>
-        <div className="max-w-5xl mx-auto">
-          <div className="text-center mb-10">
-            <p className="text-xs font-semibold tracking-widest uppercase text-safira-blue mb-2">What we stand for</p>
-            <h2 className="text-3xl font-bold text-[#0f172a] dark:text-white">Our Core Values</h2>
+      <section className="px-6 pt-20 pb-16" style={{ background: '#ffffff' }}>
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-12">
+            <p className="text-sm font-semibold tracking-widest uppercase text-safira-blue mb-3">What we stand for</p>
+            <h2 className="text-4xl font-bold text-[#0f172a] dark:text-white">Our Core Values</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
             {[
               { title: 'Safety', desc: 'A stable, nurturing home is the first step. Every child who comes to us is safe from harm from day one.', img: valuesSafetyImg, imgAlt: 'Shield with clasped hands — Safety' },
               { title: 'Restoration', desc: 'We walk alongside each child through their healing journey — at their pace, on their terms, with full dignity.', img: valuesRestorationImg, imgAlt: 'Hands holding a growing plant — Restoration' },
               { title: 'Justice', desc: 'We support survivors in pursuing what justice means to them — without pressure, with unwavering advocacy.', img: valuesJusticeImg, imgAlt: 'Scales of justice with laurel wreath — Justice' },
               { title: 'Empowerment', desc: 'Our goal is to help each child move from surviving to thriving — becoming leaders and advocates for themselves.', img: valuesEmpowermentImg, imgAlt: 'Raised fist with rays of light — Empowerment' },
             ].map(({ title, desc, img, imgAlt }) => (
-              <div key={title} className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center border border-slate-100 dark:border-slate-700 shadow-sm">
-                <div className="mx-auto mb-5 flex items-center justify-center" style={{ width: 88, height: 88 }}>
-                  <img src={img} alt={imgAlt} style={{ width: 88, height: 88, objectFit: 'contain', borderRadius: '0.75rem' }} />
+              <div key={title} className="bg-white dark:bg-slate-800 rounded-2xl p-9 text-center border border-slate-100 dark:border-slate-700 shadow-sm">
+                <div className="mx-auto mb-6 flex items-center justify-center" style={{ width: 132, height: 132 }}>
+                  <img src={img} alt={imgAlt} style={{ width: 132, height: 132, objectFit: 'contain', borderRadius: '0.75rem' }} />
                 </div>
-                <h3 className="font-bold text-lg text-[#0f172a] dark:text-white mb-2">{title}</h3>
-                <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{desc}</p>
+                <h3 className="font-bold text-2xl text-[#0f172a] dark:text-white mb-3">{title}</h3>
+                <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
         </div>
       </section>
 
-      {/* ── Impact Stats ── */}
+      {/* ── Why Safira ── */}
       <section
-        className="relative px-6 pt-16 pb-40"
+        className="relative px-2 pt-16 pb-40"
         style={{ background: 'linear-gradient(135deg, #0f172a 0%, #0e2a5c 55%, #2563eb 100%)' }}
       >
-        <div className="max-w-4xl mx-auto text-center mb-10">
-          <p className="text-xs font-semibold tracking-widest uppercase text-blue-300 mb-2">By the numbers</p>
-          <h2 className="text-3xl font-bold text-white">Our impact so far</h2>
-        </div>
-        <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="rounded-xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-            <Users className="mx-auto mb-3 text-blue-300" size={28} />
-            <div className="text-4xl font-bold text-white mb-1">{impact ? `${impact.totalResidents}+` : '—'}</div>
-            <div className="text-sm text-blue-200 font-medium">Children Served</div>
-          </div>
-          <div className="rounded-xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-            <Home className="mx-auto mb-3 text-blue-300" size={28} />
-            <div className="text-4xl font-bold text-white mb-1">{impact ? impact.activeSafehouses : '—'}</div>
-            <div className="text-sm text-blue-200 font-medium">Safe Homes</div>
-          </div>
-          <div className="rounded-xl p-8 text-center" style={{ background: 'rgba(255,255,255,0.08)', border: '1px solid rgba(255,255,255,0.12)' }}>
-            <Shield className="mx-auto mb-3 text-blue-300" size={28} />
-            <div className="text-4xl font-bold text-white mb-1">100%</div>
-            <div className="text-sm text-blue-200 font-medium">Mission-Focused</div>
+        <div className="max-w-6xl mx-auto">
+          <div
+            className="flex flex-col md:flex-row items-center gap-12"
+          >
+            {/* Image — left column */}
+            <div className="w-full md:w-1/2 flex-shrink-0 flex justify-center">
+              <div
+                className="rounded-2xl overflow-hidden"
+                style={{
+                  boxShadow: '0 12px 48px rgba(0,0,0,0.45)',
+                  border: '2px solid rgba(255,255,255,0.12)',
+                  maxWidth: '620px',
+                  width: '100%',
+                }}
+              >
+                <img
+                  src={safiraLogoImg}
+                  alt="Safira — the sapphire that stands for protection"
+                  style={{ width: '100%', height: 'auto', display: 'block' }}
+                />
+              </div>
+            </div>
+
+            {/* Text — right column */}
+            <div className="w-full md:w-1/2">
+              <p className="text-xs font-semibold tracking-widest uppercase text-blue-300 mb-3">
+                The name behind the mission
+              </p>
+              <h2
+                className="text-4xl md:text-5xl font-bold text-white mb-6"
+                style={{ lineHeight: '1.15' }}
+              >
+                Why we chose{' '}
+                <span style={{ color: '#93c5fd', fontStyle: 'italic' }}>Safira</span>
+              </h2>
+              <p
+                className="text-blue-100"
+                style={{ fontSize: '1.25rem', lineHeight: '1.75' }}
+              >
+                <em>Safira</em> is the Portuguese word for <strong style={{ color: '#fff' }}>sapphire</strong> — a symbol of protection and dignity. Every child who walks through our doors carries that same inherent worth. <strong style={{ color: '#fff' }}>Safira is our promise</strong> to guard and reflect that truth.
+              </p>
+            </div>
           </div>
         </div>
       </section>
