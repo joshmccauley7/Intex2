@@ -1,10 +1,13 @@
 import { Outlet, NavLink } from 'react-router-dom'
+import { useState } from 'react'
 import { Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard, UserCog } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import SiteNav from '../../components/layout/SiteNav'
+import ConfirmDialog from '../../components/ui/ConfirmDialog'
 
 export default function AdminLayout() {
   const { session, logout } = useAuth()
+  const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
@@ -59,7 +62,7 @@ export default function AdminLayout() {
             </p>
           )}
           <button
-            onClick={logout}
+            onClick={() => setLogoutConfirmOpen(true)}
             className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-[#1e293b]"
           >
             <LogOut size={16} />
@@ -73,6 +76,18 @@ export default function AdminLayout() {
         <Outlet />
       </main>
     </div>
+      <ConfirmDialog
+        open={logoutConfirmOpen}
+        title="Sign out?"
+        message="Are you sure you want to sign out of your account?"
+        confirmLabel="Sign Out"
+        isDanger={false}
+        onCancel={() => setLogoutConfirmOpen(false)}
+        onConfirm={async () => {
+          setLogoutConfirmOpen(false)
+          await logout()
+        }}
+      />
     </div>
   )
 }
