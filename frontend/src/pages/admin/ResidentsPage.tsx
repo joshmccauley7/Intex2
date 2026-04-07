@@ -68,6 +68,41 @@ interface ResidentDetail {
 }
 
 const SAFEHOUSES = [1,2,3,4,5,6,7,8,9].map(i => ({ id: i, name: `Lighthouse Safehouse ${i}` }))
+const BIRTH_STATUS_OPTIONS = ['Legitimate', 'Illegitimate', 'Unknown']
+const INITIAL_CASE_ASSESSMENT_OPTIONS = [
+  'Pending',
+  'For Initial Interview',
+  'Under Assessment',
+  'Assessment Completed',
+]
+const REFERRAL_SOURCE_OPTIONS = [
+  'DSWD',
+  'LGU',
+  'PNP',
+  'NGO',
+  'School',
+  'Hospital',
+  'Walk-in',
+  'Court Order',
+  'Other',
+]
+const REFERRING_AGENCY_PERSON_OPTIONS = [
+  'DSWD Social Worker',
+  'Police Officer',
+  'Barangay Officer',
+  'School Counselor',
+  'Hospital Social Worker',
+  'NGO Case Worker',
+  'Family Member',
+  'Other',
+]
+const ASSIGNED_SOCIAL_WORKER_OPTIONS = [
+  'Ana Santos',
+  'Maria Cruz',
+  'Grace Reyes',
+  'Joan Mendoza',
+  'Liza Garcia',
+]
 
 const STATUS_BADGE: Record<string, string> = {
   Active: 'bg-green-100 text-green-700',
@@ -536,6 +571,17 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
     </FormField>
   )
 
+  const selectField = (label: string, field: keyof ResidentDetail, options: string[]) => (
+    <FormField label={label}>
+      <select className={inputClass} value={(form[field] as string) ?? ''} onChange={(e) => set(field, e.target.value || null)}>
+        <option value="">Select</option>
+        {options.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </select>
+    </FormField>
+  )
+
   const checkbox = (label: string, field: keyof ResidentDetail) => (
     <label key={field} className="flex items-center gap-2 text-sm text-slate-700 mb-2 cursor-pointer">
       <input
@@ -598,7 +644,7 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
           </select>
         </FormField>
         {dateField('Date of Birth', 'dateOfBirth')}
-        {textField('Birth Status', 'birthStatus')}
+        {selectField('Birth Status', 'birthStatus', BIRTH_STATUS_OPTIONS)}
         {textField('Place of Birth', 'placeOfBirth')}
         {textField('Religion', 'religion')}
 
@@ -637,7 +683,7 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
             </select>
           </FormField>
         </div>
-        {textField('Initial Case Assessment', 'initialCaseAssessment')}
+        {selectField('Initial Case Assessment', 'initialCaseAssessment', INITIAL_CASE_ASSESSMENT_OPTIONS)}
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 mt-2">Subcategories</p>
         <div className="grid grid-cols-2">
@@ -681,8 +727,8 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
         <FormField label="Length of Stay">
           <input className={inputClass} value={form.lengthOfStay ?? ''} onChange={(e) => set('lengthOfStay', e.target.value || null)} placeholder="e.g. 2 Years 3 months" />
         </FormField>
-        {textField('Referral Source', 'referralSource')}
-        {textField('Referring Agency/Person', 'referringAgencyPerson')}
+        {selectField('Referral Source', 'referralSource', REFERRAL_SOURCE_OPTIONS)}
+        {selectField('Referring Agency/Person', 'referringAgencyPerson', REFERRING_AGENCY_PERSON_OPTIONS)}
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 mt-2">Legal</p>
         <div className="grid grid-cols-2 gap-3">
@@ -691,7 +737,7 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
         </div>
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 mt-2">Social Worker</p>
-        {textField('Assigned Social Worker', 'assignedSocialWorker')}
+        {selectField('Assigned Social Worker', 'assignedSocialWorker', ASSIGNED_SOCIAL_WORKER_OPTIONS)}
         {dateField('Case Study Prepared', 'dateCaseStudyPrepared')}
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3 mt-2">Reintegration</p>
