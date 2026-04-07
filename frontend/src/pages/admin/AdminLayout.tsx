@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { Heart, Users, Home, FileText } from 'lucide-react'
+import { Heart, Users, Home, FileText, MapPin } from 'lucide-react'
 
 export default function AdminLayout() {
   const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -32,6 +32,10 @@ export default function AdminLayout() {
           <NavLink to="/admin/process-recordings" className={navClass}>
             <FileText size={18} />
             Process Recordings
+          </NavLink>
+          <NavLink to="/admin/home-visitations" className={navClass}>
+            <MapPin size={18} />
+            Home Visitations
           </NavLink>
         </nav>
 
