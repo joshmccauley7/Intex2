@@ -5,6 +5,7 @@ import { Heart, Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-re
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
 import ThemeToggle from '../components/theme/ThemeToggle';
+import SafiraTabbedContent from '../components/SafiraTabbedContent';
 
 // Dynamically import all images from the homepage folder
 const imageModules = import.meta.glob('../images/homepage/*.{jpg,jpeg,png,webp}', {
@@ -56,7 +57,7 @@ const faqs: FAQItem[] = [
       'Due to the sensitive nature of our work and the privacy of the girls in our care, in-person visits are limited and carefully coordinated. If you are interested in volunteering or partnering with Safira, reach out through our contact form and our team will get back to you.',
   },
   {
-    question: 'How does Safira protect residents\' privacy?',
+    question: "How does Safira protect residents' privacy?",
     answer:
       'Protecting the identity and safety of every child in our care is our highest priority. We never publish identifying information about residents, all staff undergo background checks and trauma-informed care training, and our digital systems are secured with role-based access controls and GDPR-compliant data practices.',
   },
@@ -180,7 +181,6 @@ function FAQAccordion() {
           fontFamily: "'DM Sans', sans-serif",
         }}
       >
-        {/* Header */}
         <div style={{ marginBottom: '2.5rem' }}>
           <p
             style={{
@@ -210,7 +210,6 @@ function FAQAccordion() {
           </h2>
         </div>
 
-        {/* Accordion */}
         <div style={{ borderTop: '1px solid #e5e2db' }}>
           {faqs.map((faq, i) => (
             <AccordionItem
@@ -223,7 +222,6 @@ function FAQAccordion() {
           ))}
         </div>
 
-        {/* Footer CTA */}
         <p
           style={{
             marginTop: '2rem',
@@ -302,7 +300,6 @@ export default function HomePage() {
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
           <Link to="/" className="text-white hover:text-blue-400 transition-colors">
-          <Link to="/" className="text-white hover:text-blue-400 transition-colors">
             Home
           </Link>
           <a href="/about" className="hover:text-white transition-colors">
@@ -330,9 +327,8 @@ export default function HomePage() {
         </div>
       </nav>
 
-      {/* Hero Carousel */}
+      {/* ── Hero Carousel ── */}
       <section className="relative overflow-hidden" style={{ height: '560px' }}>
-        {/* Stacked image layers — CSS crossfade, no JS timing needed */}
         {heroImages.map((src, i) => (
           <div
             key={src}
@@ -344,8 +340,14 @@ export default function HomePage() {
             }}
           />
         ))}
-        {/* Very subtle darkening only at edges, keeping center bright */}
-        <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.18) 100%)' }} />
+        {/* Edge darkening */}
+        <div
+          className="absolute inset-0"
+          style={{
+            background:
+              'linear-gradient(to right, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.18) 100%)',
+          }}
+        />
 
         {/* Text card — left side */}
         <div className="relative z-10 h-full flex items-center px-10 md:px-16">
@@ -382,29 +384,31 @@ export default function HomePage() {
           <>
             <button
               onClick={() => goTo(currentImg - 1)}
-              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-white/70 hover:bg-white text-slate-800 rounded-full p-2 shadow transition-colors"
+              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-white/30 hover:bg-white/60 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
               aria-label="Previous image"
             >
-              <ChevronLeft size={22} />
+              <ChevronLeft size={20} />
             </button>
             <button
               onClick={() => goTo(currentImg + 1)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-white/70 hover:bg-white text-slate-800 rounded-full p-2 shadow transition-colors"
+              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-white/30 hover:bg-white/60 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
               aria-label="Next image"
             >
-              <ChevronRight size={22} />
+              <ChevronRight size={20} />
             </button>
-
             {/* Dot indicators */}
             <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex gap-2">
               {heroImages.map((_, i) => (
                 <button
                   key={i}
                   onClick={() => goTo(i)}
-                  className={`w-2.5 h-2.5 rounded-full transition-colors ${
-                    i === currentImg ? 'bg-white' : 'bg-white/50'
-                  }`}
                   aria-label={`Go to image ${i + 1}`}
+                  className="rounded-full transition-all"
+                  style={{
+                    width: i === currentImg ? '20px' : '8px',
+                    height: '8px',
+                    background: i === currentImg ? 'white' : 'rgba(255,255,255,0.5)',
+                  }}
                 />
               ))}
             </div>
@@ -445,18 +449,9 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Mission */}
-      <section className="bg-slate-50 dark:bg-slate-900/50 py-16 px-6">
-        <div className="max-w-2xl mx-auto text-center">
-          <h2 className="text-3xl font-bold text-navy-DEFAULT dark:text-slate-100 mb-4">
-            Our Mission
-          </h2>
-          <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
-            Safira exists to rescue, shelter, and rehabilitate children who have suffered
-            sexual abuse in Brazil. We provide safe housing, trauma-informed care, educational
-            support, and legal advocacy — empowering survivors to heal and reclaim their futures.
-          </p>
-        </div>
+      {/* ── About / Tabbed Content ── */}
+      <section className="bg-slate-50 dark:bg-slate-900 py-4 px-6">
+        <SafiraTabbedContent />
       </section>
 
       {/* ── FAQ ── */}
