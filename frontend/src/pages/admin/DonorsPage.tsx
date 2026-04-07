@@ -10,6 +10,8 @@ interface Supporter {
   region: string | null
   email: string | null
   firstDonationDate: string | null
+  churnRiskLevel: string | null
+  churnProbability: number | null
 }
 
 interface Donation {
@@ -40,6 +42,12 @@ interface SupporterDetail extends Supporter {
 const STATUS_BADGE: Record<string, string> = {
   Active: 'bg-green-100 text-green-700',
   Inactive: 'bg-slate-100 text-slate-500',
+}
+
+const CHURN_BADGE: Record<string, string> = {
+  High: 'bg-red-100 text-red-700',
+  Medium: 'bg-yellow-100 text-yellow-700',
+  Low: 'bg-green-100 text-green-700',
 }
 
 const PAGE_SIZE = 20
@@ -146,6 +154,7 @@ export default function DonorsPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Region</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">First Donation</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Churn Risk</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                   </tr>
                 </thead>
@@ -162,6 +171,13 @@ export default function DonorsPage() {
                       <td className="px-4 py-3 text-slate-600">{s.region ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{s.email ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{s.firstDonationDate ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {s.churnRiskLevel ? (
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${CHURN_BADGE[s.churnRiskLevel] ?? 'bg-slate-100 text-slate-500'}`}>
+                            {s.churnRiskLevel}
+                          </span>
+                        ) : '—'}
+                      </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <button onClick={() => openDetail(s.supporterId)} className="p-1.5 text-slate-400 hover:text-safira-blue transition-colors" title="View"><Eye size={15} /></button>
@@ -172,7 +188,7 @@ export default function DonorsPage() {
                     </tr>
                   ))}
                   {supporters.length === 0 && (
-                    <tr><td colSpan={7} className="px-4 py-8 text-center text-slate-400">No supporters found.</td></tr>
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No supporters found.</td></tr>
                   )}
                 </tbody>
               </table>

@@ -26,16 +26,25 @@ public class SupportersController : ControllerBase
 
         var supporters = await query
             .OrderBy(s => s.DisplayName)
-            .Select(s => new
-            {
-                s.SupporterId,
-                s.DisplayName,
-                s.SupporterType,
-                s.Status,
-                s.Region,
-                s.Email,
-                s.FirstDonationDate
-            })
+            .GroupJoin(
+                _db.DonorChurnPredictions,
+                s => s.SupporterId,
+                p => p.SupporterId,
+                (s, preds) => new { s, preds })
+            .SelectMany(
+                x => x.preds.DefaultIfEmpty(),
+                (x, p) => new
+                {
+                    x.s.SupporterId,
+                    x.s.DisplayName,
+                    x.s.SupporterType,
+                    x.s.Status,
+                    x.s.Region,
+                    x.s.Email,
+                    x.s.FirstDonationDate,
+                    ChurnRiskLevel = p != null ? p.RiskLevel : null,
+                    ChurnProbability = p != null ? (decimal?)p.ChurnProbability : null
+                })
             .ToListAsync();
 
         return Ok(supporters);
