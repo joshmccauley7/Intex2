@@ -410,32 +410,6 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Motto ── */}
-      <section style={{ background: '#eef4ff' }}>
-        <div className="max-w-6xl mx-auto flex flex-col md:flex-row" style={{ minHeight: '440px' }}>
-          <div
-            className="flex-shrink-0 flex items-center justify-center"
-            style={{ width: '100%', maxWidth: '480px', minHeight: '440px', background: '#dce8f7', border: '2px dashed #93c5fd' }}
-          >
-            <span className="text-blue-200 text-sm italic select-none">[ Photo coming soon ]</span>
-          </div>
-          <div className="flex flex-col justify-center px-12 py-14" style={{ flex: 1 }}>
-            <p style={{ fontFamily: "'Lora', serif", fontSize: '0.75rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: '#2563eb', marginBottom: '1.25rem' }}>
-              Safira Motto
-            </p>
-            <p style={{ fontFamily: "'Lora', serif", fontSize: 'clamp(1.1rem, 2.2vw, 1.4rem)', lineHeight: '1.85', color: '#1e293b', marginBottom: '2rem' }}>
-              We are Safira: full of hope, love, and new beginnings. Our focus is progress
-              in all aspects of life. We treat each other as family where each individual is
-              seen, heard, and loved. We create fun memories, we fight for justice, and we
-              acknowledge God in all we do.
-            </p>
-            <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.05em' }}>
-              — The Safira Community
-            </p>
-          </div>
-        </div>
-      </section>
-
       {/* ── Impact Stats ── */}
       <section
         className="relative px-6 pt-16 pb-40"
