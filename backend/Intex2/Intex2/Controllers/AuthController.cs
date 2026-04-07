@@ -144,6 +144,8 @@ public class AuthController : ControllerBase
                 d.CampaignName,
                 d.ChannelSource,
                 d.Notes,
+                d.EstimatedValue,
+                d.ImpactUnit,
                 allocations = _db.DonationAllocations
                     .Where(a => a.DonationId == d.DonationId)
                     .OrderByDescending(a => a.AllocationDate)
@@ -154,7 +156,19 @@ public class AuthController : ControllerBase
                         a.ProgramArea,
                         a.AmountAllocated,
                         a.AllocationDate,
-                        a.AllocationNotes
+                        a.AllocationNotes,
+                        SafehouseCity = _db.Safehouses
+                            .Where(s => s.SafehouseId == a.SafehouseId)
+                            .Select(s => s.City)
+                            .FirstOrDefault(),
+                        SafehouseRegion = _db.Safehouses
+                            .Where(s => s.SafehouseId == a.SafehouseId)
+                            .Select(s => s.Region)
+                            .FirstOrDefault(),
+                        SafehouseName = _db.Safehouses
+                            .Where(s => s.SafehouseId == a.SafehouseId)
+                            .Select(s => s.Name)
+                            .FirstOrDefault(),
                     })
                     .ToList()
             })
