@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { Heart } from 'lucide-react';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
-import ThemeToggle from '../components/theme/ThemeToggle';
+import SiteNav from '../components/layout/SiteNav';
 
 function DonationForm() {
   const stripe = useStripe();
@@ -281,26 +281,7 @@ export default function DonatePage() {
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
-      <nav className="bg-[#0f172a] dark:bg-slate-950 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800/80">
-        <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-          <Heart className="text-safira-blue fill-safira-blue" size={22} />
-          Safira
-        </Link>
-        <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
-          <Link to="/" className="hover:text-white transition-colors">Home</Link>
-          <Link to="/impact" className="hover:text-white transition-colors">Impact</Link>
-          <Link to="/donate" className="text-white hover:text-blue-400 transition-colors">Donate</Link>
-        </div>
-        <div className="flex items-center gap-3">
-          <ThemeToggle />
-          <Link
-            to="/login"
-            className="text-sm font-semibold text-white bg-safira-blue hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
-          >
-            Login
-          </Link>
-        </div>
-      </nav>
+      <SiteNav />
 
       <main className="flex-1 px-6 py-12">
         <section className="max-w-2xl mx-auto bg-white dark:bg-slate-900 rounded-xl border border-slate-100 dark:border-slate-700 shadow-sm p-8">
