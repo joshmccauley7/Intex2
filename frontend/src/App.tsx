@@ -30,6 +30,7 @@ export default function App() {
   return (
     <CookieConsentProvider>
       <ThemeProvider>
+        <AuthProvider>
         <BrowserRouter>
           <AnalyticsConsentBridge />
           <CookieBanner />
@@ -39,6 +40,8 @@ export default function App() {
             <Route path="/impact" element={<ImpactDashboard />} />
             <Route path="/donate" element={<DonatePage />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/login" element={<LoginPage />} />
+            <Route path="/profile" element={<ProfilePage />} />
             <Route path="/admin" element={<AdminLayout />}>
               <Route index element={<AdminDashboardPage />} />
               <Route path="dashboard" element={<AdminDashboardPage />} />
@@ -50,6 +53,7 @@ export default function App() {
             </Route>
           </Routes>
         </BrowserRouter>
+        </AuthProvider>
       </ThemeProvider>
     </CookieConsentProvider>
   );

@@ -1,5 +1,5 @@
 import { Outlet, NavLink, Link } from 'react-router-dom'
-import { Heart, Users, Home, FileText, MapPin, LogOut, KeyRound } from 'lucide-react'
+import { Heart, Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 
 export default function AdminLayout() {
