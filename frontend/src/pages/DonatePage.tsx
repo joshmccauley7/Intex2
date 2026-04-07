@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Heart, LogIn } from 'lucide-react';
 import { CardElement, Elements, useElements, useStripe } from '@stripe/react-stripe-js';
 import { loadStripe } from '@stripe/stripe-js';
@@ -94,6 +94,7 @@ function DonationFormWithGate() {
   const { session, isLoading } = useAuth();
   const stripe = useStripe();
   const elements = useElements();
+  const navigate = useNavigate();
 
   const saved = useMemo(() => loadSavedForm(), []);
 
@@ -215,7 +216,7 @@ function DonationFormWithGate() {
         }),
       });
 
-      setStatus('Thank you! Your donation was successful.');
+      navigate('/my-donations');
       setMessage('');
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Donation failed. Please try again.';

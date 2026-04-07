@@ -26,7 +26,7 @@ export default function RegisterPage() {
   const [searchParams] = useSearchParams();
   const { refreshSession } = useAuth();
 
-  const returnTo = searchParams.get('returnTo') ?? '/donate';
+  const returnTo = searchParams.get('returnTo') ?? '/';
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
