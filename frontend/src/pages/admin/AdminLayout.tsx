@@ -43,6 +43,10 @@ export default function AdminLayout() {
             <MapPin size={18} />
             Home Visitations
           </NavLink>
+          <NavLink to="/admin/stripe" className={navClass}>
+            <KeyRound size={18} />
+            Stripe
+          </NavLink>
         </nav>
 
         {/* User + Sign out */}
