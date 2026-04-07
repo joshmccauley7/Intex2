@@ -71,7 +71,11 @@ builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
 builder.Services.ConfigureApplicationCookie(options =>
 {
     options.Cookie.HttpOnly = true;
-    options.Cookie.SameSite = SameSiteMode.Lax;
+    // SameSite=None is required for cross-domain fetch (Vercel frontend → Railway backend).
+    // None only works with Secure=true, which is already enforced in production below.
+    options.Cookie.SameSite = builder.Environment.IsDevelopment()
+        ? SameSiteMode.Lax
+        : SameSiteMode.None;
     options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
         ? CookieSecurePolicy.SameAsRequest
         : CookieSecurePolicy.Always;
@@ -110,7 +114,14 @@ builder.Services.AddControllers()
 builder.Services.AddOpenApi();
 
 // ─── CORS (must allow credentials for cookie auth) ───────────────────────────
-var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+// In production, set the ALLOWED_ORIGINS environment variable in Railway to a
+// comma-separated list of allowed origins, e.g.:
+//   https://your-app.vercel.app,https://your-custom-domain.com
+var allowedOrigins =
+    (Environment.GetEnvironmentVariable("ALLOWED_ORIGINS") is { Length: > 0 } envOrigins
+        ? envOrigins.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+        : null)
+    ?? builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
     ?? new[] { "http://localhost:5173", "http://localhost:5174" };
 
 builder.Services.AddCors(options =>

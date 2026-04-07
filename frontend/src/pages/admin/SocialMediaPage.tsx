@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import { Share2, Sparkles, TrendingUp, ChevronRight, ArrowRight, BarChart2, RefreshCw, ChevronLeft } from 'lucide-react'
 import { apiFetch } from '../../api'
 
@@ -27,6 +27,7 @@ interface PredictionResult {
   recommendations: Recommendation[]
   model_version: string
   avg_conversion_rate: number
+  anchor_description: string
 }
 
 interface PostFormState {
@@ -161,7 +162,52 @@ function captionBin(n: number) {
   return 'very long (800+)'
 }
 
+// Computes a live estimate entirely in the browser from cached feature rates.
+// Uses a simple average of individual feature conversion rates — fast, honest,
+// and updates instantly without a server round-trip.
+function computeLiveEstimate(fr: FeatureRatesResponse, form: PostFormState): number {
+  const f = fr.features
+  const rates: number[] = []
+  const add = (feat: string, val: string) => {
+    const r = f[feat]?.[val]?.rate
+    if (r !== undefined) rates.push(r)
+  }
+  add('platform',           form.platform)
+  add('post_type',          form.post_type)
+  add('media_type',         form.media_type)
+  add('content_topic',      form.content_topic)
+  add('sentiment_tone',     form.sentiment_tone)
+  add('day_of_week',        form.day_of_week)
+  add('has_cta',            String(form.has_call_to_action))
+  add('call_to_action_type', form.call_to_action_type)
+  add('resident_story',     String(form.features_resident_story))
+  add('is_boosted',         String(form.is_boosted))
+  add('hour_bin',           hourBin(form.post_hour))
+  add('hashtag_bin',        hashtagBin(form.num_hashtags))
+  add('caption_bin',        captionBin(form.caption_length))
+  if (rates.length === 0) return fr.overall_rate
+  return rates.reduce((a, b) => a + b, 0) / rates.length
+}
+
 // ── Sub-components ────────────────────────────────────────────────────────────
+
+function LiveEstimateBar({ estimate, overall }: { estimate: number; overall: number }) {
+  const diff   = estimate - overall
+  const color  = diff > 0.03 ? 'bg-emerald-500' : diff < -0.03 ? 'bg-red-400' : 'bg-amber-400'
+  const label  = diff > 0.03 ? 'above avg' : diff < -0.03 ? 'below avg' : 'near avg'
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between text-xs">
+        <span className="text-slate-500 font-medium">Live estimate</span>
+        <span className="font-bold text-slate-700">{pct(estimate)} <span className="text-slate-400 font-normal">({label})</span></span>
+      </div>
+      <div className="w-full bg-slate-100 rounded-full h-2">
+        <div className={`h-2 rounded-full transition-all duration-300 ${color}`} style={{ width: `${Math.min(estimate * 100 / 1, 100)}%` }} />
+      </div>
+      <p className="text-xs text-slate-400">Click <strong>Predict</strong> for the anchored analysis with recommendations.</p>
+    </div>
+  )
+}
 
 function RateBadge({ rate, overall }: { rate: number; overall: number }) {
   const diff = rate - overall
@@ -325,11 +371,15 @@ export default function SocialMediaPage() {
     setPredicting(true)
     setPredError(null)
     try {
-      const data = await apiFetch('/api/social-media/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(form),
-      })
+      // Run prediction and refresh feature rates in parallel so badges stay current
+      const [data] = await Promise.all([
+        apiFetch('/api/social-media/predict', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(form),
+        }),
+        fetchFeatureRates(),
+      ])
       setResult(data)
       setResultIsStale(false)
     } catch (e: unknown) {
@@ -361,13 +411,29 @@ export default function SocialMediaPage() {
       .finally(() => setInsightsLoading(false))
   }, [])
 
-  useEffect(() => { fetchHistory(1, historyFilter) }, [historyFilter, fetchHistory])
-  useEffect(() => { fetchInsights() }, [fetchInsights])
-  useEffect(() => {
+  const fetchFeatureRates = useCallback(() => {
     apiFetch('/api/social-media/feature-rates')
       .then((d: FeatureRatesResponse) => setFeatureRates(d))
-      .catch(() => { /* hints are optional — silently skip if unavailable */ })
+      .catch(() => { /* hints optional — silently skip */ })
   }, [])
+
+  useEffect(() => { fetchHistory(1, historyFilter) }, [historyFilter, fetchHistory])
+  useEffect(() => { fetchInsights() }, [fetchInsights])
+
+  // Load feature rates on mount, then refresh every 30 minutes so the live
+  // estimates automatically pick up newly added social media posts.
+  useEffect(() => {
+    fetchFeatureRates()
+    const interval = setInterval(fetchFeatureRates, 30 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [fetchFeatureRates])
+
+  // Live estimate — computed in the browser from cached rates, updates instantly
+  // on every form change without any server round-trip.
+  const liveEstimate = useMemo(
+    () => featureRates ? computeLiveEstimate(featureRates, form) : null,
+    [featureRates, form]
+  )
 
   return (
     <div className="space-y-8">
@@ -499,6 +565,13 @@ export default function SocialMediaPage() {
 
         {/* ── Results + Recommendations ── */}
         <div className="space-y-4">
+          {/* Live estimate — always visible on the right, updates instantly */}
+          {liveEstimate !== null && featureRates && (
+            <div className="bg-white rounded-xl border border-slate-200 p-4">
+              <LiveEstimateBar estimate={liveEstimate} overall={featureRates.overall_rate} />
+            </div>
+          )}
+
           {!result && !predError && (
             <div className="bg-white rounded-xl border border-dashed border-slate-200 p-8 flex flex-col items-center justify-center text-center gap-3 min-h-[200px]">
               <Sparkles size={32} className="text-slate-300" />
@@ -551,7 +624,7 @@ export default function SocialMediaPage() {
                 </div>
 
                 <p className="text-xs text-slate-400 mt-3 text-center">
-                  Model {result.model_version} · Threshold 40%
+                  Anchored on: {result.anchor_description}
                 </p>
               </div>
 

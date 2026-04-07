@@ -237,8 +237,10 @@ public class SocialMediaController : ControllerBase
     }
 
     // POST /api/social-media/predict
-    // Scores a planned post directly from historical conversion rates in the DB.
-    // No external Python service or pre-trained model required.
+    // Two-phase scoring:
+    //   1. Anchor on the actual observed (platform × post_type) conversion rate from the DB.
+    //   2. Apply secondary adjustments from remaining features at a low weight (25%)
+    //      so they nudge the score without compounding to unrealistic levels.
     [HttpPost("predict")]
     public async Task<IActionResult> Predict([FromBody] PredictRequest req)
     {
@@ -246,8 +248,31 @@ public class SocialMediaController : ControllerBase
         {
             var (featureRates, overallRate, avgValue) = await LoadFeatureRatesAsync();
 
+            // ── Phase 1: anchor to real (platform × post_type) data ─────────────
+            var combo = await GetComboRateAsync(req.Platform, req.PostType);
+
+            double anchorRate;
+            string anchorDescription;
+            if (combo is { N: >= 5 })
+            {
+                anchorRate        = combo.Value.Rate;
+                anchorDescription = $"{req.Platform} × {req.PostType} ({combo.Value.N} posts)";
+            }
+            else if (featureRates.TryGetValue("post_type", out var ptRates) &&
+                     ptRates.TryGetValue(req.PostType, out var ptStat) && ptStat.N >= 5)
+            {
+                anchorRate        = ptStat.Rate;
+                anchorDescription = $"{req.PostType} overall (combo had < 5 posts)";
+            }
+            else
+            {
+                anchorRate        = overallRate;
+                anchorDescription = "overall average (insufficient data)";
+            }
+
+            // ── Phase 2: small secondary adjustments from remaining features ────
             var input = BuildInputMap(req);
-            double score = ComputeScore(featureRates, input, overallRate);
+            double score = ComputeAnchoredScore(featureRates, input, anchorRate, overallRate);
             var recs    = BuildRecommendations(featureRates, input, overallRate, score);
 
             return Ok(new
@@ -258,6 +283,7 @@ public class SocialMediaController : ControllerBase
                 recommendations       = recs,
                 model_version         = "v1.0-live",
                 avg_conversion_rate   = Math.Round(overallRate, 3),
+                anchor_description    = anchorDescription,
             });
         }
         catch (Exception ex)
@@ -405,8 +431,77 @@ public class SocialMediaController : ControllerBase
         ["caption_bin"]        = CaptionBin(r.CaptionLength),
     };
 
-    // Additive log-odds model: each feature contributes a log-odds adjustment
-    // relative to the overall base rate. Adjustments are shrunk for small samples.
+    // Looks up the actual historical conversion rate for a specific platform + post_type combo.
+    private async Task<(double Rate, int N)?> GetComboRateAsync(string platform, string postType)
+    {
+        const string sql = """
+            SELECT AVG(CASE WHEN donation_referrals > 0 THEN 1.0 ELSE 0.0 END)::float AS rate,
+                   COUNT(*)::int AS n
+            FROM social_media_posts
+            WHERE platform = @platform AND post_type = @post_type
+            """;
+
+        var conn = _db.Database.GetDbConnection();
+        var closeAfter = conn.State != System.Data.ConnectionState.Open;
+        if (closeAfter) await conn.OpenAsync();
+        try
+        {
+            await using var cmd = conn.CreateCommand();
+            cmd.CommandText = sql;
+            var p1 = cmd.CreateParameter(); p1.ParameterName = "@platform";  p1.Value = platform;  cmd.Parameters.Add(p1);
+            var p2 = cmd.CreateParameter(); p2.ParameterName = "@post_type"; p2.Value = postType;  cmd.Parameters.Add(p2);
+            await using var reader = await cmd.ExecuteReaderAsync();
+            if (await reader.ReadAsync() && reader["n"] != DBNull.Value)
+            {
+                var n = Convert.ToInt32(reader["n"]);
+                if (n == 0) return null;
+                return (Rate: Convert.ToDouble(reader["rate"]), N: n);
+            }
+            return null;
+        }
+        finally
+        {
+            if (closeAfter) await conn.CloseAsync();
+        }
+    }
+
+    // Two-phase scoring:
+    //   Phase 1 — anchor to the real observed (platform × post_type) rate.
+    //   Phase 2 — secondary features apply small log-odds adjustments (25% weight)
+    //             so they refine the anchor without compounding to unrealistic extremes.
+    private static double ComputeAnchoredScore(
+        Dictionary<string, Dictionary<string, (double Rate, int N)>> featureRates,
+        Dictionary<string, string> input,
+        double anchorRate,
+        double overallRate)
+    {
+        var primaryFeatures = new HashSet<string> { "platform", "post_type" };
+        var anchorLogOdds   = LogOdds(anchorRate);
+        var totalAdj        = 0.0;
+        var counted         = 0;
+
+        foreach (var (feat, val) in input)
+        {
+            if (primaryFeatures.Contains(feat)) continue;
+            if (!featureRates.TryGetValue(feat, out var vals)) continue;
+            if (!vals.TryGetValue(val, out var stat)) continue;
+            if (stat.N < 5) continue;
+
+            // Deviation relative to overall average — represents signal beyond baseline.
+            var deviation = LogOdds(stat.Rate) - LogOdds(overallRate);
+            var shrink    = Math.Min(1.0, (stat.N - 4.0) / 46.0);
+            totalAdj += deviation * shrink;
+            counted++;
+        }
+
+        if (counted == 0) return anchorRate;
+
+        const double secondaryWeight = 0.25;
+        var finalLogOdds = anchorLogOdds + (totalAdj / Math.Sqrt(counted)) * secondaryWeight;
+        return Math.Clamp(Sigmoid(finalLogOdds), 0.01, 0.99);
+    }
+
+    // Original scorer kept for BuildRecommendations (relative comparisons only).
     private static double ComputeScore(
         Dictionary<string, Dictionary<string, (double Rate, int N)>> featureRates,
         Dictionary<string, string> input,
@@ -422,15 +517,12 @@ public class SocialMediaController : ControllerBase
             if (!vals.TryGetValue(val, out var stat)) continue;
             if (stat.N < 3) continue;
 
-            // Shrink toward 0 for small samples (full weight at n=30+)
             var shrink = Math.Min(1.0, (stat.N - 2.0) / 28.0);
             totalAdj += (LogOdds(stat.Rate) - baseLogOdds) * shrink;
             counted++;
         }
 
         if (counted == 0) return overallRate;
-
-        // Scale down total adjustment (sqrt keeps prediction in a reasonable range)
         var finalLogOdds = baseLogOdds + totalAdj / Math.Sqrt(counted);
         return Math.Clamp(Sigmoid(finalLogOdds), 0.01, 0.99);
     }
