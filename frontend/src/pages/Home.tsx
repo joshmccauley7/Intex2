@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../App.css';
 import { Heart, Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
@@ -26,7 +26,6 @@ interface ImpactSummary {
 export default function HomePage() {
   const [impact, setImpact] = useState<ImpactSummary | null>(null);
   const [currentImg, setCurrentImg] = useState(0);
-  const [fading, setFading] = useState(false);
   const [imagesReady, setImagesReady] = useState(heroImages.length === 0);
 
   useEffect(() => {
@@ -35,7 +34,7 @@ export default function HomePage() {
       .catch(() => null);
   }, []);
 
-  // Preload all carousel images before showing anything
+  // Preload all carousel images before revealing the hero
   useEffect(() => {
     if (heroImages.length === 0) return;
     let loaded = 0;
@@ -49,25 +48,17 @@ export default function HomePage() {
     });
   }, []);
 
-  const goTo = useCallback(
-    (index: number) => {
-      if (heroImages.length <= 1) return;
-      setFading(true);
-      setTimeout(() => {
-        setCurrentImg((index + heroImages.length) % heroImages.length);
-        setFading(false);
-      }, 350);
-    },
-    []
-  );
+  const goTo = (index: number) => {
+    setCurrentImg((index + heroImages.length) % heroImages.length);
+  };
 
   useEffect(() => {
     if (heroImages.length <= 1) return;
     const timer = setInterval(() => {
-      goTo(currentImg + 1);
+      setCurrentImg((prev) => (prev + 1) % heroImages.length);
     }, 5000);
     return () => clearInterval(timer);
-  }, [currentImg, goTo]);
+  }, []);
 
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
@@ -108,15 +99,18 @@ export default function HomePage() {
 
       {/* Hero Carousel */}
       <section className="relative overflow-hidden" style={{ height: '560px' }}>
-        {/* Background image — hidden until all images are preloaded */}
-        <div
-          className="absolute inset-0 bg-cover bg-center transition-opacity duration-700"
-          style={{
-            backgroundImage: `url(${heroImages[currentImg]})`,
-            backgroundPosition: 'center 20%',
-            opacity: !imagesReady || fading ? 0 : 1,
-          }}
-        />
+        {/* Stacked image layers — CSS crossfade, no JS timing needed */}
+        {heroImages.map((src, i) => (
+          <div
+            key={src}
+            className="absolute inset-0 bg-cover bg-center transition-opacity duration-[1500ms]"
+            style={{
+              backgroundImage: `url(${src})`,
+              backgroundPosition: 'center 20%',
+              opacity: imagesReady && i === currentImg ? 1 : 0,
+            }}
+          />
+        ))}
         {/* Very subtle darkening only at edges, keeping center bright */}
         <div className="absolute inset-0" style={{ background: 'linear-gradient(to right, rgba(0,0,0,0.18) 0%, rgba(0,0,0,0.04) 50%, rgba(0,0,0,0.18) 100%)' }} />
 
