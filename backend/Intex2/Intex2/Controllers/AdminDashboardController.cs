@@ -124,6 +124,17 @@ public class AdminDashboardController : ControllerBase
             .Select(g => new { RiskLevel = g.Key, Count = g.Count() })
             .ToListAsync();
 
+        // OKR: % of active donors with at least one donation in the rolling last 3 months (same "active donor" pool as activeDonors).
+        var threeMonthsAgo = today.AddMonths(-3);
+        var donorOkrRecentCount = await _db.Supporters
+            .Where(s => s.Status == "Active")
+            .Where(s => s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
+            .CountAsync();
+
+        double? donorOkrPercent = activeDonors == 0
+            ? null
+            : Math.Round(100.0 * donorOkrRecentCount / activeDonors, 1);
+
         return Ok(new
         {
             activeResidents,
@@ -138,7 +149,9 @@ public class AdminDashboardController : ControllerBase
             educationAvg,
             enrollmentCounts,
             counselingCounts,
-            activeRiskCounts
+            activeRiskCounts,
+            donorOkrPercent,
+            donorOkrRecentCount
         });
     }
 }
