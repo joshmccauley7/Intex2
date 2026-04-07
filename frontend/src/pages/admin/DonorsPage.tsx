@@ -50,6 +50,12 @@ const CHURN_BADGE: Record<string, string> = {
   Low: 'bg-green-100 text-green-700',
 }
 
+const DONATION_TYPE_BADGE: Record<string, string> = {
+  Recurring: 'bg-blue-100 text-blue-700',
+  'Not recurring': 'bg-purple-100 text-purple-700',
+  Mixed: 'bg-amber-100 text-amber-700',
+}
+
 const PAGE_SIZE = 20
 
 export default function DonorsPage() {
@@ -222,9 +228,14 @@ export default function DonorsPage() {
                   <h2 className="text-xl font-bold text-[#0f172a]">{selectedSupporter.displayName}</h2>
                   <p className="text-sm text-slate-500">{selectedSupporter.supporterType}</p>
                 </div>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[selectedSupporter.status] ?? ''}`}>
-                  {selectedSupporter.status}
-                </span>
+                <div className="flex flex-col items-end gap-1">
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${STATUS_BADGE[selectedSupporter.status] ?? ''}`}>
+                    {selectedSupporter.status}
+                  </span>
+                  <span className={`px-3 py-1 rounded-full text-sm font-semibold ${DONATION_TYPE_BADGE[recurringSummary(selectedSupporter.donations)] ?? 'bg-slate-100 text-slate-500'}`}>
+                    {recurringSummary(selectedSupporter.donations)}
+                  </span>
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-6">
@@ -253,7 +264,6 @@ export default function DonorsPage() {
                           <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500">Date</th>
                           <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500">Value</th>
                           <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500">Campaign</th>
-                          <th className="text-left px-3 py-2 text-xs font-semibold text-slate-500">Recurring</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
@@ -267,7 +277,6 @@ export default function DonorsPage() {
                               {d.amount != null ? `${d.amount} ${d.impactUnit ?? ''}` : d.estimatedValue != null ? `${d.estimatedValue} ${d.impactUnit ?? ''}` : '—'}
                             </td>
                             <td className="px-3 py-2 text-slate-600">{d.campaignName ?? '—'}</td>
-                            <td className="px-3 py-2 text-slate-600">{d.isRecurring ? 'Yes' : 'No'}</td>
                           </tr>
                         ))}
                       </tbody>
@@ -328,6 +337,14 @@ function DetailRow({ label, value }: { label: string; value: string | null | und
       <span className="text-slate-700">{value ?? '—'}</span>
     </div>
   )
+}
+
+function recurringSummary(donations: Donation[] | undefined): string {
+  if (!donations || donations.length === 0) return '—'
+  const hasRecurring = donations.some((d) => d.isRecurring)
+  const hasOneTime = donations.some((d) => !d.isRecurring)
+  if (hasRecurring && hasOneTime) return 'Mixed'
+  return hasRecurring ? 'Recurring' : 'Not recurring'
 }
 
 function Pagination({ current, total, onChange, count, pageSize }: {
