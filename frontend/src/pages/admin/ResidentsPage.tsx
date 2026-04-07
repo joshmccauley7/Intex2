@@ -692,22 +692,36 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
     </label>
   )
 
+  const buildPayload = () => {
+    const normalized = Object.fromEntries(
+      Object.entries(form).map(([key, value]) => {
+        if (typeof value === 'string') {
+          const trimmed = value.trim()
+          return [key, trimmed === '' ? null : trimmed]
+        }
+        return [key, value]
+      })
+    )
+    return normalized
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setSaving(true)
     setError(null)
+    const payload = buildPayload()
     try {
       if (existing) {
         await apiFetch(`/api/residents/${existing.residentId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         })
       } else {
         await apiFetch('/api/residents', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         })
       }
       onSaved()
