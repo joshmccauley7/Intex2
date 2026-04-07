@@ -17,4 +17,5 @@ public class AppDbContext : DbContext
     public DbSet<DonorChurnPrediction> DonorChurnPredictions => Set<DonorChurnPrediction>();
     public DbSet<HealthWellbeingRecord> HealthWellbeingRecords => Set<HealthWellbeingRecord>();
     public DbSet<EducationRecord> EducationRecords => Set<EducationRecord>();
+    public DbSet<SocialMediaPost> SocialMediaPosts => Set<SocialMediaPost>();
 }

@@ -21,6 +21,7 @@ import HomeVisitationsPage from './pages/admin/HomeVisitationsPage';
 import StripeSettingsPage from './pages/admin/StripeSettingsPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
+import SocialMediaPage from './pages/admin/SocialMediaPage';
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { isLoading, isAdmin } = useAuth();
@@ -76,6 +77,7 @@ export default function App() {
               <Route path="process-recordings" element={<ProcessRecordingsPage />} />
               <Route path="home-visitations" element={<HomeVisitationsPage />} />
               <Route path="stripe" element={<StripeSettingsPage />} />
+              <Route path="social-media" element={<SocialMediaPage />} />
               <Route path="users" element={<UserManagementPage />} />
             </Route>
           </Routes>

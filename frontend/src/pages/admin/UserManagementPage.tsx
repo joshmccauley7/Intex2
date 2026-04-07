@@ -240,10 +240,78 @@ function DeleteConfirmModal({
   );
 }
 
+const PAGE_SIZE = 15;
+const ROLE_FILTERS = ['All', 'Admin', 'Donor'] as const;
+type RoleFilter = typeof ROLE_FILTERS[number];
+
+function Pagination({ current, total, onChange, count, pageSize }: {
+  current: number;
+  total: number;
+  onChange: (page: number) => void;
+  count: number;
+  pageSize: number;
+}) {
+  if (total <= 1) return null;
+  const from = (current - 1) * pageSize + 1;
+  const to = Math.min(current * pageSize, count);
+
+  const pages: (number | '...')[] = [];
+  if (total <= 7) {
+    for (let i = 1; i <= total; i++) pages.push(i);
+  } else {
+    pages.push(1);
+    if (current > 3) pages.push('...');
+    for (let i = Math.max(2, current - 1); i <= Math.min(total - 1, current + 1); i++) pages.push(i);
+    if (current < total - 2) pages.push('...');
+    pages.push(total);
+  }
+
+  return (
+    <div className="flex items-center justify-between mt-4">
+      <p className="text-xs text-slate-500">{from}–{to} of {count}</p>
+      <div className="flex items-center gap-1">
+        <button
+          onClick={() => onChange(current - 1)}
+          disabled={current === 1}
+          className="px-2.5 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          Prev
+        </button>
+        {pages.map((p, i) =>
+          p === '...' ? (
+            <span key={`ellipsis-${i}`} className="px-2 text-slate-400 text-xs">…</span>
+          ) : (
+            <button
+              key={p}
+              onClick={() => onChange(p as number)}
+              className={`px-2.5 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                p === current
+                  ? 'bg-safira-blue text-white border-safira-blue'
+                  : 'text-slate-600 border-slate-200 hover:bg-slate-50'
+              }`}
+            >
+              {p}
+            </button>
+          )
+        )}
+        <button
+          onClick={() => onChange(current + 1)}
+          disabled={current === total}
+          className="px-2.5 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+        >
+          Next
+        </button>
+      </div>
+    </div>
+  );
+}
+
 export default function UserManagementPage() {
   const { session } = useAuth();
   const [users, setUsers] = useState<AppUser[]>([]);
   const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<RoleFilter>('All');
+  const [currentPage, setCurrentPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -251,12 +319,11 @@ export default function UserManagementPage() {
   const [editUser, setEditUser] = useState<AppUser | null>(null);
   const [deleteUser, setDeleteUser] = useState<AppUser | null>(null);
 
-  async function loadUsers(q?: string) {
+  async function loadUsers() {
     setLoading(true);
     setError(null);
     try {
-      const params = q ? `?search=${encodeURIComponent(q)}` : '';
-      const data = await apiFetch(`/api/admin/users${params}`);
+      const data = await apiFetch('/api/admin/users');
       setUsers(data);
     } catch {
       setError('Failed to load users.');
@@ -270,9 +337,13 @@ export default function UserManagementPage() {
   }, []);
 
   function handleSearchChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const q = e.target.value;
-    setSearch(q);
-    loadUsers(q);
+    setSearch(e.target.value);
+    setCurrentPage(1);
+  }
+
+  function handleRoleFilter(role: RoleFilter) {
+    setRoleFilter(role);
+    setCurrentPage(1);
   }
 
   async function handleCreate(form: UserFormState) {
@@ -286,7 +357,7 @@ export default function UserManagementPage() {
         role: form.role,
       }),
     });
-    await loadUsers(search);
+    await loadUsers();
   }
 
   async function handleEdit(form: UserFormState) {
@@ -302,14 +373,27 @@ export default function UserManagementPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-    await loadUsers(search);
+    await loadUsers();
   }
 
   async function handleDelete() {
     if (!deleteUser) return;
     await apiFetch(`/api/admin/users/${deleteUser.id}`, { method: 'DELETE' });
-    await loadUsers(search);
+    await loadUsers();
   }
+
+  const filtered = users.filter((u) => {
+    const matchesSearch =
+      search.trim() === '' ||
+      (u.email || u.userName).toLowerCase().includes(search.toLowerCase());
+    const matchesRole =
+      roleFilter === 'All' ||
+      u.roles.map((r) => r.toLowerCase()).includes(roleFilter.toLowerCase());
+    return matchesSearch && matchesRole;
+  });
+
+  const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+  const paginated = filtered.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE);
 
   const roleLabel = (roles: string[]) => {
     if (roles.includes('admin')) return 'Admin';
@@ -341,16 +425,33 @@ export default function UserManagementPage() {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative mb-4 max-w-sm">
-        <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-        <input
-          type="text"
-          placeholder="Search by email..."
-          value={search}
-          onChange={handleSearchChange}
-          className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-safira-blue"
-        />
+      {/* Search + Role Filter */}
+      <div className="flex flex-wrap items-center gap-3 mb-4">
+        <div className="relative max-w-sm flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search by email..."
+            value={search}
+            onChange={handleSearchChange}
+            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-300 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-safira-blue"
+          />
+        </div>
+        <div className="flex items-center gap-1">
+          {ROLE_FILTERS.map((r) => (
+            <button
+              key={r}
+              onClick={() => handleRoleFilter(r)}
+              className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors ${
+                roleFilter === r
+                  ? 'bg-safira-blue text-white border-safira-blue'
+                  : 'text-slate-600 border-slate-200 hover:bg-slate-50 dark:text-slate-300 dark:border-slate-700 dark:hover:bg-slate-800'
+              }`}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
       </div>
 
       {error && (
@@ -360,6 +461,7 @@ export default function UserManagementPage() {
       {loading ? (
         <p className="text-sm text-slate-500 dark:text-slate-400">Loading users...</p>
       ) : (
+        <>
         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
           <table className="w-full text-sm">
             <thead>
@@ -376,14 +478,14 @@ export default function UserManagementPage() {
               </tr>
             </thead>
             <tbody>
-              {users.length === 0 ? (
+              {paginated.length === 0 ? (
                 <tr>
                   <td colSpan={3} className="px-4 py-8 text-center text-slate-400">
                     No users found.
                   </td>
                 </tr>
               ) : (
-                users.map((user) => {
+                paginated.map((user) => {
                   const isSelf = user.userName === session.userName;
                   return (
                     <tr
@@ -427,6 +529,14 @@ export default function UserManagementPage() {
             </tbody>
           </table>
         </div>
+        <Pagination
+          current={currentPage}
+          total={totalPages}
+          onChange={setCurrentPage}
+          count={filtered.length}
+          pageSize={PAGE_SIZE}
+        />
+        </>
       )}
 
       {showCreate && (

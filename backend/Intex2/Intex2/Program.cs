@@ -97,6 +97,9 @@ builder.Services.AddAuthorization(options =>
     options.AddPolicy("AdminOnly", policy => policy.RequireRole(AdminSeeder.AdminRole));
 });
 
+// ─── HttpClient (for proxying to Python prediction API) ──────────────────────
+builder.Services.AddHttpClient();
+
 // ─── Controllers ─────────────────────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(options =>

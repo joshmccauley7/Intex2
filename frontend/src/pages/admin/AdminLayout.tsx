@@ -1,6 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useState } from 'react'
-import { Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard, UserCog } from 'lucide-react'
+import { Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard, UserCog, Share2 } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import SiteNav from '../../components/layout/SiteNav'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -21,7 +21,7 @@ export default function AdminLayout() {
       <SiteNav />
       <div className="flex flex-1">
       {/* Sidebar */}
-      <aside className="w-56 bg-[#0f172a] text-white flex flex-col shrink-0">
+      <aside className="w-56 bg-[#0f172a] text-white flex flex-col shrink-0 sticky top-[65px] h-[calc(100vh-65px)]">
         {/* Nav */}
         <nav className="flex flex-col gap-1 p-3 flex-1">
           <NavLink to="/admin/dashboard" className={navClass}>
@@ -47,6 +47,10 @@ export default function AdminLayout() {
           <NavLink to="/admin/stripe" className={navClass}>
             <KeyRound size={18} />
             Stripe
+          </NavLink>
+          <NavLink to="/admin/social-media" className={navClass}>
+            <Share2 size={18} />
+            Social Media
           </NavLink>
           <NavLink to="/admin/users" className={navClass}>
             <UserCog size={18} />
