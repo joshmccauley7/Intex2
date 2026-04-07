@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import '../App.css';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Users, Home, Shield, type LucideIcon } from 'lucide-react';
 import safiraLogoImg from '../images/safira cropped.png';
 import valuesSafetyImg from '../images/values/safety.jpg';
 import valuesRestorationImg from '../images/values/restoration.jpg';
@@ -17,6 +17,12 @@ const imageModules = import.meta.glob(
 ) as Record<string, { default: string }>;
 
 const heroImages = Object.values(imageModules).map((m) => m.default);
+
+const homepageImpactStats: { icon: LucideIcon; value: string; label: string }[] = [
+  { icon: Users, value: '77+', label: 'Children Served' },
+  { icon: Home, value: '9', label: 'Safe Homes' },
+  { icon: Shield, value: '8', label: 'Years of Impact' },
+];
 
 // ─────────────────────────────────────────────
 // FAQ Data
@@ -433,18 +439,28 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* ── Founder Quote (intersecting card) ── */}
-            <div className="relative z-10" style={{ marginTop: '-6rem', marginBottom: '3rem', padding: '0 12.5%' }}>
-        <div
-          className="rounded-2xl px-14 py-8 text-center"
-          style={{ background: '#ffffff', boxShadow: '0 8px 40px rgba(15, 23, 42, 0.18)' }}
-        >
-          <span style={{ fontSize: '3.5rem', lineHeight: 1, color: '#2563eb', fontFamily: 'Georgia, serif', display: 'block', marginBottom: '0.25rem' }}>&ldquo;</span>
-          <p style={{ fontFamily: "'DM Serif Display', serif", fontWeight: 400, fontSize: 'clamp(1.4rem, 2.6vw, 1.9rem)', lineHeight: '1.8', color: '#1e293b', margin: '0 0 1.5rem' }}>
-            Every child deserves to feel safe, valued, and full of possibility.
-            That is not a dream — it is a right we fight for every single day.
-          </p>
-          <p style={{ fontSize: '1rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.05em' }}>— Safira Founders</p>
+      {/* ── Impact stats (intersecting row) ── */}
+      <div className="relative z-10 -mt-24 mb-14 w-full max-w-5xl mx-auto px-5 sm:px-8">
+        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-5 lg:gap-6">
+          {homepageImpactStats.map(({ icon: Icon, value, label }) => (
+            <div
+              key={label}
+              className="group relative flex flex-col items-center rounded-2xl border border-slate-200/90 bg-white px-6 pb-9 pt-10 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-4px_rgba(15,23,42,0.1)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.14)]"
+            >
+              <div
+                className="mb-5 flex h-[3.5rem] w-[3.5rem] shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-blue-50 to-blue-100/60 text-safira-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-blue-200/50"
+                aria-hidden
+              >
+                <Icon size={30} strokeWidth={1.65} className="opacity-95" />
+              </div>
+              <p className="min-h-[3rem] text-[2.625rem] font-bold leading-none tracking-tight text-navy tabular-nums sm:text-5xl sm:min-h-[3.25rem]">
+                {value}
+              </p>
+              <p className="mt-3 max-w-[11rem] text-[0.9375rem] font-medium leading-snug text-slate-600">
+                {label}
+              </p>
+            </div>
+          ))}
         </div>
       </div>
 
