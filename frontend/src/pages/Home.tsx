@@ -309,17 +309,11 @@ export default function HomePage() {
           >
             Home
           </Link>
-          <a href="/about" className="hover:text-white transition-colors">
-            About
-          </a>
           <Link to="/impact" className="hover:text-white transition-colors">
             Impact
           </Link>
           <a href="/donate" className="hover:text-white transition-colors">
             Donate
-          </a>
-          <a href="/contact" className="hover:text-white transition-colors">
-            Contact
           </a>
           <Link to="/admin/donors" className="hover:text-white transition-colors">
             Admin
