@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import '../App.css';
-import { Heart, Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
+import faviconImg from '/favicon.ico';
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
 import ThemeToggle from '../components/theme/ThemeToggle';
@@ -295,7 +296,7 @@ export default function HomePage() {
       {/* ── Navbar ── */}
       <nav className="bg-[#0f172a] dark:bg-slate-950 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800/80">
         <Link to="/" className="flex items-center gap-2 font-bold text-xl">
-          <Heart className="text-safira-blue fill-safira-blue" size={22} />
+          <img src={faviconImg} alt="Safira logo" style={{ width: 22, height: 22 }} />
           Safira
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
@@ -321,7 +322,7 @@ export default function HomePage() {
             href="/donate"
             className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
           >
-            <Heart size={16} className="fill-white" />
+            <img src={faviconImg} alt="" style={{ width: 16, height: 16 }} />
             <span className="hidden sm:inline">Donate Now</span>
           </a>
         </div>
@@ -372,7 +373,7 @@ export default function HomePage() {
                 href="/donate"
                 className="inline-flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white font-semibold px-6 py-3 rounded-lg transition-colors text-sm shadow"
               >
-                <Heart size={16} className="fill-white" />
+                <img src={faviconImg} alt="" style={{ width: 16, height: 16 }} />
                 Donate Now
               </a>
             </div>
