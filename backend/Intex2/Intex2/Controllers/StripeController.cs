@@ -1,3 +1,4 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
@@ -15,6 +16,7 @@ public class StripeController : ControllerBase
     }
 
     [HttpGet("admin/status")]
+    [Authorize(Policy = "AdminOnly")]
     public IActionResult GetAdminStatus()
     {
         var hasSecret = !string.IsNullOrWhiteSpace(Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY"));
@@ -27,6 +29,7 @@ public class StripeController : ControllerBase
     }
 
     [HttpPost("admin/keys")]
+    [Authorize(Policy = "AdminOnly")]
     public IActionResult SaveKeys([FromBody] SaveStripeKeysRequest req)
     {
         if (string.IsNullOrWhiteSpace(req.SecretKey) || string.IsNullOrWhiteSpace(req.PublishableKey))
