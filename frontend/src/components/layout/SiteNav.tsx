@@ -1,7 +1,7 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { LogOut } from 'lucide-react';
-import faviconImg from '/favicon.ico';
+import navLogoImg from '../../images/background.jpg';
 import ThemeToggle from '../theme/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmDialog from '../ui/ConfirmDialog';
@@ -30,7 +30,7 @@ export default function SiteNav() {
     <nav className="bg-[#0f172a] dark:bg-slate-950 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800/80">
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2 font-bold text-xl shrink-0">
-        <img src={faviconImg} alt="Safira logo" style={{ width: 22, height: 22 }} />
+        <img src={navLogoImg} alt="Safira logo" style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: '4px' }} />
         Safira
       </Link>
 

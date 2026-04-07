@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import '../App.css';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import safiraLogoImg from '../images/safira cropped.png';
-import faviconImg from '/favicon.ico';
 import valuesSafetyImg from '../images/values/safety.jpg';
 import valuesRestorationImg from '../images/values/restoration.jpg';
 import valuesJusticeImg from '../images/values/justice.png';
@@ -313,9 +312,8 @@ export default function HomePage() {
             <div className="hero-animate-delay-2">
               <a
                 href="/donate"
-                className="inline-flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white font-semibold px-6 py-3 rounded-lg transition-colors text-sm shadow"
+                className="inline-flex items-center bg-safira-blue hover:bg-safira-blue-dark text-white font-semibold px-6 py-3 rounded-lg transition-colors text-sm shadow"
               >
-                <img src={faviconImg} alt="" style={{ width: 16, height: 16 }} />
                 Donate Now
               </a>
             </div>
