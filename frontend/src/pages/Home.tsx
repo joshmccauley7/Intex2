@@ -353,18 +353,18 @@ export default function HomePage() {
         {/* Text card — left side */}
         <div className="relative z-10 h-full flex items-center px-10 md:px-16">
           <div
-            className="max-w-sm w-full rounded-2xl px-8 py-9 hero-animate"
+            className="w-[480px] max-w-[55%] rounded-lg px-8 py-4 hero-animate"
             style={{
-              background: 'rgba(255,255,255,0.65)',
+              background: 'rgba(255,255,255,0.72)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
-              boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
+              boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
             }}
           >
-            <h1 className="text-3xl font-bold leading-tight mb-3 text-[#0f172a] hero-animate">
+            <h1 className="text-3xl font-bold leading-tight mb-2 text-[#0f172a] hero-animate">
               Every Child Deserves Safety
             </h1>
-            <p className="text-slate-600 mb-6 leading-relaxed text-sm hero-animate-delay">
+            <p className="text-slate-600 mb-4 leading-relaxed text-sm hero-animate-delay">
               Safira protects children who are victims of sexual abuse in Brazil, providing
               shelter, healing, and a path to a brighter future.
             </p>
