@@ -2,6 +2,10 @@ import { useEffect, useState } from 'react';
 import '../App.css';
 import { Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import faviconImg from '/favicon.ico';
+import valuesSafetyImg from '../images/values/safety.jpg';
+import valuesRestorationImg from '../images/values/restoration.jpg';
+import valuesJusticeImg from '../images/values/justice.png';
+import valuesEmpowermentImg from '../images/values/empowerment.jpg';
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
 import SiteNav from '../components/layout/SiteNav';
@@ -390,17 +394,14 @@ export default function HomePage() {
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-6">
             {[
-              { title: 'Safety', desc: 'A stable, nurturing home is the first step. Every child who comes to us is safe from harm from day one.' },
-              { title: 'Restoration', desc: 'We walk alongside each child through their healing journey — at their pace, on their terms, with full dignity.' },
-              { title: 'Justice', desc: 'We support survivors in pursuing what justice means to them — without pressure, with unwavering advocacy.' },
-              { title: 'Empowerment', desc: 'Our goal is to help each child move from surviving to thriving — becoming leaders and advocates for themselves.' },
-            ].map(({ title, desc }) => (
+              { title: 'Safety', desc: 'A stable, nurturing home is the first step. Every child who comes to us is safe from harm from day one.', img: valuesSafetyImg, imgAlt: 'Shield with clasped hands — Safety' },
+              { title: 'Restoration', desc: 'We walk alongside each child through their healing journey — at their pace, on their terms, with full dignity.', img: valuesRestorationImg, imgAlt: 'Hands holding a growing plant — Restoration' },
+              { title: 'Justice', desc: 'We support survivors in pursuing what justice means to them — without pressure, with unwavering advocacy.', img: valuesJusticeImg, imgAlt: 'Scales of justice with laurel wreath — Justice' },
+              { title: 'Empowerment', desc: 'Our goal is to help each child move from surviving to thriving — becoming leaders and advocates for themselves.', img: valuesEmpowermentImg, imgAlt: 'Raised fist with rays of light — Empowerment' },
+            ].map(({ title, desc, img, imgAlt }) => (
               <div key={title} className="bg-white dark:bg-slate-800 rounded-2xl p-6 text-center border border-slate-100 dark:border-slate-700 shadow-sm">
-                <div
-                  className="mx-auto mb-5 rounded-xl flex items-center justify-center"
-                  style={{ width: 88, height: 88, background: '#f1f5f9', border: '2px dashed #cbd5e1' }}
-                >
-                  <span className="text-slate-300 text-xs select-none">img</span>
+                <div className="mx-auto mb-5 flex items-center justify-center" style={{ width: 88, height: 88 }}>
+                  <img src={img} alt={imgAlt} style={{ width: 88, height: 88, objectFit: 'contain', borderRadius: '0.75rem' }} />
                 </div>
                 <h3 className="font-bold text-lg text-[#0f172a] dark:text-white mb-2">{title}</h3>
                 <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">{desc}</p>
