@@ -119,21 +119,29 @@ const RISK_BADGE: Record<string, string> = {
 
 const PAGE_SIZE = 20
 
-function generateResidentCodes() {
-  const now = new Date()
-  const y = now.getFullYear()
-  const m = String(now.getMonth() + 1).padStart(2, '0')
-  const d = String(now.getDate()).padStart(2, '0')
-  const stamp = `${y}${m}${d}`
-  const unique = `${Date.now()}`.slice(-4)
+function generateResidentCodesFromExisting(residents: Array<{ caseControlNo: string | null; internalCode: string | null }>) {
+  const maxInternal = residents.reduce((max, r) => {
+    const match = r.internalCode?.match(/^LS-(\d+)$/i)
+    if (!match) return max
+    return Math.max(max, parseInt(match[1], 10))
+  }, 0)
+
+  const maxCaseControl = residents.reduce((max, r) => {
+    const match = r.caseControlNo?.match(/^C(\d+)$/i)
+    if (!match) return max
+    return Math.max(max, parseInt(match[1], 10))
+  }, 0)
+
+  const nextInternal = maxInternal + 1
+  const nextCaseControl = maxCaseControl + 1
+
   return {
-    caseControlNo: `CCN-${stamp}-${unique}`,
-    internalCode: `RES-${y}-${unique}`,
+    caseControlNo: `C${String(nextCaseControl).padStart(4, '0')}`,
+    internalCode: `LS-${String(nextInternal).padStart(4, '0')}`,
   }
 }
 
 const blankForm = (): Partial<ResidentDetail> => ({
-  ...generateResidentCodes(),
   caseStatus: 'Active',
   caseCategory: '',
   currentRiskLevel: 'Medium',
@@ -569,6 +577,18 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
   const [form, setForm] = useState<Partial<ResidentDetail>>(existing ?? blankForm())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (existing) return
+    if (form.caseControlNo || form.internalCode) return
+
+    apiFetch('/api/residents')
+      .then((rows: Array<{ caseControlNo: string | null; internalCode: string | null }>) => {
+        const generated = generateResidentCodesFromExisting(rows)
+        setForm((f) => ({ ...f, ...generated }))
+      })
+      .catch(() => null)
+  }, [existing, form.caseControlNo, form.internalCode])
 
   const set = (field: keyof ResidentDetail, value: unknown) =>
     setForm(f => ({ ...f, [field]: value }))
