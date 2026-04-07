@@ -36,6 +36,7 @@ export default function App() {
             <Routes>
               <Route path="/" element={<HomePage />} />
               <Route path="/impact" element={<ImpactDashboard />} />
+              <Route path="/donate" element={<DonatePage />} />
               <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
               <Route path="/login" element={<LoginPage />} />
               <Route
@@ -50,6 +51,7 @@ export default function App() {
                 <Route path="residents" element={<ResidentsPage />} />
                 <Route path="process-recordings" element={<ProcessRecordingsPage />} />
                 <Route path="home-visitations" element={<HomeVisitationsPage />} />
+                <Route path="stripe" element={<StripeSettingsPage />} />
               </Route>
             </Routes>
           </AuthProvider>

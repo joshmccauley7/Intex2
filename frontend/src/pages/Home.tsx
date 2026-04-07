@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import '../App.css';
 import { Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import faviconImg from '/favicon.ico';
@@ -258,6 +258,7 @@ function FAQAccordion() {
 // Home Page
 // ─────────────────────────────────────────────
 export default function HomePage() {
+  const navigate = useNavigate();
   const { session, isAdmin, logout } = useAuth();
   const [impact, setImpact] = useState<ImpactSummary | null>(null);
   const [currentImg, setCurrentImg] = useState(0);
@@ -319,7 +320,7 @@ export default function HomePage() {
           <ThemeToggle />
           {session.isAuthenticated ? (
             <button
-              onClick={() => (isAdmin ? (window.location.href = '/admin/donors') : logout())}
+              onClick={() => (isAdmin ? navigate('/admin/donors') : logout())}
               className="text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
               title={isAdmin ? 'Go to admin' : 'Sign out'}
             >
