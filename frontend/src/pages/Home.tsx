@@ -315,6 +315,9 @@ export default function HomePage() {
           <a href="/contact" className="hover:text-white transition-colors">
             Contact
           </a>
+          <Link to="/admin/donors" className="hover:text-white transition-colors">
+            Admin
+          </Link>
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
