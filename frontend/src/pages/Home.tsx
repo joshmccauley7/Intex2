@@ -434,14 +434,13 @@ export default function HomePage() {
       </section>
 
       {/* ── Founder Quote (intersecting card) ── */}
-      <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&display=swap" rel="stylesheet" />
-      <div className="relative z-10" style={{ marginTop: '-6rem', marginBottom: '3rem', padding: '0 12.5%' }}>
+            <div className="relative z-10" style={{ marginTop: '-6rem', marginBottom: '3rem', padding: '0 12.5%' }}>
         <div
           className="rounded-2xl px-14 py-8 text-center"
           style={{ background: '#ffffff', boxShadow: '0 8px 40px rgba(15, 23, 42, 0.18)' }}
         >
           <span style={{ fontSize: '3.5rem', lineHeight: 1, color: '#2563eb', fontFamily: 'Georgia, serif', display: 'block', marginBottom: '0.25rem' }}>&ldquo;</span>
-          <p style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontStyle: 'italic', fontSize: 'clamp(1.4rem, 2.6vw, 1.9rem)', lineHeight: '1.8', color: '#1e293b', margin: '0 0 1.5rem' }}>
+          <p style={{ fontFamily: "'DM Serif Display', serif", fontWeight: 400, fontSize: 'clamp(1.4rem, 2.6vw, 1.9rem)', lineHeight: '1.8', color: '#1e293b', margin: '0 0 1.5rem' }}>
             Every child deserves to feel safe, valued, and full of possibility.
             That is not a dream — it is a right we fight for every single day.
           </p>
