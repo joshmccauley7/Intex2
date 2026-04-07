@@ -1,15 +1,24 @@
 import { useState } from "react";
-import aboutImg from "../images/tabs/About.jpg";
-import missionImg from "../images/tabs/Mission.jpg";
-import platformImg from "../images/tabs/Platform.jpg";
-import donateImg from "../images/tabs/Donate.jpg";
+
+// Tab images are optional — add About.jpg, Mission.jpg, Platform.jpg, Donate.jpg
+// to src/images/tabs/ and they will appear automatically.
+const tabImageModules = import.meta.glob("../images/tabs/*.{jpg,jpeg,png,webp}", {
+  eager: true,
+}) as Record<string, { default: string }>;
+
+function tabImg(name: string): string | undefined {
+  const key = Object.keys(tabImageModules).find((k) =>
+    k.toLowerCase().includes(name.toLowerCase())
+  );
+  return key ? tabImageModules[key].default : undefined;
+}
 
 interface TabContent {
   heading: string;
   body: string;
   accent: string;
   accentLight: string;
-  image: string;
+  image?: string;
   imageAlt: string;
 }
 
@@ -28,7 +37,7 @@ const tabs: Tab[] = [
       body: "Safira is a nonprofit organization dedicated to providing safe housing, holistic care, and lasting restoration to girls who have survived sex trafficking and abuse. Inspired by the pioneering work of Lighthouse Sanctuary in the Philippines, we are bringing that same model of healing — rooted in hope, dignity, and community — to a new region of the world.",
       accent: "#2563eb",
       accentLight: "#eff6ff",
-      image: aboutImg,
+      image: tabImg("about"),
       imageAlt: "Safira safe house exterior",
     },
   },
@@ -40,7 +49,7 @@ const tabs: Tab[] = [
       body: "Our mission is to serve girl survivors with everything they need to thrive: safe shelter, nutritious food, access to education, and a community of people who see, hear, and love them. We are guided by a simple belief — every child deserves to feel safe, valued, and full of possibility. Since 2022, we have served over 40 residents across two shelters.",
       accent: "#7c3aed",
       accentLight: "#f5f3ff",
-      image: missionImg,
+      image: tabImg("mission"),
       imageAlt: "Girls in a classroom learning together",
     },
   },
@@ -52,7 +61,7 @@ const tabs: Tab[] = [
       body: "We built a secure, centralized case management platform so our staff can spend less time fighting spreadsheets and more time with the girls they serve. The system tracks resident progress, manages donor relationships, surfaces impact metrics in real time, and uses machine learning to flag at-risk donors before they lapse — all protected behind role-based authentication and GDPR-compliant privacy controls.",
       accent: "#059669",
       accentLight: "#ecfdf5",
-      image: platformImg,
+      image: tabImg("platform"),
       imageAlt: "Screenshot of the Safira admin dashboard",
     },
   },
@@ -64,7 +73,7 @@ const tabs: Tab[] = [
       body: "Every donation to Safira goes directly toward shelter, meals, education, and care for the girls we serve. We believe donors deserve full transparency — that's why our platform gives you access to your giving history, real impact data, and the stories behind the numbers. Whether you give once or become a recurring supporter, you are part of restoring hope.",
       accent: "#dc2626",
       accentLight: "#fef2f2",
-      image: donateImg,
+      image: tabImg("donate"),
       imageAlt: "A child reading a book in the Safira shelter",
     },
   },
@@ -136,10 +145,16 @@ export default function SafiraTabbedContent() {
             borderRadius: "16px",
             overflow: "hidden",
             display: "flex",
+            flexDirection: "column",
             minHeight: "280px",
             animation: "fadeSlide 0.25s ease",
           }}
         >
+          {/* Accent strip — full width across top */}
+          <div style={{ height: "4px", background: accent, flexShrink: 0 }} />
+
+          {/* Row: text + image */}
+          <div style={{ display: "flex", flex: 1 }}>
           {/* Left: text content (2/3) */}
           <div
             style={{
@@ -149,8 +164,6 @@ export default function SafiraTabbedContent() {
               borderRight: "1px solid #e8e6e0",
             }}
           >
-            {/* Accent strip */}
-            <div style={{ height: "4px", background: accent, flexShrink: 0 }} />
             <div
               style={{
                 padding: "1.75rem 2rem 2rem",
@@ -186,27 +199,30 @@ export default function SafiraTabbedContent() {
             </div>
           </div>
 
-          {/* Right: image (1/3) */}
-          <div
-            style={{
-              flex: "1",
-              minWidth: 0,
-              padding: "12px 12px 12px 0",
-            }}
-          >
-            <img
-              src={image}
-              alt={imageAlt}
+          {/* Right: image (1/3) — only shown when image exists */}
+          {image && (
+            <div
               style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-                display: "block",
-                borderRadius: "8px",
+                flex: "1",
+                minWidth: 0,
+                padding: "12px 12px 12px 0",
               }}
-            />
-          </div>
-        </div>
+            >
+              <img
+                src={image}
+                alt={imageAlt}
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                  display: "block",
+                  borderRadius: "8px",
+                }}
+              />
+            </div>
+          )}
+          </div>{/* end row */}
+        </div>{/* end card */}
 
         <style>{`
           @keyframes fadeSlide {
