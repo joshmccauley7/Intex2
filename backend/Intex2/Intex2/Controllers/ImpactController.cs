@@ -131,7 +131,12 @@ public class ImpactController : ControllerBase
                 """
                 SELECT
                     to_char(date_trunc('month', donation_date), 'YYYY-MM') AS month,
-                    SUM(COALESCE(amount, 0)) AS total_amount_php,
+                    SUM(
+                        CASE
+                            WHEN UPPER(COALESCE(currency_code, 'PHP')) = 'USD' THEN COALESCE(amount, 0) * 56
+                            ELSE COALESCE(amount, 0)
+                        END
+                    ) AS total_amount_php,
                     COUNT(*) AS donation_count
                 FROM donations
                 WHERE donation_type = 'Monetary'
@@ -151,7 +156,13 @@ public class ImpactController : ControllerBase
                 """
                 SELECT
                     donation_type,
-                    SUM(COALESCE(amount, estimated_value, 0)) AS total_value,
+                    SUM(
+                        CASE
+                            WHEN amount IS NOT NULL AND UPPER(COALESCE(currency_code, 'PHP')) = 'USD' THEN amount * 56
+                            WHEN amount IS NOT NULL THEN amount
+                            ELSE COALESCE(estimated_value, 0)
+                        END
+                    ) AS total_value,
                     COUNT(*) AS event_count
                 FROM donations
                 GROUP BY donation_type
