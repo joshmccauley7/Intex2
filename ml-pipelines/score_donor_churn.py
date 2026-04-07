@@ -120,7 +120,7 @@ def build_feature_matrix(
     )
     trend = (
         donations.groupby("supporter_id")
-        .apply(monetary_trend_slope)
+        .apply(monetary_trend_slope, include_groups=False)
         .reset_index(name="monetary_trend")
     )
     rfm = rfm.merge(trend, on="supporter_id", how="left")
@@ -128,7 +128,7 @@ def build_feature_matrix(
     # Temporal
     temp = (
         donations.groupby("supporter_id")
-        .apply(temporal_features)
+        .apply(temporal_features, include_groups=False)
         .reset_index()
     )
     months_active = (
@@ -180,7 +180,9 @@ def build_feature_matrix(
             "created_at",
         ]
     ].copy()
-    feat["tenure_days"] = (analysis_date - pd.to_datetime(feat["created_at"])).dt.days
+    feat = feat.assign(
+        tenure_days=(analysis_date - pd.to_datetime(feat["created_at"])).dt.days
+    )
 
     for df, label in [
         (rfm, "RFM"),
@@ -248,9 +250,13 @@ def main():
     donations    = pd.read_sql("SELECT * FROM donations",              conn)
     allocations  = pd.read_sql("SELECT * FROM donation_allocations",   conn)
 
-    supporters["created_at"]          = pd.to_datetime(supporters["created_at"])
-    supporters["first_donation_date"] = pd.to_datetime(supporters["first_donation_date"])
-    donations["donation_date"]        = pd.to_datetime(donations["donation_date"])
+    supporters = supporters.assign(
+        created_at=pd.to_datetime(supporters["created_at"]),
+        first_donation_date=pd.to_datetime(supporters["first_donation_date"]),
+    )
+    donations = donations.assign(
+        donation_date=pd.to_datetime(donations["donation_date"]),
+    )
 
     log.info(
         "Loaded: %d supporters, %d donations, %d allocations",
