@@ -98,22 +98,6 @@ public class AuthController : ControllerBase
 
         await _userManager.AddToRoleAsync(user, AdminSeeder.DonorRole);
 
-        // Create a matching Supporter record in PostgreSQL
-        var nameParts = (request.FullName ?? request.Email).Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
-        var supporter = new Supporter
-        {
-            SupporterType = "MonetaryDonor",
-            DisplayName = request.FullName ?? request.Email,
-            FirstName = nameParts.Length > 0 ? nameParts[0] : request.Email,
-            LastName = nameParts.Length > 1 ? nameParts[1] : "",
-            Email = user.Email,
-            Status = "Active",
-            CreatedAt = DateTime.UtcNow,
-            AcquisitionChannel = "Website"
-        };
-        _db.Supporters.Add(supporter);
-        await _db.SaveChangesAsync();
-
         // Auto sign-in after registration
         await _signInManager.SignInAsync(user, isPersistent: false);
 
