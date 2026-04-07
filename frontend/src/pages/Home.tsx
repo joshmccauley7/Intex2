@@ -72,7 +72,7 @@ interface AccordionItemProps {
 
 function AccordionItem({ question, answer, isOpen, onToggle }: AccordionItemProps) {
   return (
-    <div style={{ borderBottom: '1px solid #e5e2db', overflow: 'hidden' }}>
+    <div style={{ borderBottom: '1px solid #c9c2b4', overflow: 'hidden' }}>
       <button
         onClick={onToggle}
         style={{
@@ -202,7 +202,7 @@ function FAQAccordion() {
           </h2>
         </div>
 
-        <div style={{ borderTop: '1px solid #e5e2db' }}>
+        <div style={{ borderTop: '1px solid #c9c2b4' }}>
           {faqs.map((faq, i) => (
             <AccordionItem
               key={i}
@@ -214,28 +214,21 @@ function FAQAccordion() {
           ))}
         </div>
 
-        <p
+        <div
           style={{
             marginTop: '2rem',
             fontSize: '0.875rem',
             color: '#5f5d53',
             fontFamily: "'DM Sans', sans-serif",
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '0.35rem',
           }}
         >
-          Still have questions?{' '}
-          <a
-            href="#contact"
-            style={{
-              color: '#1a1a18',
-              textDecoration: 'underline',
-              textDecorationColor: '#b0ad9e',
-              textUnderlineOffset: '3px',
-            }}
-          >
-            Get in touch
-          </a>
-          .
-        </p>
+          <p style={{ margin: 0, fontWeight: 600, color: '#1a1a18' }}>Still have questions? Reach us directly:</p>
+          <p style={{ margin: 0 }}>📞 555-555-5555</p>
+          <p style={{ margin: 0 }}>✉️ safira@email.com</p>
+        </div>
       </div>
     </>
   );
@@ -443,17 +436,18 @@ export default function HomePage() {
       </section>
 
       {/* ── Founder Quote (intersecting card) ── */}
-      <div className="relative z-10 px-6" style={{ marginTop: '-6rem', marginBottom: '3rem' }}>
+      <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@1,600&display=swap" rel="stylesheet" />
+      <div className="relative z-10" style={{ marginTop: '-6rem', marginBottom: '3rem', padding: '0 12.5%' }}>
         <div
-          className="max-w-2xl mx-auto rounded-2xl px-10 py-8 text-center"
+          className="rounded-2xl px-14 py-8 text-center"
           style={{ background: '#ffffff', boxShadow: '0 8px 40px rgba(15, 23, 42, 0.18)' }}
         >
-          <span style={{ fontSize: '3rem', lineHeight: 1, color: '#2563eb', fontFamily: 'Georgia, serif', display: 'block', marginBottom: '0.25rem' }}>&ldquo;</span>
-          <p style={{ fontFamily: "'Lora', serif", fontSize: 'clamp(1rem, 2vw, 1.25rem)', lineHeight: '1.8', color: '#1e293b', margin: '0 0 1.5rem' }}>
+          <span style={{ fontSize: '3.5rem', lineHeight: 1, color: '#2563eb', fontFamily: 'Georgia, serif', display: 'block', marginBottom: '0.25rem' }}>&ldquo;</span>
+          <p style={{ fontFamily: "'Cormorant Garamond', serif", fontWeight: 600, fontStyle: 'italic', fontSize: 'clamp(1.4rem, 2.6vw, 1.9rem)', lineHeight: '1.8', color: '#1e293b', margin: '0 0 1.5rem' }}>
             Every child deserves to feel safe, valued, and full of possibility.
             That is not a dream — it is a right we fight for every single day.
           </p>
-          <p style={{ fontSize: '0.85rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.05em' }}>— Safira Founders</p>
+          <p style={{ fontSize: '1rem', fontWeight: 700, color: '#2563eb', letterSpacing: '0.05em' }}>— Safira Founders</p>
         </div>
       </div>
 
@@ -461,7 +455,9 @@ export default function HomePage() {
       <SafiraTabbedContent />
 
       {/* ── FAQ ── */}
-      <FAQAccordion />
+      <div style={{ background: '#f7f3ec' }}>
+        <FAQAccordion />
+      </div>
 
       <SiteFooter />
     </div>
