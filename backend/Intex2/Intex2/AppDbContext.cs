@@ -14,4 +14,6 @@ public class AppDbContext : DbContext
     public DbSet<HomeVisitation> HomeVisitations => Set<HomeVisitation>();
     public DbSet<CaseConference> CaseConferences => Set<CaseConference>();
     public DbSet<DonorChurnPrediction> DonorChurnPredictions => Set<DonorChurnPrediction>();
+    public DbSet<HealthWellbeingRecord> HealthWellbeingRecords => Set<HealthWellbeingRecord>();
+    public DbSet<EducationRecord> EducationRecords => Set<EducationRecord>();
 }

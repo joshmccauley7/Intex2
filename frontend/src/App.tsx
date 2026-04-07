@@ -17,6 +17,7 @@ import ResidentsPage from './pages/admin/ResidentsPage';
 import ProcessRecordingsPage from './pages/admin/ProcessRecordingsPage';
 import HomeVisitationsPage from './pages/admin/HomeVisitationsPage';
 import StripeSettingsPage from './pages/admin/StripeSettingsPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { isLoading, isAdmin } = useAuth();
@@ -30,33 +31,24 @@ export default function App() {
     <CookieConsentProvider>
       <ThemeProvider>
         <BrowserRouter>
-          <AuthProvider>
-            <AnalyticsConsentBridge />
-            <CookieBanner />
-            <CookieSettingsModal />
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/impact" element={<ImpactDashboard />} />
-              <Route path="/donate" element={<DonatePage />} />
-              <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route
-                path="/admin"
-                element={
-                  <RequireAdmin>
-                    <AdminLayout />
-                  </RequireAdmin>
-                }
-              >
-                <Route path="donors" element={<DonorsPage />} />
-                <Route path="residents" element={<ResidentsPage />} />
-                <Route path="process-recordings" element={<ProcessRecordingsPage />} />
-                <Route path="home-visitations" element={<HomeVisitationsPage />} />
-                <Route path="stripe" element={<StripeSettingsPage />} />
-              </Route>
-            </Routes>
-          </AuthProvider>
+          <AnalyticsConsentBridge />
+          <CookieBanner />
+          <CookieSettingsModal />
+          <Routes>
+            <Route path="/" element={<HomePage />} />
+            <Route path="/impact" element={<ImpactDashboard />} />
+            <Route path="/donate" element={<DonatePage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route path="donors" element={<DonorsPage />} />
+              <Route path="residents" element={<ResidentsPage />} />
+              <Route path="process-recordings" element={<ProcessRecordingsPage />} />
+              <Route path="home-visitations" element={<HomeVisitationsPage />} />
+              <Route path="stripe" element={<StripeSettingsPage />} />
+            </Route>
+          </Routes>
         </BrowserRouter>
       </ThemeProvider>
     </CookieConsentProvider>
