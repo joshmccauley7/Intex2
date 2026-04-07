@@ -92,7 +92,7 @@ export default function DonorsPage() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-navy-DEFAULT">Donors &amp; Contributors</h1>
+        <h1 className="text-2xl font-bold text-[#0f172a]">Donors &amp; Contributors</h1>
         <button
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -152,7 +152,7 @@ export default function DonorsPage() {
                 <tbody className="divide-y divide-slate-100">
                   {paginated.map((s) => (
                     <tr key={s.supporterId} onClick={() => openDetail(s.supporterId)} className="hover:bg-slate-50 transition-colors cursor-pointer">
-                      <td className="px-4 py-3 font-medium text-navy-DEFAULT">{s.displayName}</td>
+                      <td className="px-4 py-3 font-medium text-[#0f172a]">{s.displayName}</td>
                       <td className="px-4 py-3 text-slate-600">{s.supporterType}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[s.status] ?? 'bg-slate-100 text-slate-500'}`}>
@@ -185,7 +185,7 @@ export default function DonorsPage() {
       {/* Delete confirmation modal */}
       {deleteConfirmId !== null && (
         <Modal onClose={() => setDeleteConfirmId(null)}>
-          <h2 className="text-lg font-bold text-navy-DEFAULT mb-2">Delete Supporter</h2>
+          <h2 className="text-lg font-bold text-[#0f172a] mb-2">Delete Supporter</h2>
           <p className="text-slate-600 text-sm mb-6">Are you sure you want to delete this supporter? This cannot be undone.</p>
           <div className="flex gap-3 justify-end">
             <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
@@ -203,7 +203,7 @@ export default function DonorsPage() {
             <>
               <div className="flex items-start justify-between mb-4">
                 <div>
-                  <h2 className="text-xl font-bold text-navy-DEFAULT">{selectedSupporter.displayName}</h2>
+                  <h2 className="text-xl font-bold text-[#0f172a]">{selectedSupporter.displayName}</h2>
                   <p className="text-sm text-slate-500">{selectedSupporter.supporterType}</p>
                 </div>
                 <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[selectedSupporter.status] ?? ''}`}>
@@ -221,7 +221,7 @@ export default function DonorsPage() {
               </div>
 
               <div className="border-t border-slate-100 pt-4 mb-4">
-                <h3 className="text-sm font-semibold text-navy-DEFAULT mb-3">Donations ({selectedSupporter.donations?.length ?? 0})</h3>
+                <h3 className="text-sm font-semibold text-[#0f172a] mb-3">Donations ({selectedSupporter.donations?.length ?? 0})</h3>
                 {selectedSupporter.donations?.length > 0 ? (
                   <div className="rounded-lg border border-slate-200 overflow-hidden">
                     <table className="w-full text-sm">
@@ -433,7 +433,7 @@ function SupporterFormModal({ existing, onClose, onSaved }: SupporterFormModalPr
 
   return (
     <Modal onClose={onClose}>
-      <h2 className="text-lg font-bold text-navy-DEFAULT mb-4">{existing ? 'Edit Supporter' : 'Add Supporter'}</h2>
+      <h2 className="text-lg font-bold text-[#0f172a] mb-4">{existing ? 'Edit Supporter' : 'Add Supporter'}</h2>
       <form onSubmit={handleSubmit}>
         <FormField label="Type">
           <select className={inputClass} value={form.supporterType} onChange={(e) => setForm({ ...form, supporterType: e.target.value })}>
@@ -544,7 +544,7 @@ function DonationFormModal({ supporterId, onClose, onSaved }: DonationFormModalP
 
   return (
     <Modal onClose={onClose}>
-      <h2 className="text-lg font-bold text-navy-DEFAULT mb-4">Add Donation</h2>
+      <h2 className="text-lg font-bold text-[#0f172a] mb-4">Add Donation</h2>
       <form onSubmit={handleSubmit}>
         <FormField label="Type">
           <select className={inputClass} value={form.donationType} onChange={(e) => setForm({ ...form, donationType: e.target.value })} required>

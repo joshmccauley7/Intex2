@@ -165,7 +165,7 @@ export default function ResidentsPage() {
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold text-navy-DEFAULT">Caseload Inventory</h1>
+        <h1 className="text-2xl font-bold text-[#0f172a]">Caseload Inventory</h1>
         <button
           onClick={() => setShowCreateModal(true)}
           className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
@@ -235,7 +235,7 @@ export default function ResidentsPage() {
                 <tbody className="divide-y divide-slate-100">
                   {paginated.map((r) => (
                     <tr key={r.residentId} onClick={() => openDetail(r.residentId)} className="hover:bg-slate-50 transition-colors cursor-pointer">
-                      <td className="px-4 py-3 font-medium text-navy-DEFAULT">{r.internalCode ?? '—'}</td>
+                      <td className="px-4 py-3 font-medium text-[#0f172a]">{r.internalCode ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{r.caseCategory ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.caseStatus ?? ''] ?? 'bg-slate-100 text-slate-500'}`}>
@@ -276,7 +276,7 @@ export default function ResidentsPage() {
       {/* Delete confirmation modal */}
       {deleteConfirmId !== null && (
         <Modal onClose={() => setDeleteConfirmId(null)}>
-          <h2 className="text-lg font-bold text-navy-DEFAULT mb-2">Delete Resident</h2>
+          <h2 className="text-lg font-bold text-[#0f172a] mb-2">Delete Resident</h2>
           <p className="text-slate-600 text-sm mb-6">Are you sure you want to delete this resident record? This cannot be undone.</p>
           <div className="flex gap-3 justify-end">
             <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
@@ -290,7 +290,7 @@ export default function ResidentsPage() {
         <Modal onClose={() => setSelectedResident(null)} wide>
           <div className="flex items-start justify-between mb-4">
             <div>
-              <h2 className="text-xl font-bold text-navy-DEFAULT">{selectedResident.internalCode ?? 'Resident'}</h2>
+              <h2 className="text-xl font-bold text-[#0f172a]">{selectedResident.internalCode ?? 'Resident'}</h2>
               <p className="text-sm text-slate-500">{selectedResident.caseCategory ?? '—'}</p>
             </div>
             {selectedResident.caseStatus && (
@@ -423,7 +423,7 @@ function Modal({ children, onClose, wide }: { children: React.ReactNode; onClose
 }
 
 function SectionHeading({ children }: { children: React.ReactNode }) {
-  return <h3 className="text-sm font-semibold text-navy-DEFAULT mb-2 mt-4 first:mt-0">{children}</h3>
+  return <h3 className="text-sm font-semibold text-[#0f172a] mb-2 mt-4 first:mt-0">{children}</h3>
 }
 
 function DetailRow({ label, value }: { label: string; value: string | null | undefined }) {
@@ -576,7 +576,7 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
 
   return (
     <Modal onClose={onClose} wide>
-      <h2 className="text-lg font-bold text-navy-DEFAULT mb-4">{existing ? 'Edit Resident' : 'Add Resident'}</h2>
+      <h2 className="text-lg font-bold text-[#0f172a] mb-4">{existing ? 'Edit Resident' : 'Add Resident'}</h2>
       <form onSubmit={handleSubmit}>
 
         <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Identifiers</p>
