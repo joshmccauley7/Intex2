@@ -10,6 +10,7 @@ import ImpactDashboard from './pages/ImpactDashboard';
 import DonatePage from './pages/DonatePage';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
 import LoginPage from './pages/LoginPage';
+import ProfilePage from './pages/ProfilePage';
 import AdminLayout from './pages/admin/AdminLayout';
 import DonorsPage from './pages/admin/DonorsPage';
 import ResidentsPage from './pages/admin/ResidentsPage';
@@ -39,6 +40,7 @@ export default function App() {
               <Route path="/donate" element={<DonatePage />} />
               <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/profile" element={<ProfilePage />} />
               <Route
                 path="/admin"
                 element={
