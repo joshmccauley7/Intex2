@@ -13,6 +13,7 @@ function DonationForm() {
 
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [amount, setAmount] = useState('50');
   const [message, setMessage] = useState('');
   const [frequency, setFrequency] = useState<'one_time' | 'monthly'>('one_time');
@@ -31,8 +32,8 @@ function DonationForm() {
       setError('Payment service is still loading. Please try again.');
       return;
     }
-    if (!fullName.trim() || !email.trim() || !amountValue || amountValue <= 0) {
-      setError('Please enter your full name, email, and a valid amount.');
+    if (!fullName.trim() || !email.trim() || !phone.trim() || !amountValue || amountValue <= 0) {
+      setError('Please enter your full name, email, phone, and a valid amount.');
       return;
     }
 
@@ -47,6 +48,7 @@ function DonationForm() {
             amountUsd: amountValue,
             fullName: fullName.trim(),
             email: email.trim(),
+            phone: phone.trim(),
             message: message.trim(),
             successUrl: `${base}?success=1&mode=monthly&session_id={CHECKOUT_SESSION_ID}`,
             cancelUrl: `${base}?canceled=1&mode=monthly`,
@@ -66,6 +68,7 @@ function DonationForm() {
           amountUsd: amountValue,
           fullName: fullName.trim(),
           email: email.trim(),
+          phone: phone.trim(),
           message: message.trim(),
         }),
       });
@@ -99,6 +102,7 @@ function DonationForm() {
           isRecurring: false,
           fullName: fullName.trim(),
           email: email.trim(),
+          phone: phone.trim(),
           message: message.trim(),
         }),
       });
@@ -133,6 +137,17 @@ function DonationForm() {
           onChange={(e) => setEmail(e.target.value)}
           className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
           placeholder="you@example.com"
+          required
+        />
+      </div>
+      <div>
+        <label className="block text-sm font-medium mb-1">Phone number</label>
+        <input
+          type="tel"
+          value={phone}
+          onChange={(e) => setPhone(e.target.value)}
+          className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
+          placeholder="+1 (555) 123-4567"
           required
         />
       </div>

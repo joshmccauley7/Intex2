@@ -44,6 +44,7 @@ public class DonationsController : ControllerBase
             {
                 ["donor_name"] = req.FullName ?? "",
                 ["donor_email"] = req.Email ?? "",
+                ["donor_phone"] = req.Phone ?? "",
                 ["message"] = req.Message ?? ""
             }
         };
@@ -101,6 +102,7 @@ public class DonationsController : ControllerBase
             {
                 ["donor_name"] = req.FullName ?? "",
                 ["donor_email"] = req.Email ?? "",
+                ["donor_phone"] = req.Phone ?? "",
                 ["message"] = req.Message ?? "",
                 ["amount_usd"] = req.AmountUsd.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["is_recurring"] = "true"
@@ -139,7 +141,12 @@ public class DonationsController : ControllerBase
         if (existing != null)
             return Ok(new { message = "Donation already recorded.", donationId = existing.DonationId });
 
-        var supporter = await GetOrCreateSupporterAsync(req.FullName, req.Email);
+        var metaPhone = intent.Metadata != null && intent.Metadata.TryGetValue("donor_phone", out var phoneFromMeta)
+            ? phoneFromMeta
+            : null;
+        var effectivePhone = !string.IsNullOrWhiteSpace(req.Phone) ? req.Phone : metaPhone;
+
+        var supporter = await GetOrCreateSupporterAsync(req.FullName, req.Email, effectivePhone);
         var donation = await CreateDonationAsync(
             supporter.SupporterId,
             req.AmountUsd,
@@ -180,9 +187,10 @@ public class DonationsController : ControllerBase
             : ((session.AmountTotal ?? 0) / 100m);
         var fullName = session.Metadata != null && session.Metadata.TryGetValue("donor_name", out var dn) ? dn : null;
         var email = session.CustomerDetails?.Email ?? (session.Metadata != null && session.Metadata.TryGetValue("donor_email", out var de) ? de : null);
+        var phone = session.CustomerDetails?.Phone ?? (session.Metadata != null && session.Metadata.TryGetValue("donor_phone", out var dp) ? dp : null);
         var message = session.Metadata != null && session.Metadata.TryGetValue("message", out var dm) ? dm : null;
 
-        var supporter = await GetOrCreateSupporterAsync(fullName, email);
+        var supporter = await GetOrCreateSupporterAsync(fullName, email, phone);
         var donation = await CreateDonationAsync(
             supporter.SupporterId,
             amountUsd,
@@ -193,13 +201,22 @@ public class DonationsController : ControllerBase
         return Ok(new { message = "Recurring donation recorded.", donationId = donation.DonationId });
     }
 
-    private async Task<Supporter> GetOrCreateSupporterAsync(string? fullNameRaw, string? emailRaw)
+    private async Task<Supporter> GetOrCreateSupporterAsync(string? fullNameRaw, string? emailRaw, string? phoneRaw)
     {
         var email = emailRaw?.Trim();
         var fullName = string.IsNullOrWhiteSpace(fullNameRaw) ? "Anonymous Donor" : fullNameRaw.Trim();
+        var phone = phoneRaw?.Trim();
 
         var supporter = await _db.Supporters.FirstOrDefaultAsync(s => s.Email == email && s.Email != null);
-        if (supporter != null) return supporter;
+        if (supporter != null)
+        {
+            if (!string.IsNullOrWhiteSpace(phone) && !string.Equals(supporter.Phone, phone, StringComparison.Ordinal))
+            {
+                supporter.Phone = phone;
+                await _db.SaveChangesAsync();
+            }
+            return supporter;
+        }
 
         var nameParts = fullName.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
         supporter = new Supporter
@@ -209,6 +226,7 @@ public class DonationsController : ControllerBase
             FirstName = nameParts.Length > 0 ? nameParts[0] : "Anonymous",
             LastName = nameParts.Length > 1 ? nameParts[1] : "Donor",
             Email = email,
+            Phone = phone,
             Status = "Active",
             Country = "USA",
             CreatedAt = DateTime.UtcNow,
@@ -244,6 +262,7 @@ public sealed class CreatePaymentIntentRequest
     public decimal AmountUsd { get; set; }
     public string? FullName { get; set; }
     public string? Email { get; set; }
+    public string? Phone { get; set; }
     public string? Message { get; set; }
 }
 
@@ -254,6 +273,7 @@ public sealed class RecordDonationRequest
     public bool IsRecurring { get; set; }
     public string? FullName { get; set; }
     public string? Email { get; set; }
+    public string? Phone { get; set; }
     public string? Message { get; set; }
 }
 
@@ -262,6 +282,7 @@ public sealed class CreateRecurringSessionRequest
     public decimal AmountUsd { get; set; }
     public string? FullName { get; set; }
     public string? Email { get; set; }
+    public string? Phone { get; set; }
     public string? Message { get; set; }
     public string SuccessUrl { get; set; } = "";
     public string CancelUrl { get; set; } = "";
