@@ -47,4 +47,5 @@ public class Donation
 
     public Supporter Supporter { get; set; } = null!;
     public ICollection<InKindDonationItem> InKindItems { get; set; } = new List<InKindDonationItem>();
+    public ICollection<DonationAllocation> Allocations { get; set; } = new List<DonationAllocation>();
 }
