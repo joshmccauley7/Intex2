@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 [ApiController]
 [Route("api/residents")]
+[Authorize(Policy = "AdminOnly")]
 public class ResidentsController : ControllerBase
 {
     private readonly AppDbContext _db;

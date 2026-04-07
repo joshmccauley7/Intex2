@@ -1,7 +1,10 @@
-import { Outlet, NavLink } from 'react-router-dom'
-import { Heart, Users, Home, FileText, MapPin } from 'lucide-react'
+import { Outlet, NavLink, Link } from 'react-router-dom'
+import { Heart, Users, Home, FileText, MapPin, LogOut } from 'lucide-react'
+import { useAuth } from '../../context/AuthContext'
 
 export default function AdminLayout() {
+  const { session, logout } = useAuth()
+
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
       isActive
@@ -13,11 +16,14 @@ export default function AdminLayout() {
     <div className="flex min-h-screen font-sans">
       {/* Sidebar */}
       <aside className="w-56 bg-[#0f172a] text-white flex flex-col shrink-0">
-        {/* Logo */}
-        <div className="flex items-center gap-2 font-bold text-xl px-4 py-5 border-b border-slate-700">
+        {/* Logo — links back to home */}
+        <Link
+          to="/"
+          className="flex items-center gap-2 font-bold text-xl px-4 py-5 border-b border-slate-700 hover:opacity-80 transition-opacity"
+        >
           <Heart className="text-safira-blue fill-safira-blue" size={20} />
           Safira
-        </div>
+        </Link>
 
         {/* Nav */}
         <nav className="flex flex-col gap-1 p-3 flex-1">
@@ -39,14 +45,20 @@ export default function AdminLayout() {
           </NavLink>
         </nav>
 
-        {/* Back to site */}
-        <div className="p-3 border-t border-slate-700">
-          <a
-            href="/"
-            className="flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-[#1e293b]"
+        {/* User + Sign out */}
+        <div className="p-3 border-t border-slate-700 space-y-1">
+          {session.userName && (
+            <p className="px-4 py-2 text-xs text-slate-400 truncate">
+              Signed in as <span className="text-white font-medium">{session.userName}</span>
+            </p>
+          )}
+          <button
+            onClick={logout}
+            className="w-full flex items-center gap-3 px-4 py-3 text-sm font-medium text-slate-400 hover:text-white transition-colors rounded-lg hover:bg-[#1e293b]"
           >
-            ← Back to Site
-          </a>
+            <LogOut size={16} />
+            Sign Out
+          </button>
         </div>
       </aside>
 
