@@ -45,12 +45,11 @@ export async function loginUser(
 export async function registerUser(
   email: string,
   password: string,
-  confirmPassword: string,
-  fullName?: string
+  confirmPassword: string
 ): Promise<AuthSession> {
   const res = await authFetch('/api/auth/register', {
     method: 'POST',
-    body: JSON.stringify({ email, password, confirmPassword, fullName }),
+    body: JSON.stringify({ email, password, confirmPassword }),
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));

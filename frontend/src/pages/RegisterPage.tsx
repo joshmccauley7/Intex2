@@ -28,7 +28,6 @@ export default function RegisterPage() {
 
   const returnTo = searchParams.get('returnTo') ?? '/';
 
-  const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -54,7 +53,7 @@ export default function RegisterPage() {
 
     setLoading(true);
     try {
-      await registerUser(email.trim(), password, confirmPassword, fullName.trim() || undefined);
+      await registerUser(email.trim(), password, confirmPassword);
       await refreshSession();
       navigate(returnTo, { replace: true });
     } catch (err: unknown) {
@@ -83,20 +82,6 @@ export default function RegisterPage() {
         </p>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1">
-              Full name <span className="text-slate-400">(optional)</span>
-            </label>
-            <input
-              type="text"
-              autoComplete="name"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-safira-blue"
-              placeholder="Jane Doe"
-            />
-          </div>
-
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
               Email address
