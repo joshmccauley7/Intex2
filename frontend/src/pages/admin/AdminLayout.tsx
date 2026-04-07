@@ -1,5 +1,5 @@
 import { Outlet, NavLink } from 'react-router-dom'
-import { Heart, Users, Home, FileText, MapPin, KeyRound } from 'lucide-react'
+import { Heart, Users, Home, FileText, MapPin, KeyRound, LayoutDashboard } from 'lucide-react'
 
 export default function AdminLayout() {
   const navClass = ({ isActive }: { isActive: boolean }) =>
@@ -21,6 +21,10 @@ export default function AdminLayout() {
 
         {/* Nav */}
         <nav className="flex flex-col gap-1 p-3 flex-1">
+          <NavLink to="/admin/dashboard" className={navClass}>
+            <LayoutDashboard size={18} />
+            Dashboard
+          </NavLink>
           <NavLink to="/admin/donors" className={navClass}>
             <Users size={18} />
             Donors

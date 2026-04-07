@@ -315,7 +315,7 @@ export default function HomePage() {
           <a href="/donate" className="hover:text-white transition-colors">
             Donate
           </a>
-          <Link to="/admin/donors" className="hover:text-white transition-colors">
+          <Link to="/admin/dashboard" className="hover:text-white transition-colors">
             Admin
           </Link>
         </div>

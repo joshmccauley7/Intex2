@@ -14,6 +14,7 @@ import ResidentsPage from './pages/admin/ResidentsPage';
 import ProcessRecordingsPage from './pages/admin/ProcessRecordingsPage';
 import HomeVisitationsPage from './pages/admin/HomeVisitationsPage';
 import StripeSettingsPage from './pages/admin/StripeSettingsPage';
+import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 
 export default function App() {
   return (
@@ -29,6 +30,8 @@ export default function App() {
             <Route path="/donate" element={<DonatePage />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/admin" element={<AdminLayout />}>
+              <Route index element={<AdminDashboardPage />} />
+              <Route path="dashboard" element={<AdminDashboardPage />} />
               <Route path="donors" element={<DonorsPage />} />
               <Route path="residents" element={<ResidentsPage />} />
               <Route path="process-recordings" element={<ProcessRecordingsPage />} />
