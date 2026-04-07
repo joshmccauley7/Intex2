@@ -7,5 +7,6 @@ export async function apiFetch(path: string, options?: RequestInit) {
     ...options,
   });
   if (!res.ok) throw new Error(`API error ${res.status}: ${res.statusText}`);
+  if (res.status === 204) return null;
   return res.json();
 }

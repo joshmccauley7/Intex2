@@ -7,6 +7,10 @@ import AnalyticsConsentBridge from './components/cookies/AnalyticsConsentBridge'
 import HomePage from './pages/Home';
 import ImpactDashboard from './pages/ImpactDashboard';
 import PrivacyPolicyPage from './pages/PrivacyPolicyPage';
+import AdminLayout from './pages/admin/AdminLayout';
+import DonorsPage from './pages/admin/DonorsPage';
+import ResidentsPage from './pages/admin/ResidentsPage';
+import ProcessRecordingsPage from './pages/admin/ProcessRecordingsPage';
 
 export default function App() {
   return (
@@ -20,6 +24,11 @@ export default function App() {
             <Route path="/" element={<HomePage />} />
             <Route path="/impact" element={<ImpactDashboard />} />
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/admin" element={<AdminLayout />}>
+              <Route path="donors" element={<DonorsPage />} />
+              <Route path="residents" element={<ResidentsPage />} />
+              <Route path="process-recordings" element={<ProcessRecordingsPage />} />
+            </Route>
           </Routes>
         </BrowserRouter>
       </ThemeProvider>

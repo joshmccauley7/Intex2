@@ -1,0 +1,48 @@
+{
+  "model_name": "donor_churn_classifier",
+  "model_type": "RandomForestClassifier",
+  "version": "v1.0",
+  "trained_at": "2026-04-07T10:45:32.584101",
+  "training_samples": 60,
+  "churn_rate": 0.25,
+  "analysis_date": "2026-03-02",
+  "loo_auc_roc": 0.9955555555555555,
+  "cv_auc_roc": 1.0,
+  "prediction_threshold": 0.4,
+  "numeric_features": [
+    "recency_days",
+    "frequency",
+    "monetary_total",
+    "monetary_avg",
+    "monetary_trend",
+    "avg_days_between_donations",
+    "std_days_between_donations",
+    "donation_span_days",
+    "months_active",
+    "pct_recurring",
+    "num_campaigns",
+    "pct_monetary",
+    "donation_type_diversity",
+    "channel_diversity",
+    "has_social_referral",
+    "num_safehouses_supported",
+    "num_program_areas",
+    "tenure_days"
+  ],
+  "categorical_features": [
+    "supporter_type",
+    "acquisition_channel",
+    "relationship_type",
+    "region"
+  ],
+  "best_params": {
+    "max_depth": "None",
+    "min_samples_leaf": "1",
+    "n_estimators": "100"
+  },
+  "risk_thresholds": {
+    "High": 0.7,
+    "Medium": 0.4,
+    "Low": 0.0
+  }
+}
