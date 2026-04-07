@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\intex2\\backend\\intex2\\intex2\\Intex2.csproj": {}
+    "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\Intex2\\backend\\Intex2\\Intex2\\Intex2.csproj": {}
   },
   "projects": {
-    "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\intex2\\backend\\intex2\\intex2\\Intex2.csproj": {
+    "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\Intex2\\backend\\Intex2\\Intex2\\Intex2.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\intex2\\backend\\intex2\\intex2\\Intex2.csproj",
+        "projectUniqueName": "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\Intex2\\backend\\Intex2\\Intex2\\Intex2.csproj",
         "projectName": "Intex2",
-        "projectPath": "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\intex2\\backend\\intex2\\intex2\\Intex2.csproj",
+        "projectPath": "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\Intex2\\backend\\Intex2\\Intex2\\Intex2.csproj",
         "packagesPath": "C:\\Users\\joshm\\.nuget\\packages\\",
-        "outputPath": "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\intex2\\backend\\intex2\\intex2\\obj\\",
+        "outputPath": "C:\\Users\\joshm\\Desktop\\BYU\\Intex2\\Intex2\\backend\\Intex2\\Intex2\\./tempobj/",
         "projectStyle": "PackageReference",
         "fallbackFolders": [
           "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
@@ -73,6 +73,10 @@
             "Npgsql.EntityFrameworkCore.PostgreSQL": {
               "target": "Package",
               "version": "[10.0.1, )"
+            },
+            "Stripe.net": {
+              "target": "Package",
+              "version": "[51.0.0, )"
             }
           },
           "imports": [

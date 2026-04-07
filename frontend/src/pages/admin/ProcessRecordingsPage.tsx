@@ -141,7 +141,7 @@ export default function ProcessRecordingsPage() {
             {/* Header */}
             <div className="flex items-center justify-between mb-6">
               <div>
-                <h1 className="text-2xl font-bold text-navy-DEFAULT">Process Recordings</h1>
+                <h1 className="text-2xl font-bold text-[#0f172a]">Process Recordings</h1>
                 <p className="text-sm text-slate-500 mt-0.5">{selectedResident?.internalCode ?? `Resident ${selectedResidentId}`}</p>
               </div>
               <button
@@ -175,7 +175,7 @@ export default function ProcessRecordingsPage() {
                   <div className="flex items-start justify-between mb-4">
                     <div className="flex items-center gap-3 flex-wrap">
                       <div>
-                        <p className="font-semibold text-navy-DEFAULT">{rec.sessionDate ?? '—'}</p>
+                        <p className="font-semibold text-[#0f172a]">{rec.sessionDate ?? '—'}</p>
                         <p className="text-sm text-slate-500">{rec.socialWorker ?? '—'}</p>
                       </div>
                       {rec.sessionType && (
@@ -248,7 +248,7 @@ export default function ProcessRecordingsPage() {
       {/* Delete confirmation modal */}
       {deleteConfirmId !== null && (
         <Modal onClose={() => setDeleteConfirmId(null)}>
-          <h2 className="text-lg font-bold text-navy-DEFAULT mb-2">Delete Recording</h2>
+          <h2 className="text-lg font-bold text-[#0f172a] mb-2">Delete Recording</h2>
           <p className="text-slate-600 text-sm mb-6">Are you sure you want to delete this process recording? This cannot be undone.</p>
           <div className="flex gap-3 justify-end">
             <button onClick={() => setDeleteConfirmId(null)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Cancel</button>
@@ -397,7 +397,7 @@ function RecordingFormModal({ residentId, existing, onClose, onSaved }: Recordin
 
   return (
     <Modal onClose={onClose}>
-      <h2 className="text-lg font-bold text-navy-DEFAULT mb-4">
+      <h2 className="text-lg font-bold text-[#0f172a] mb-4">
         {existing ? 'Edit Process Recording' : 'New Process Recording'}
       </h2>
       <form onSubmit={handleSubmit}>

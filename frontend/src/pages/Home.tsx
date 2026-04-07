@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import '../App.css';
 import { Users, Home, Shield, ChevronLeft, ChevronRight } from 'lucide-react';
 import logoImg from '../images/background.jpg';
@@ -7,6 +7,7 @@ import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
 import ThemeToggle from '../components/theme/ThemeToggle';
 import SafiraTabbedContent from '../components/SafiraTabbedContent';
+import { useAuth } from '../context/AuthContext';
 
 // Dynamically import all images from the homepage folder
 const imageModules = import.meta.glob(
@@ -255,6 +256,8 @@ function FAQAccordion() {
 // Home Page
 // ─────────────────────────────────────────────
 export default function HomePage() {
+  const navigate = useNavigate();
+  const { session, isAdmin, logout } = useAuth();
   const [impact, setImpact] = useState<ImpactSummary | null>(null);
   const [currentImg, setCurrentImg] = useState(0);
   const [imagesReady, setImagesReady] = useState(heroImages.length === 0);
@@ -301,11 +304,9 @@ export default function HomePage() {
         </Link>
         <div className="hidden md:flex items-center gap-8 text-sm font-medium text-slate-300">
           <Link to="/" className="text-white hover:text-blue-400 transition-colors">
+          <Link to="/" className="text-white hover:text-blue-400 transition-colors">
             Home
           </Link>
-          <a href="/about" className="hover:text-white transition-colors">
-            About
-          </a>
           <Link to="/impact" className="hover:text-white transition-colors">
             Impact
           </Link>
@@ -318,12 +319,22 @@ export default function HomePage() {
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          <a
-            href="/donate"
-            className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-          >
-            <span className="hidden sm:inline">Donate Now</span>
-          </a>
+          {session.isAuthenticated ? (
+            <button
+              onClick={() => (isAdmin ? navigate('/admin/donors') : logout())}
+              className="text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
+              title={isAdmin ? 'Go to admin' : 'Sign out'}
+            >
+              {session.userName}
+            </button>
+          ) : (
+            <Link
+              to="/login"
+              className="text-sm font-semibold text-white bg-safira-blue hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+            >
+              Login
+            </Link>
+          )}
         </div>
       </nav>
 

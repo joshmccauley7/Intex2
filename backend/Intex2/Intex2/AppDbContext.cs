@@ -11,4 +11,7 @@ public class AppDbContext : DbContext
     public DbSet<InKindDonationItem> InKindDonationItems => Set<InKindDonationItem>();
     public DbSet<Resident> Residents => Set<Resident>();
     public DbSet<ProcessRecording> ProcessRecordings => Set<ProcessRecording>();
+    public DbSet<HomeVisitation> HomeVisitations => Set<HomeVisitation>();
+    public DbSet<CaseConference> CaseConferences => Set<CaseConference>();
+    public DbSet<DonorChurnPrediction> DonorChurnPredictions => Set<DonorChurnPrediction>();
 }

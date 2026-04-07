@@ -1,8 +1,10 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 [ApiController]
 [Route("api")]
+[Authorize(Policy = "AdminOnly")]
 public class ProcessRecordingsController : ControllerBase
 {
     private readonly AppDbContext _db;

@@ -1,8 +1,9 @@
+using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Load .env file in development
+// ─── Load .env in development ───────────────────────────────────────────────
 if (builder.Environment.IsDevelopment())
 {
     var envPath = Path.Combine(Directory.GetCurrentDirectory(), ".env");
@@ -11,8 +12,7 @@ if (builder.Environment.IsDevelopment())
         foreach (var line in File.ReadAllLines(envPath))
         {
             var trimmed = line.Trim();
-            if (trimmed.Length == 0 || trimmed.StartsWith('#'))
-                continue;
+            if (trimmed.Length == 0 || trimmed.StartsWith('#')) continue;
             var parts = trimmed.Split('=', 2);
             if (parts.Length == 2)
                 Environment.SetEnvironmentVariable(parts[0].Trim(), parts[1].Trim());
@@ -20,11 +20,11 @@ if (builder.Environment.IsDevelopment())
     }
 }
 
+// ─── Main app database (PostgreSQL) ─────────────────────────────────────────
 var rawUrl = Environment.GetEnvironmentVariable("DATABASE_URL")
     ?? builder.Configuration.GetConnectionString("DefaultConnection")
     ?? throw new InvalidOperationException("DATABASE_URL environment variable is not set.");
 
-// Convert postgresql:// URI to Npgsql key=value format
 string connectionString;
 if (rawUrl.StartsWith("postgresql://") || rawUrl.StartsWith("postgres://"))
 {
@@ -37,7 +37,6 @@ if (rawUrl.StartsWith("postgresql://") || rawUrl.StartsWith("postgres://"))
     var database = uri.AbsolutePath.TrimStart('/');
     connectionString = $"Host={uri.Host};Port={port};Database={database};Username={username};Password={password}";
 
-    // Railway and most hosted Postgres require TLS from local dev machines
     var local = uri.Host.Equals("localhost", StringComparison.OrdinalIgnoreCase)
         || uri.Host.Equals("127.0.0.1");
     if (!local)
@@ -51,6 +50,57 @@ else
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+// ─── Identity database (SQLite) ──────────────────────────────────────────────
+var identityDb = builder.Configuration.GetConnectionString("IdentityConnection")
+    ?? "Data Source=identity.db";
+
+builder.Services.AddDbContext<AuthIdentityDbContext>(options =>
+    options.UseSqlite(identityDb));
+
+// ─── ASP.NET Core Identity ───────────────────────────────────────────────────
+builder.Services.AddIdentity<ApplicationUser, IdentityRole>(options =>
+{
+    // Passphrase-style policy: length only, no symbol/digit/uppercase required
+    options.Password.RequiredLength = 14;
+    options.Password.RequireUppercase = false;
+    options.Password.RequireDigit = false;
+    options.Password.RequireLowercase = false;
+    options.Password.RequireNonAlphanumeric = false;
+})
+.AddEntityFrameworkStores<AuthIdentityDbContext>()
+.AddDefaultTokenProviders();
+
+// ─── Auth cookie settings ────────────────────────────────────────────────────
+builder.Services.ConfigureApplicationCookie(options =>
+{
+    options.Cookie.HttpOnly = true;
+    options.Cookie.SameSite = SameSiteMode.Lax;
+    options.Cookie.SecurePolicy = builder.Environment.IsDevelopment()
+        ? CookieSecurePolicy.SameAsRequest
+        : CookieSecurePolicy.Always;
+    options.SlidingExpiration = true;
+    options.ExpireTimeSpan = TimeSpan.FromDays(7);
+    options.LoginPath = "/login";
+    // Return 401 for API calls instead of redirecting
+    options.Events.OnRedirectToLogin = ctx =>
+    {
+        if (ctx.Request.Path.StartsWithSegments("/api"))
+        {
+            ctx.Response.StatusCode = 401;
+            return Task.CompletedTask;
+        }
+        ctx.Response.Redirect(ctx.RedirectUri);
+        return Task.CompletedTask;
+    };
+});
+
+// ─── Authorization policies ──────────────────────────────────────────────────
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("AdminOnly", policy => policy.RequireRole(AdminSeeder.AdminRole));
+});
+
+// ─── Controllers ─────────────────────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -59,25 +109,38 @@ builder.Services.AddControllers()
     });
 builder.Services.AddOpenApi();
 
+// ─── CORS (must allow credentials for cookie auth) ───────────────────────────
+var allowedOrigins = builder.Configuration.GetSection("AllowedOrigins").Get<string[]>()
+    ?? new[] { "http://localhost:5173", "http://localhost:5174" };
+
 builder.Services.AddCors(options =>
 {
     options.AddDefaultPolicy(policy =>
     {
-        policy.AllowAnyOrigin()
+        policy.WithOrigins(allowedOrigins)
               .AllowAnyHeader()
-              .AllowAnyMethod();
+              .AllowAnyMethod()
+              .AllowCredentials();
     });
 });
 
+// ─── Build ────────────────────────────────────────────────────────────────────
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// ─── Seed admin user ──────────────────────────────────────────────────────────
+using (var scope = app.Services.CreateScope())
 {
-    app.MapOpenApi();
+    var identityCtx = scope.ServiceProvider.GetRequiredService<AuthIdentityDbContext>();
+    identityCtx.Database.Migrate();
+    await AdminSeeder.SeedAsync(scope.ServiceProvider, builder.Configuration);
 }
+
+if (app.Environment.IsDevelopment())
+    app.MapOpenApi();
 
 app.UseCors();
 app.UseHttpsRedirection();
+app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 app.Run();
