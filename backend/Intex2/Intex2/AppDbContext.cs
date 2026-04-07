@@ -10,4 +10,5 @@ public class AppDbContext : DbContext
     public DbSet<Donation> Donations => Set<Donation>();
     public DbSet<InKindDonationItem> InKindDonationItems => Set<InKindDonationItem>();
     public DbSet<Resident> Residents => Set<Resident>();
+    public DbSet<ProcessRecording> ProcessRecordings => Set<ProcessRecording>();
 }
