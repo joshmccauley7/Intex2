@@ -143,7 +143,20 @@ public class AuthController : ControllerBase
                 d.IsRecurring,
                 d.CampaignName,
                 d.ChannelSource,
-                d.Notes
+                d.Notes,
+                allocations = _db.DonationAllocations
+                    .Where(a => a.DonationId == d.DonationId)
+                    .OrderByDescending(a => a.AllocationDate)
+                    .Select(a => new
+                    {
+                        a.AllocationId,
+                        a.SafehouseId,
+                        a.ProgramArea,
+                        a.AmountAllocated,
+                        a.AllocationDate,
+                        a.AllocationNotes
+                    })
+                    .ToList()
             })
             .ToListAsync();
 
