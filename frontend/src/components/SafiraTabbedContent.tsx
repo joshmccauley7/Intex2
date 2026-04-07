@@ -1,4 +1,8 @@
 import { useState } from "react";
+import aboutImg from "../images/tabs/About.jpg";
+import missionImg from "../images/tabs/Mission.jpg";
+import platformImg from "../images/tabs/Platform.jpg";
+import donateImg from "../images/tabs/Donate.jpg";
 
 interface TabContent {
   heading: string;
@@ -24,7 +28,7 @@ const tabs: Tab[] = [
       body: "Safira is a nonprofit organization dedicated to providing safe housing, holistic care, and lasting restoration to girls who have survived sex trafficking and abuse. Inspired by the pioneering work of Lighthouse Sanctuary in the Philippines, we are bringing that same model of healing — rooted in hope, dignity, and community — to a new region of the world.",
       accent: "#2563eb",
       accentLight: "#eff6ff",
-      image: "/images/about.png",
+      image: aboutImg,
       imageAlt: "Safira safe house exterior",
     },
   },
@@ -36,7 +40,7 @@ const tabs: Tab[] = [
       body: "Our mission is to serve girl survivors with everything they need to thrive: safe shelter, nutritious food, access to education, and a community of people who see, hear, and love them. We are guided by a simple belief — every child deserves to feel safe, valued, and full of possibility. Since 2022, we have served over 40 residents across two shelters.",
       accent: "#7c3aed",
       accentLight: "#f5f3ff",
-      image: "/images/mission.png",
+      image: missionImg,
       imageAlt: "Girls in a classroom learning together",
     },
   },
@@ -48,7 +52,7 @@ const tabs: Tab[] = [
       body: "We built a secure, centralized case management platform so our staff can spend less time fighting spreadsheets and more time with the girls they serve. The system tracks resident progress, manages donor relationships, surfaces impact metrics in real time, and uses machine learning to flag at-risk donors before they lapse — all protected behind role-based authentication and GDPR-compliant privacy controls.",
       accent: "#059669",
       accentLight: "#ecfdf5",
-      image: "/images/platform.png",
+      image: platformImg,
       imageAlt: "Screenshot of the Safira admin dashboard",
     },
   },
@@ -60,7 +64,7 @@ const tabs: Tab[] = [
       body: "Every donation to Safira goes directly toward shelter, meals, education, and care for the girls we serve. We believe donors deserve full transparency — that's why our platform gives you access to your giving history, real impact data, and the stories behind the numbers. Whether you give once or become a recurring supporter, you are part of restoring hope.",
       accent: "#dc2626",
       accentLight: "#fef2f2",
-      image: "/images/donate.png",
+      image: donateImg,
       imageAlt: "A child reading a book in the Safira shelter",
     },
   },
