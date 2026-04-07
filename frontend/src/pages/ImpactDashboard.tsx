@@ -8,6 +8,31 @@ import {
 import { apiFetch } from '../api';
 import SiteFooter from '../components/layout/SiteFooter';
 import SiteNav from '../components/layout/SiteNav';
+import volunteerBgImg from '../images/volunteer_bg.jpg';
+import impactImg1 from '../images/homepage/2.jpg';
+import impactImg2 from '../images/homepage/3.jpg';
+import impactImg3 from '../images/homepage/4.jpg';
+
+const SAFIRA_IMPACT_NOTES = [
+  {
+    date: 'March 31, 2026',
+    headline: 'Safira Impact Update – April 2026',
+    summary: 'This month we welcomed 4 new residents across our São Paulo and Recife safe homes, bringing our total community to 77 girls. Our trauma-informed care team completed 38 individual counseling sessions, and 3 young women successfully transitioned into our vocational training track.',
+    img: impactImg1,
+  },
+  {
+    date: 'February 28, 2026',
+    headline: 'Safira Impact Update – March 2026',
+    summary: 'In March, Safira partnered with two local legal aid organizations to file protective orders on behalf of 6 survivors. Our education program recorded a 94% school attendance rate, and the first cohort of girls in our digital-skills workshop completed their certificates.',
+    img: impactImg2,
+  },
+  {
+    date: 'January 31, 2026',
+    headline: 'Safira Impact Update – February 2026',
+    summary: 'February brought the opening of our third safe home in Fortaleza, funded entirely by donor contributions. Staff conducted 21 family-reintegration assessments, and our community outreach team held awareness workshops reaching over 200 at-risk youth in partnership with local schools.',
+    img: impactImg3,
+  },
+];
 
 const PHP_TO_USD = 56;
 
@@ -437,15 +462,24 @@ export default function ImpactDashboard() {
       <SiteNav />
 
       <main className="flex-1">
-        <section className="bg-gradient-to-b from-slate-50 to-white dark:from-slate-900/70 dark:to-slate-950 py-14 px-6 border-b border-slate-100 dark:border-slate-800">
-          <div className="mx-auto max-w-7xl">
+        <section
+          className="relative py-14 px-6 border-b border-slate-100 dark:border-slate-800 overflow-hidden"
+          style={{
+            backgroundImage: `url(${volunteerBgImg})`,
+            backgroundSize: 'cover',
+            backgroundPosition: 'center 40%',
+          }}
+        >
+          {/* Dark overlay so the card text stays readable */}
+          <div className="absolute inset-0" style={{ background: 'rgba(10, 20, 40, 0.52)' }} />
+          <div className="relative mx-auto max-w-7xl">
             <div
               className="max-w-3xl rounded-2xl px-8 py-8"
               style={{
-                background: 'rgba(255,255,255,0.72)',
-                backdropFilter: 'blur(8px)',
-                WebkitBackdropFilter: 'blur(8px)',
-                boxShadow: '0 8px 40px rgba(0,0,0,0.08)',
+                background: 'rgba(255,255,255,0.82)',
+                backdropFilter: 'blur(12px)',
+                WebkitBackdropFilter: 'blur(12px)',
+                boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
               }}
             >
               <p className="text-xs uppercase tracking-[0.24em] text-safira-blue font-semibold">
@@ -592,13 +626,20 @@ export default function ImpactDashboard() {
                 <p className="mb-4 text-xs text-slate-500 dark:text-slate-400">
                   Most recent field snapshots from operations and case teams.
                 </p>
-                <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                  {recentHighlights.map((s) => (
-                    <div key={s.snapshotId} className="rounded-lg border border-slate-200 p-3 dark:border-slate-700">
-                      <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                        {new Date(s.snapshotDate).toLocaleDateString()}
-                      </p>
-                      <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100">{s.headline}</p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                  {SAFIRA_IMPACT_NOTES.map((note) => (
+                    <div key={note.headline} className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
+                      <img
+                        src={note.img}
+                        alt={note.headline}
+                        className="w-full object-cover"
+                        style={{ height: 160 }}
+                      />
+                      <div className="p-4 flex flex-col flex-1">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400">{note.date}</p>
+                        <p className="mt-1 text-sm font-semibold text-slate-800 dark:text-slate-100 mb-2">{note.headline}</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{note.summary}</p>
+                      </div>
                     </div>
                   ))}
                 </div>
