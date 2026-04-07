@@ -193,7 +193,7 @@ function FAQAccordion() {
               fontWeight: '600',
               letterSpacing: '0.12em',
               textTransform: 'uppercase',
-              color: '#b0ad9e',
+              color: '#6b6656',
               marginBottom: '0.5rem',
             }}
           >
@@ -231,7 +231,7 @@ function FAQAccordion() {
           style={{
             marginTop: '2rem',
             fontSize: '0.875rem',
-            color: '#9a9990',
+            color: '#5f5d53',
             fontFamily: "'DM Sans', sans-serif",
           }}
         >
@@ -299,7 +299,7 @@ export default function HomePage() {
       <SiteNav />
 
       {/* ── Hero Carousel ── */}
-      <section className="relative overflow-hidden" style={{ height: '560px' }}>
+      <section className="relative overflow-hidden h-[420px] md:h-[560px]">
         {heroImages.map((src, i) => (
           <div
             key={src}
@@ -320,9 +320,9 @@ export default function HomePage() {
         />
 
         {/* Text card */}
-        <div className="relative z-10 h-full flex items-center px-10 md:px-16">
+        <div className="relative z-10 h-full flex items-center px-4 sm:px-6 md:px-16">
           <div
-            className="w-[480px] max-w-[55%] rounded-lg px-8 py-4 hero-animate"
+            className="w-full md:w-[480px] md:max-w-[55%] rounded-lg px-5 sm:px-6 md:px-8 py-4 hero-animate"
             style={{
               background: 'rgba(255,255,255,0.72)',
               backdropFilter: 'blur(8px)',
@@ -330,10 +330,10 @@ export default function HomePage() {
               boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
             }}
           >
-            <h1 className="text-3xl font-bold leading-tight mb-2 text-[#0f172a] hero-animate">
+            <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2 text-[#0f172a] hero-animate">
               Every Child Deserves Safety
             </h1>
-            <p className="text-slate-600 mb-4 leading-relaxed text-sm hero-animate-delay">
+            <p className="text-slate-600 mb-4 leading-relaxed text-sm sm:text-base hero-animate-delay">
               Safira protects children who are victims of sexual abuse in Brazil, providing
               shelter, healing, and a path to a brighter future.
             </p>
@@ -354,14 +354,14 @@ export default function HomePage() {
           <>
             <button
               onClick={() => goTo(currentImg - 1)}
-              className="absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-white/30 hover:bg-white/60 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
+              className="hidden md:block absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-white/30 hover:bg-white/60 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
               aria-label="Previous image"
             >
               <ChevronLeft size={20} />
             </button>
             <button
               onClick={() => goTo(currentImg + 1)}
-              className="absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-white/30 hover:bg-white/60 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
+              className="hidden md:block absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-white/30 hover:bg-white/60 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
               aria-label="Next image"
             >
               <ChevronRight size={20} />
