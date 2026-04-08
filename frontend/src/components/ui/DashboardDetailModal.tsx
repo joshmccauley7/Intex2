@@ -466,6 +466,8 @@ export interface DashboardDetailModalProps {
   periodOptions?: { label: string; value: string }[]
   period?: string
   onPeriodChange?: (value: string) => void
+  /** Extra CTA button shown in the footer alongside the main link */
+  extraAction?: { label: string; to: string }
 }
 
 export function DashboardDetailModal({
@@ -486,6 +488,7 @@ export function DashboardDetailModal({
   periodOptions,
   period,
   onPeriodChange,
+  extraAction,
 }: DashboardDetailModalProps) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -627,13 +630,13 @@ export function DashboardDetailModal({
           <div className="px-6 pt-4 pb-2 border-b border-slate-100 shrink-0 flex flex-col gap-4">
             {/* Primary chart — full width (only when explicitly marked) */}
             {primaryChart && (
-              <ChartPanel chart={primaryChart} isPrimary={true} />
+              <ChartPanel key={`${primaryChart.id}-${period ?? 'all'}`} chart={primaryChart} isPrimary={true} />
             )}
             {/* Grid charts — side by side (2-col) or single column */}
             {gridCharts.length > 0 && (
               <div className={`grid gap-6 ${gridCharts.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 {gridCharts.map((chart) => (
-                  <ChartPanel key={chart.id} chart={chart} isPrimary={false} />
+                  <ChartPanel key={`${chart.id}-${period ?? 'all'}`} chart={chart} isPrimary={false} />
                 ))}
               </div>
             )}
@@ -724,6 +727,14 @@ export function DashboardDetailModal({
                 {loadingMore
                   ? 'Loading…'
                   : `Load more (${(totalCount - items.length).toLocaleString()} remaining)`}
+              </button>
+            )}
+            {extraAction && (
+              <button
+                onClick={() => { onClose(); navigate(extraAction.to) }}
+                className="text-sm font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                {extraAction.label} →
               </button>
             )}
             {linkTo && (

@@ -94,7 +94,9 @@ const PAGE_SIZE = 20
 
 export default function DonorsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const [activeTab, setActiveTab] = useState<'donors' | 'outreach'>('donors')
+  const [activeTab, setActiveTab] = useState<'donors' | 'outreach'>(
+    searchParams.get('tab') === 'outreach' ? 'outreach' : 'donors'
+  )
 
   // ── Donors tab state ────────────────────────────────────────────────────────
   const [supporters, setSupporters] = useState<Supporter[]>([])
@@ -177,7 +179,11 @@ export default function DonorsPage() {
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchSupporters() }, [])
+  useEffect(() => {
+    fetchSupporters()
+    // If landing directly on outreach tab via URL, pre-load the queue
+    if (searchParams.get('tab') === 'outreach') loadQueue()
+  }, [])
 
   const FILTER_FIELDS = [
     { value: 'name',      label: 'Name' },

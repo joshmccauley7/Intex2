@@ -30,17 +30,21 @@ public class AdminDashboardController : ControllerBase
 
         // Resolve the period window (used by OKR sections; ignored by others)
         var periodDays = period switch {
-            "30d"  => 30,
+            "3mo"  => 90,
             "6mo"  => 180,
             "12mo" => 365,
-            _      => 90,   // default "3mo"
+            _      => 0,    // "all" = no date filter
         };
         var periodLabel = period switch {
-            "30d"  => "30 Days",
+            "3mo"  => "3 Months",
             "6mo"  => "6 Months",
             "12mo" => "12 Months",
-            _      => "3 Months",
+            _      => "All Time",
         };
+        // periodStart: for "all" use a very old date so >= comparisons match everything
+        var periodStartGlobal = periodDays > 0
+            ? DateOnly.FromDateTime(DateTime.UtcNow).AddDays(-periodDays)
+            : new DateOnly(2000, 1, 1);
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var thirtyDaysAgo  = today.AddDays(-30);
@@ -54,24 +58,28 @@ public class AdminDashboardController : ControllerBase
             // ── Active Donors ─────────────────────────────────────────────────
             case "donors":
             {
-                var total     = await _db.Supporters.CountAsync(s => s.Status == "Active");
-                var gave30d   = await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= thirtyDaysAgo));
-                var gave90d   = await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= ninetyDaysAgo));
-                var repeatDonors = await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Count() >= 2);
-                var repeatRate   = total > 0 ? Math.Round(100.0 * repeatDonors / total, 1) : 0.0;
+                var periodStart      = periodStartGlobal;
+                var threeMonthCutoff = today.AddMonths(-3);
+                var total            = await _db.Supporters.CountAsync(s => s.Status == "Active");
+                var activeIn3Mo      = await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= threeMonthCutoff));
+                var gaveInPeriod     = period == "all" ? total
+                    : await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= periodStart));
+                var repeatDonors     = await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Count(d => d.DonationDate >= periodStart) >= 2);
+                var repeatRate       = gaveInPeriod > 0 ? Math.Round(100.0 * repeatDonors / gaveInPeriod, 1) : 0.0;
 
-                // Concentration donut: top-5 donors by all-time giving + "All Others"
+                // Concentration donut: top-5 donors by giving in period + "All Others"
                 var top6 = await _db.Supporters
                     .Where(s => s.Status == "Active")
                     .Select(s => new {
                         Name  = s.DisplayName ?? "Unknown",
-                        Total = s.Donations.Where(d => d.Amount != null).Sum(d => (decimal?)d.Amount) ?? 0m
+                        Total = s.Donations.Where(d => d.Amount != null && d.DonationDate >= periodStart).Sum(d => (decimal?)d.Amount) ?? 0m
                     })
                     .OrderByDescending(x => x.Total)
                     .Take(6)
                     .ToListAsync();
 
                 var grandTotal = (double)(await _db.Donations
+                    .Where(d => d.Amount != null && d.DonationDate >= periodStart)
                     .Join(_db.Supporters.Where(s => s.Status == "Active"),
                           d => d.SupporterId, s => s.SupporterId, (d, s) => d.Amount)
                     .Where(a => a != null)
@@ -85,9 +93,9 @@ public class AdminDashboardController : ControllerBase
                 if (grandTotal > top5Total + 0.01)
                     concentrationSeries.Add(new { name = "All Others", value = grandTotal - top5Total });
 
-                // Country bar: giving by country (top 8)
+                // Country bar: giving by country in period (top 8)
                 var countrySeries = await _db.Donations
-                    .Where(d => d.Amount != null)
+                    .Where(d => d.Amount != null && d.DonationDate >= periodStart)
                     .Join(_db.Supporters.Where(s => s.Status == "Active" && s.Country != null),
                           d => d.SupporterId, s => s.SupporterId,
                           (d, s) => new { s.Country, d.Amount })
@@ -100,10 +108,10 @@ public class AdminDashboardController : ControllerBase
                     .Take(8)
                     .ToListAsync();
 
-                // Cadence histogram: donors by gift-count bucket
+                // Cadence histogram: gift count within period
                 var giftCounts = await _db.Supporters
-                    .Where(s => s.Status == "Active")
-                    .Select(s => s.Donations.Count())
+                    .Where(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= periodStart))
+                    .Select(s => s.Donations.Count(d => d.DonationDate >= periodStart))
                     .ToListAsync();
 
                 var cadenceSeries = new object[]
@@ -125,23 +133,23 @@ public class AdminDashboardController : ControllerBase
                         s.Status,
                         s.Country,
                         LastDonation  = s.Donations.Max(d => (DateOnly?)d.DonationDate),
-                        TotalDonated  = s.Donations.Where(d => d.Amount != null).Sum(d => (decimal?)d.Amount) ?? 0m,
-                        GiftCount     = s.Donations.Count(),
+                        TotalDonated  = s.Donations.Where(d => d.Amount != null && d.DonationDate >= periodStart).Sum(d => (decimal?)d.Amount) ?? 0m,
+                        GiftCount     = s.Donations.Count(d => d.DonationDate >= periodStart),
                     })
                     .ToListAsync();
 
                 var kpis = new object[]
                 {
-                    new { label = "Active Donors",  value = total.ToString("N0") },
-                    new { label = "Gave in 30d",    value = gave30d.ToString("N0") },
-                    new { label = "Gave in 90d",    value = gave90d.ToString("N0") },
-                    new { label = "Repeat Rate",    value = $"{repeatRate}%" },
+                    new { label = "Active Donors",              value = total.ToString("N0") },
+                    new { label = "Active (Last 3 Months)",     value = activeIn3Mo.ToString("N0") },
+                    new { label = $"Repeat Donors ({periodLabel})", value = repeatDonors.ToString("N0") },
+                    new { label = "Repeat Rate",                value = $"{repeatRate}%" },
                 };
                 var charts = new object[]
                 {
-                    new { id = "country",       type = "bar",   title = "Giving by Country (top 8, PHP)",  series = countrySeries,        valuePrefix = "₱", primary = true, sort = "desc" },
-                    new { id = "concentration", type = "donut", title = "Donor Concentration (Top 5)",     series = concentrationSeries,  compact = true },
-                    new { id = "cadence",       type = "bar",   title = "Gift Frequency",                   series = cadenceSeries,        compact = true },
+                    new { id = "country",       type = "bar",   title = $"Giving by Country ({periodLabel}, PHP)", series = countrySeries,       valuePrefix = "₱", primary = true, sort = "desc" },
+                    new { id = "concentration", type = "donut", title = $"Donor Concentration ({periodLabel})",    series = concentrationSeries, compact = true },
+                    new { id = "cadence",       type = "bar",   title = $"Gift Frequency ({periodLabel})",          series = cadenceSeries,       compact = true },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -165,14 +173,15 @@ public class AdminDashboardController : ControllerBase
                     .Select(p => p.SupporterId)
                     .ToListAsync();
 
-                var inactive60d    = riskIds.Count > 0
+                var periodStart    = periodStartGlobal;
+                var inactiveInPeriod = riskIds.Count > 0
                     ? await _db.Supporters
                         .Where(s => riskIds.Contains(s.SupporterId))
-                        .CountAsync(s => !s.Donations.Any(d => d.DonationDate >= sixtyDaysAgo))
+                        .CountAsync(s => !s.Donations.Any(d => d.DonationDate >= periodStart))
                     : 0;
                 var atRiskRevenue  = riskIds.Count > 0
                     ? await _db.Donations
-                        .Where(d => riskIds.Contains(d.SupporterId) && d.DonationDate >= twelveMonthsAgo && d.Amount != null)
+                        .Where(d => riskIds.Contains(d.SupporterId) && d.DonationDate >= periodStart && d.Amount != null)
                         .SumAsync(d => (decimal?)d.Amount)
                     : (decimal?)0m;
 
@@ -220,18 +229,18 @@ public class AdminDashboardController : ControllerBase
                             p.RiskLevel,
                             ChurnProbability = Math.Round((double)p.ChurnProbability * 100, 1),
                             LastDonation     = s.Donations.Max(d => (DateOnly?)d.DonationDate),
-                            ValueLast12Mo    = s.Donations
-                                .Where(d => d.DonationDate >= twelveMonthsAgo && d.Amount != null)
+                            ValueInPeriod    = s.Donations
+                                .Where(d => d.DonationDate >= periodStart && d.Amount != null)
                                 .Sum(d => (decimal?)d.Amount) ?? 0m,
                         })
                     .ToListAsync();
 
                 var kpis = new object[]
                 {
-                    new { label = $"{level} Risk Donors",        value = total.ToString("N0") },
-                    new { label = "Avg Churn Probability",        value = $"{avgChurnPct}%" },
-                    new { label = "Inactive 60+ Days",            value = inactive60d.ToString("N0") },
-                    new { label = "12-Month Revenue at Risk",     value = atRiskRevenue.HasValue ? $"₱{atRiskRevenue.Value:N0}" : "—" },
+                    new { label = $"{level} Risk Donors",                     value = total.ToString("N0") },
+                    new { label = "Avg Churn Probability",                     value = $"{avgChurnPct}%" },
+                    new { label = $"Inactive ({periodLabel})",                 value = inactiveInPeriod.ToString("N0") },
+                    new { label = $"Revenue at Risk ({periodLabel})",          value = atRiskRevenue.HasValue ? $"₱{atRiskRevenue.Value:N0}" : "—" },
                 };
                 // Neither marked primary → both render side-by-side in grid
                 var charts = new object[]
@@ -245,10 +254,11 @@ public class AdminDashboardController : ControllerBase
             // ── Active Residents ──────────────────────────────────────────────
             case "residents":
             {
-                var total       = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
-                var highRisk    = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "High");
-                var medRisk     = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "Medium");
-                var newAdm30d   = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.DateOfAdmission >= thirtyDaysAgo);
+                var periodStart  = periodStartGlobal;
+                var total        = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
+                var highRisk     = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "High");
+                var medRisk      = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "Medium");
+                var newAdmInPeriod = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.DateOfAdmission >= periodStart);
 
                 // By safe house bar chart
                 var bySafehouse = await _db.Residents
@@ -285,10 +295,10 @@ public class AdminDashboardController : ControllerBase
 
                 var kpis = new object[]
                 {
-                    new { label = "Active Residents",   value = total.ToString("N0") },
-                    new { label = "High Risk",          value = highRisk.ToString("N0") },
-                    new { label = "Medium Risk",        value = medRisk.ToString("N0") },
-                    new { label = "New Admissions 30d", value = newAdm30d.ToString("N0") },
+                    new { label = "Active Residents",             value = total.ToString("N0") },
+                    new { label = "High Risk",                    value = highRisk.ToString("N0") },
+                    new { label = "Medium Risk",                  value = medRisk.ToString("N0") },
+                    new { label = $"New Admissions ({periodLabel})", value = newAdmInPeriod.ToString("N0") },
                 };
                 var charts = new object[]
                 {
@@ -367,19 +377,20 @@ public class AdminDashboardController : ControllerBase
             // ── Donations ─────────────────────────────────────────────────────
             case "donations":
             {
-                var total       = await _db.Donations.CountAsync();
-                var totalAmount = await _db.Donations.Where(d => d.Amount != null).SumAsync(d => (decimal?)d.Amount);
-                var recent30d   = await _db.Donations.CountAsync(d => d.DonationDate >= thirtyDaysAgo);
+                var periodStart  = periodStartGlobal;
+                var total        = await _db.Donations.CountAsync(d => d.DonationDate >= periodStart);
+                var totalAmount  = await _db.Donations.Where(d => d.Amount != null && d.DonationDate >= periodStart).SumAsync(d => (decimal?)d.Amount);
+                var recurringCt  = await _db.Donations.CountAsync(d => d.DonationDate >= periodStart && d.IsRecurring == true);
 
                 var byTypeSeries = await _db.Donations
-                    .Where(d => d.DonationType != null)
+                    .Where(d => d.DonationType != null && d.DonationDate >= periodStart)
                     .GroupBy(d => d.DonationType)
                     .Select(g => new { name = g.Key!, value = g.Count() })
                     .OrderByDescending(x => x.value)
                     .ToListAsync();
 
                 var items = await _db.Donations
-                    .Where(d => d.DonationDate != null)
+                    .Where(d => d.DonationDate != null && d.DonationDate >= periodStart)
                     .OrderByDescending(d => d.DonationDate)
                     .Skip(skip).Take(pageSize)
                     .Join(_db.Supporters, d => d.SupporterId, s => s.SupporterId,
@@ -388,13 +399,13 @@ public class AdminDashboardController : ControllerBase
 
                 var kpis = new object[]
                 {
-                    new { label = "Total Donations", value = total.ToString("N0") },
-                    new { label = "Total Amount",    value = totalAmount.HasValue ? $"₱{totalAmount.Value:N0}" : "—" },
-                    new { label = "Received in 30d", value = recent30d.ToString("N0") },
+                    new { label = $"Donations ({periodLabel})", value = total.ToString("N0") },
+                    new { label = "Total Amount",               value = totalAmount.HasValue ? $"₱{totalAmount.Value:N0}" : "—" },
+                    new { label = "Recurring",                  value = recurringCt.ToString("N0") },
                 };
                 var charts = new object[]
                 {
-                    new { id = "by-type", type = "bar", title = "Donations by Type", series = byTypeSeries, primary = true, sort = "desc" },
+                    new { id = "by-type", type = "bar", title = $"Donations by Type ({periodLabel})", series = byTypeSeries, primary = true, sort = "desc" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -402,17 +413,19 @@ public class AdminDashboardController : ControllerBase
             // ── Conferences ───────────────────────────────────────────────────
             case "conferences":
             {
-                var total    = await _db.CaseConferences.CountAsync(c => c.NextConferenceDate >= today);
-                var next7d   = await _db.CaseConferences.CountAsync(c => c.NextConferenceDate >= today && c.NextConferenceDate <= today.AddDays(7));
+                // For "all time", show all upcoming conferences; otherwise look ahead by period window
+                var periodEnd  = periodDays > 0 ? today.AddDays(periodDays) : new DateOnly(2099, 12, 31);
+                var total      = await _db.CaseConferences.CountAsync(c => c.NextConferenceDate >= today && c.NextConferenceDate <= periodEnd);
+                var next7d     = await _db.CaseConferences.CountAsync(c => c.NextConferenceDate >= today && c.NextConferenceDate <= today.AddDays(7));
                 var byTypeSeries = await _db.CaseConferences
-                    .Where(c => c.NextConferenceDate >= today && c.ConferenceType != null)
+                    .Where(c => c.NextConferenceDate >= today && c.NextConferenceDate <= periodEnd && c.ConferenceType != null)
                     .GroupBy(c => c.ConferenceType)
                     .Select(g => new { name = g.Key!, value = g.Count() })
                     .OrderByDescending(x => x.value)
                     .ToListAsync();
 
                 var items = await _db.CaseConferences
-                    .Where(c => c.NextConferenceDate != null && c.NextConferenceDate >= today)
+                    .Where(c => c.NextConferenceDate != null && c.NextConferenceDate >= today && c.NextConferenceDate <= periodEnd)
                     .OrderBy(c => c.NextConferenceDate)
                     .Skip(skip).Take(pageSize)
                     .Join(_db.Residents, c => c.ResidentId, r => r.ResidentId,
@@ -421,12 +434,12 @@ public class AdminDashboardController : ControllerBase
 
                 var kpis = new object[]
                 {
-                    new { label = "Upcoming Conferences", value = total.ToString("N0") },
-                    new { label = "Due in 7 Days",        value = next7d.ToString("N0") },
+                    new { label = $"Upcoming ({periodLabel})", value = total.ToString("N0") },
+                    new { label = "Due in 7 Days",             value = next7d.ToString("N0") },
                 };
                 var charts = new object[]
                 {
-                    new { id = "by-type", type = "bar", title = "Upcoming by Type", series = byTypeSeries, primary = true, sort = "desc" },
+                    new { id = "by-type", type = "bar", title = $"Upcoming by Type (next {periodLabel})", series = byTypeSeries, primary = true, sort = "desc" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -434,12 +447,13 @@ public class AdminDashboardController : ControllerBase
             // ── Health ────────────────────────────────────────────────────────
             case "health":
             {
-                var total         = await _db.HealthWellbeingRecords.CountAsync();
-                var belowThreshold = await _db.HealthWellbeingRecords.CountAsync(h => h.GeneralHealthScore != null && h.GeneralHealthScore < 3);
-                var avgHealth     = await _db.HealthWellbeingRecords.Where(h => h.GeneralHealthScore != null).AverageAsync(h => (double)h.GeneralHealthScore!.Value);
-                var avgNutrition  = await _db.HealthWellbeingRecords.Where(h => h.NutritionScore != null).AverageAsync(h => (double)h.NutritionScore!.Value);
-                var avgSleep      = await _db.HealthWellbeingRecords.Where(h => h.SleepQualityScore != null).AverageAsync(h => (double)h.SleepQualityScore!.Value);
-                var avgEnergy     = await _db.HealthWellbeingRecords.Where(h => h.EnergyLevelScore != null).AverageAsync(h => (double)h.EnergyLevelScore!.Value);
+                var periodStart    = periodStartGlobal;
+                var total          = await _db.HealthWellbeingRecords.CountAsync(h => h.RecordDate >= periodStart);
+                var belowThreshold = await _db.HealthWellbeingRecords.CountAsync(h => h.RecordDate >= periodStart && h.GeneralHealthScore != null && h.GeneralHealthScore < 3);
+                var avgHealth      = await _db.HealthWellbeingRecords.Where(h => h.RecordDate >= periodStart && h.GeneralHealthScore != null).AverageAsync(h => (double)h.GeneralHealthScore!.Value);
+                var avgNutrition   = await _db.HealthWellbeingRecords.Where(h => h.RecordDate >= periodStart && h.NutritionScore != null).AverageAsync(h => (double)h.NutritionScore!.Value);
+                var avgSleep       = await _db.HealthWellbeingRecords.Where(h => h.RecordDate >= periodStart && h.SleepQualityScore != null).AverageAsync(h => (double)h.SleepQualityScore!.Value);
+                var avgEnergy      = await _db.HealthWellbeingRecords.Where(h => h.RecordDate >= periodStart && h.EnergyLevelScore != null).AverageAsync(h => (double)h.EnergyLevelScore!.Value);
 
                 var avgScoresSeries = new object[]
                 {
@@ -449,9 +463,9 @@ public class AdminDashboardController : ControllerBase
                     new { name = "Energy Level",   value = Math.Round(avgEnergy, 2) },
                 };
 
-                // Avg general health score by safe house (materialized to avoid SQL translation issues)
+                // Avg general health score by safe house in period (materialized to avoid SQL translation issues)
                 var healthScoresByResident = await _db.HealthWellbeingRecords
-                    .Where(h => h.GeneralHealthScore != null && h.ResidentId != null)
+                    .Where(h => h.RecordDate >= periodStart && h.GeneralHealthScore != null && h.ResidentId != null)
                     .Select(h => new { ResidentId = h.ResidentId!.Value, Score = (double)h.GeneralHealthScore!.Value })
                     .ToListAsync();
 
@@ -478,9 +492,9 @@ public class AdminDashboardController : ControllerBase
                     })
                     .ToArray();
 
-                // Action list: sorted by lowest general health first (most needing attention)
+                // Action list: records in period, sorted by lowest general health first
                 var items = await _db.HealthWellbeingRecords
-                    .Where(h => h.RecordDate != null)
+                    .Where(h => h.RecordDate != null && h.RecordDate >= periodStart)
                     .OrderBy(h => h.GeneralHealthScore ?? 99)
                     .ThenByDescending(h => h.RecordDate)
                     .Skip(skip).Take(pageSize)
@@ -498,12 +512,12 @@ public class AdminDashboardController : ControllerBase
 
                 var kpis = new object[]
                 {
-                    new { label = "Total Records",     value = total.ToString("N0") },
-                    new { label = "Below Threshold",   value = belowThreshold.ToString("N0") },
-                    new { label = "Avg Health",        value = $"{Math.Round(avgHealth, 1)}/5" },
-                    new { label = "Avg Nutrition",     value = $"{Math.Round(avgNutrition, 1)}/5" },
-                    new { label = "Avg Sleep",         value = $"{Math.Round(avgSleep, 1)}/5" },
-                    new { label = "Avg Energy",        value = $"{Math.Round(avgEnergy, 1)}/5" },
+                    new { label = $"Records ({periodLabel})", value = total.ToString("N0") },
+                    new { label = "Below Threshold",          value = belowThreshold.ToString("N0") },
+                    new { label = "Avg Health",               value = $"{Math.Round(avgHealth, 1)}/5" },
+                    new { label = "Avg Nutrition",            value = $"{Math.Round(avgNutrition, 1)}/5" },
+                    new { label = "Avg Sleep",                value = $"{Math.Round(avgSleep, 1)}/5" },
+                    new { label = "Avg Energy",               value = $"{Math.Round(avgEnergy, 1)}/5" },
                 };
                 var charts = new object[]
                 {
@@ -517,14 +531,16 @@ public class AdminDashboardController : ControllerBase
             // ── Education ─────────────────────────────────────────────────────
             case "education":
             {
-                var total        = await _db.EducationRecords.CountAsync();
-                var enrolled     = await _db.EducationRecords.CountAsync(e => e.EnrollmentStatus == "Enrolled");
-                var atRisk       = await _db.EducationRecords.CountAsync(e => e.AttendanceRate != null && e.AttendanceRate < 0.7m);
-                var avgAttendance = await _db.EducationRecords.Where(e => e.AttendanceRate != null).AverageAsync(e => (double)e.AttendanceRate!.Value);
-                var avgProgress   = await _db.EducationRecords.Where(e => e.ProgressPercent != null).AverageAsync(e => (double)e.ProgressPercent!.Value);
+                var periodStart   = periodStartGlobal;
+                var total         = await _db.EducationRecords.CountAsync(e => e.RecordDate >= periodStart);
+                var enrolled      = await _db.EducationRecords.CountAsync(e => e.RecordDate >= periodStart && e.EnrollmentStatus == "Enrolled");
+                var atRisk        = await _db.EducationRecords.CountAsync(e => e.RecordDate >= periodStart && e.AttendanceRate != null && e.AttendanceRate < 0.7m);
+                var avgAttendance = await _db.EducationRecords.Where(e => e.RecordDate >= periodStart && e.AttendanceRate != null).AverageAsync(e => (double)e.AttendanceRate!.Value);
+                var avgProgress   = await _db.EducationRecords.Where(e => e.RecordDate >= periodStart && e.ProgressPercent != null).AverageAsync(e => (double)e.ProgressPercent!.Value);
 
-                // Enrollment status donut
+                // Enrollment status donut (within period)
                 var enrollmentSeries = await _db.EducationRecords
+                    .Where(e => e.RecordDate >= periodStart)
                     .GroupBy(e => e.EnrollmentStatus)
                     .Select(g => new { name = g.Key ?? "Unknown", value = g.Count() })
                     .OrderByDescending(x => x.value)
@@ -533,13 +549,13 @@ public class AdminDashboardController : ControllerBase
                 // At-risk proportion (attendance < 70%)
                 var atRiskSeries = new object[]
                 {
-                    new { name = "At Risk (<70%)", value = atRisk,           color = "#dc2626" },
-                    new { name = "On Track",        value = total - atRisk,  color = "#16a34a" },
+                    new { name = "At Risk (<70%)", value = atRisk,          color = "#dc2626" },
+                    new { name = "On Track",        value = total - atRisk, color = "#16a34a" },
                 };
 
                 // At-risk by enrollment status (vertical bar)
                 var atRiskByStatusRaw = await _db.EducationRecords
-                    .Where(e => e.AttendanceRate != null && e.AttendanceRate < 0.7m && e.EnrollmentStatus != null)
+                    .Where(e => e.RecordDate >= periodStart && e.AttendanceRate != null && e.AttendanceRate < 0.7m && e.EnrollmentStatus != null)
                     .GroupBy(e => e.EnrollmentStatus)
                     .Select(g => new { name = g.Key!, value = g.Count() })
                     .OrderByDescending(x => x.value)
@@ -547,9 +563,9 @@ public class AdminDashboardController : ControllerBase
 
                 var atRiskRate = enrolled > 0 ? Math.Round(100.0 * atRisk / enrolled, 1) : 0.0;
 
-                // Action list: sorted by lowest attendance first
+                // Action list: sorted by lowest attendance first, within period
                 var items = await _db.EducationRecords
-                    .Where(e => e.RecordDate != null)
+                    .Where(e => e.RecordDate != null && e.RecordDate >= periodStart)
                     .OrderBy(e => e.AttendanceRate ?? 1m)
                     .ThenByDescending(e => e.RecordDate)
                     .Skip(skip).Take(pageSize)
@@ -566,12 +582,12 @@ public class AdminDashboardController : ControllerBase
 
                 var kpis = new object[]
                 {
-                    new { label = "Total Records",     value = total.ToString("N0") },
-                    new { label = "Enrolled",          value = enrolled.ToString("N0") },
-                    new { label = "At-Risk Learners",  value = atRisk.ToString("N0") },
-                    new { label = "At-Risk Rate",      value = $"{atRiskRate}%" },
-                    new { label = "Avg Attendance",    value = $"{Math.Round(avgAttendance * 100, 1)}%" },
-                    new { label = "Avg Progress",      value = $"{Math.Round(avgProgress, 1)}%" },
+                    new { label = $"Records ({periodLabel})", value = total.ToString("N0") },
+                    new { label = "Enrolled",                  value = enrolled.ToString("N0") },
+                    new { label = "At-Risk Learners",          value = atRisk.ToString("N0") },
+                    new { label = "At-Risk Rate",              value = $"{atRiskRate}%" },
+                    new { label = "Avg Attendance",            value = $"{Math.Round(avgAttendance * 100, 1)}%" },
+                    new { label = "Avg Progress",              value = $"{Math.Round(avgProgress, 1)}%" },
                 };
                 var charts = new object[]
                 {
@@ -584,18 +600,21 @@ public class AdminDashboardController : ControllerBase
             // ── Counseling ────────────────────────────────────────────────────
             case "counseling":
             {
-                var total          = await _db.ProcessRecordings.CountAsync();
-                var uniqueResidents = await _db.ProcessRecordings.Select(p => p.ResidentId).Distinct().CountAsync();
-                var avgDuration    = await _db.ProcessRecordings.Where(p => p.SessionDurationMinutes != null).AverageAsync(p => (double?)p.SessionDurationMinutes);
+                var periodStart    = periodStartGlobal;
+                var total          = await _db.ProcessRecordings.CountAsync(p => p.SessionDate >= periodStart);
+                var uniqueResidents = await _db.ProcessRecordings.Where(p => p.SessionDate >= periodStart).Select(p => p.ResidentId).Distinct().CountAsync();
+                var avgDuration    = await _db.ProcessRecordings.Where(p => p.SessionDate >= periodStart && p.SessionDurationMinutes != null).AverageAsync(p => (double?)p.SessionDurationMinutes);
 
                 var byTypeSeries = await _db.ProcessRecordings
+                    .Where(p => p.SessionDate >= periodStart)
                     .GroupBy(p => p.SessionType)
                     .Select(g => new { name = g.Key ?? "Unknown", value = g.Count() })
                     .OrderByDescending(x => x.value)
                     .ToListAsync();
 
-                // Sessions by resident risk tier (shows who is getting the most counseling)
+                // Sessions by resident risk tier in period
                 var sessionsByRiskRaw = await _db.ProcessRecordings
+                    .Where(p => p.SessionDate >= periodStart)
                     .Join(_db.Residents, p => p.ResidentId, r => r.ResidentId, (p, r) => new { r.CurrentRiskLevel })
                     .GroupBy(x => x.CurrentRiskLevel)
                     .Select(g => new { name = g.Key ?? "Unknown", value = g.Count() })
@@ -610,9 +629,9 @@ public class AdminDashboardController : ControllerBase
 
                 var avgSessionsPerResident = uniqueResidents > 0 ? Math.Round((double)total / uniqueResidents, 1) : 0.0;
 
-                // Action list: most recent sessions first
+                // Action list: most recent sessions first, within period
                 var items = await _db.ProcessRecordings
-                    .Where(p => p.SessionDate != null)
+                    .Where(p => p.SessionDate != null && p.SessionDate >= periodStart)
                     .OrderByDescending(p => p.SessionDate)
                     .Skip(skip).Take(pageSize)
                     .Join(_db.Residents, p => p.ResidentId, r => r.ResidentId,
@@ -628,10 +647,10 @@ public class AdminDashboardController : ControllerBase
 
                 var kpis = new object[]
                 {
-                    new { label = "Total Sessions",         value = total.ToString("N0") },
-                    new { label = "Unique Residents",       value = uniqueResidents.ToString("N0") },
-                    new { label = "Avg Sessions / Resident",value = avgSessionsPerResident.ToString("N1") },
-                    new { label = "Avg Duration (min)",     value = avgDuration.HasValue ? Math.Round(avgDuration.Value, 0).ToString("N0") : "—" },
+                    new { label = $"Sessions ({periodLabel})", value = total.ToString("N0") },
+                    new { label = "Unique Residents",          value = uniqueResidents.ToString("N0") },
+                    new { label = "Avg Sessions / Resident",   value = avgSessionsPerResident.ToString("N1") },
+                    new { label = "Avg Duration (min)",        value = avgDuration.HasValue ? Math.Round(avgDuration.Value, 0).ToString("N0") : "—" },
                 };
                 var charts = new object[]
                 {
@@ -647,11 +666,12 @@ public class AdminDashboardController : ControllerBase
             case "risk-medium":
             case "risk-low":
             {
-                var level    = section == "risk-high" ? "High" : section == "risk-medium" ? "Medium" : "Low";
-                var total    = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == level);
-                var allActive = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
-                var newInRisk30d = await _db.Residents.CountAsync(r =>
-                    r.CaseStatus == "Active" && r.CurrentRiskLevel == level && r.DateOfAdmission >= thirtyDaysAgo);
+                var periodStart   = periodStartGlobal;
+                var level         = section == "risk-high" ? "High" : section == "risk-medium" ? "Medium" : "Low";
+                var total         = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == level);
+                var allActive     = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
+                var newInRiskPeriod = await _db.Residents.CountAsync(r =>
+                    r.CaseStatus == "Active" && r.CurrentRiskLevel == level && r.DateOfAdmission >= periodStart);
 
                 // Full risk tier distribution for context
                 var allRiskCounts = await _db.Residents
@@ -688,9 +708,9 @@ public class AdminDashboardController : ControllerBase
 
                 var kpis = new object[]
                 {
-                    new { label = $"{level} Risk Residents", value = total.ToString("N0") },
-                    new { label = "Share of Active",          value = $"{sharePct}%" },
-                    new { label = "New Admissions 30d",       value = newInRisk30d.ToString("N0") },
+                    new { label = $"{level} Risk Residents",          value = total.ToString("N0") },
+                    new { label = "Share of Active",                   value = $"{sharePct}%" },
+                    new { label = $"New Admissions ({periodLabel})",   value = newInRiskPeriod.ToString("N0") },
                 };
                 var charts = new object[]
                 {
@@ -704,7 +724,7 @@ public class AdminDashboardController : ControllerBase
             // ── OKR sections ──────────────────────────────────────────────────
             case "okr-recent":
             {
-                var periodStart   = today.AddDays(-periodDays);
+                var periodStart   = periodStartGlobal;
                 var activeDonors  = await _db.Supporters.CountAsync(s => s.Status == "Active");
                 var total         = await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= periodStart));
                 var lapsed        = activeDonors - total;
@@ -732,15 +752,16 @@ public class AdminDashboardController : ControllerBase
                     new { name = "4+ gifts",  value = giftCountsPeriod.Count(c => c >= 4) },
                 };
 
-                // Monthly donor activity trend (always 12 months for historical context)
-                var rawDonations12mo = await _db.Donations
-                    .Where(d => d.DonationDate >= twelveMonthsAgo)
+                // Monthly donor activity trend — spans the selected period
+                var trendMonths = period switch { "all" => 24, "6mo" => 6, "12mo" => 12, _ => 3 };
+                var rawDonationsTrend = await _db.Donations
+                    .Where(d => d.DonationDate >= periodStart)
                     .Select(d => new { d.SupporterId, d.DonationDate.Year, d.DonationDate.Month })
                     .ToListAsync();
 
-                var trendSeries = Enumerable.Range(0, 12).Select(i => {
-                    var monthDate = today.AddMonths(i - 11);
-                    var count = rawDonations12mo
+                var trendSeries = Enumerable.Range(0, trendMonths).Select(i => {
+                    var monthDate = today.AddMonths(i - (trendMonths - 1));
+                    var count = rawDonationsTrend
                         .Where(d => d.Year == monthDate.Year && d.Month == monthDate.Month)
                         .Select(d => d.SupporterId).Distinct().Count();
                     return (object)new { name = new DateTime(monthDate.Year, monthDate.Month, 1).ToString("MMM ''yy"), value = count };
@@ -775,7 +796,7 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "trend",     type = "line",  title = "Active Donors per Month (12mo)", series = trendSeries,     primary = true },
+                    new { id = "trend",     type = "line",  title = $"Active Donors per Month ({periodLabel})", series = trendSeries,     primary = true },
                     new { id = "retention", type = "donut", title = "Retention Split",                 series = retentionSeries, compact = true },
                     new { id = "frequency", type = "bar",   title = $"Gift Frequency ({periodLabel})", series = frequencySeries, compact = true },
                 };
@@ -784,7 +805,7 @@ public class AdminDashboardController : ControllerBase
 
             case "okr-lapsed":
             {
-                var periodStart  = today.AddDays(-periodDays);
+                var periodStart  = periodStartGlobal;
                 var activeDonors = await _db.Supporters.CountAsync(s => s.Status == "Active");
                 var total        = await _db.Supporters
                     .CountAsync(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= periodStart));
@@ -840,14 +861,15 @@ public class AdminDashboardController : ControllerBase
                     })
                     .ToListAsync();
 
-                // Monthly lapsed donor count trend (last 12 months)
+                // Monthly lapsed donor count trend — spans the selected period
+                var lapsedTrendMonths = period switch { "all" => 24, "6mo" => 6, "12mo" => 12, _ => 3 };
                 var rawLapsedDonations = await _db.Donations
-                    .Where(d => lapsedIds.Contains(d.SupporterId) && d.DonationDate >= twelveMonthsAgo)
+                    .Where(d => lapsedIds.Contains(d.SupporterId) && d.DonationDate >= periodStart)
                     .Select(d => new { d.SupporterId, d.DonationDate.Year, d.DonationDate.Month })
                     .ToListAsync();
 
-                var lapsedTrendSeries = Enumerable.Range(0, 12).Select(i => {
-                    var monthDate = today.AddMonths(i - 11);
+                var lapsedTrendSeries = Enumerable.Range(0, lapsedTrendMonths).Select(i => {
+                    var monthDate = today.AddMonths(i - (lapsedTrendMonths - 1));
                     var count = rawLapsedDonations
                         .Where(d => d.Year == monthDate.Year && d.Month == monthDate.Month)
                         .Select(d => d.SupporterId).Distinct().Count();
@@ -862,7 +884,7 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "trend",      type = "line",  title = $"Lapsed Donor Activity (12mo)",     series = lapsedTrendSeries, primary = true },
+                    new { id = "trend",      type = "line",  title = $"Lapsed Donor Activity ({periodLabel})",     series = lapsedTrendSeries, primary = true },
                     new { id = "retention",  type = "donut", title = $"Active vs Lapsed ({periodLabel})", series = retentionSeries,   compact = true },
                     new { id = "by-country", type = "bar",   title = "Lapsed Donors by Country",          series = countrySeries,     compact = true },
                 };
