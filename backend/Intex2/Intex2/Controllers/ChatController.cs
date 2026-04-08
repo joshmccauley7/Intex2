@@ -39,15 +39,38 @@ public class ChatController : ControllerBase
 
         try
         {
-            // 1. Run predefined queries based on the message intent
-            var contextData = await GatherContext(request.Message);
+            var key = request.PromptKey;
 
-            // 2. Build the system prompt with gathered data
+            // ── Tier 1: Instant DB response — zero API cost ───────────────────
+            // Only for predetermined buttons where we know exactly what to show.
+            if (key != null)
+            {
+                var instant = await TryInstantResponse(key);
+                if (instant != null)
+                    return Ok(new { response = instant });
+            }
+
+            // ── Tier 2: Pre-aggregated summary → tiny focused Claude call ─────
+            // We build a minimal JSON summary ourselves; Claude just narrates it.
+            if (key != null)
+            {
+                var tier2 = await TryTier2Response(key);
+                if (tier2 != null)
+                {
+                    var t2response = await CallClaude(tier2.System, tier2.User, null);
+                    return Ok(new { response = t2response });
+                }
+            }
+
+            // ── Tier 4: Full AI ───────────────────────────────────────────────
+            // For creative/draft prompts with a key OR all free-typed questions.
+            // Still domain-scoped when key is known so we don't flood the prompt.
+            var contextData = key != null
+                ? await GatherDomainContext(key, request.Message)
+                : await GatherContext(request.Message);
+
             var systemPrompt = BuildSystemPrompt(contextData);
-
-            // 3. Call Claude and get a response
             var response = await CallClaude(systemPrompt, request.Message, request.History);
-
             return Ok(new { response });
         }
         catch (HttpRequestException ex)
@@ -65,7 +88,297 @@ public class ChatController : ControllerBase
         }
     }
 
-    // ─── Context gathering ────────────────────────────────────────────────────
+    // ─── Tier 1: Instant responses (zero API calls) ───────────────────────────
+    // Returns a formatted string ready to display, or null if not a Tier 1 key.
+
+    private async Task<string?> TryInstantResponse(string key) => key switch
+    {
+        "resident.long_stay"       => await InstantLongStay(),
+        "resident.safety_concerns" => await InstantSafetyConcerns(),
+        "resident.pending_followups" => await InstantPendingFollowups(),
+        "donor.churn_risk"         => await InstantChurnRisk(),
+        "donor.lapsed"             => await InstantLapsedDonors(),
+        "social.top_content"       => await InstantTopContent(),
+        _ => null
+    };
+
+    private async Task<string> InstantLongStay()
+    {
+        var cutoff = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
+        var residents = await _db.Residents
+            .Where(r => r.DateOfAdmission != null && r.DateOfAdmission <= cutoff)
+            .OrderBy(r => r.DateOfAdmission)
+            .Select(r => new { r.CaseControlNo, r.InternalCode, r.ResidentId, r.DateOfAdmission, r.CaseStatus, r.ReintegrationStatus, r.AssignedSocialWorker })
+            .ToListAsync();
+
+        if (!residents.Any())
+            return "✅ No residents have been in care for 30 or more days.";
+
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var sb = new StringBuilder();
+        sb.AppendLine($"**{residents.Count} resident{(residents.Count == 1 ? "" : "s")} have been in care for 30+ days:**\n");
+        foreach (var r in residents)
+        {
+            var label = r.CaseControlNo ?? r.InternalCode ?? $"Resident {r.ResidentId}";
+            var days = r.DateOfAdmission.HasValue ? today.DayNumber - r.DateOfAdmission.Value.DayNumber : 0;
+            sb.AppendLine($"• **{label}** — {days} days | Status: {r.CaseStatus ?? "N/A"} | Reintegration: {r.ReintegrationStatus ?? "N/A"} | Worker: {r.AssignedSocialWorker ?? "N/A"}");
+        }
+        sb.AppendLine("\nConsider reviewing each resident's transition or reintegration plan.");
+        return sb.ToString();
+    }
+
+    private async Task<string> InstantSafetyConcerns()
+    {
+        var weekAgo = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7));
+        var concerns = await _db.HomeVisitations
+            .Where(v => v.SafetyConcernsNoted == true && v.VisitDate >= weekAgo)
+            .OrderByDescending(v => v.VisitDate)
+            .Select(v => new { v.ResidentId, v.VisitDate, v.SocialWorker, v.FollowUpNeeded, v.FollowUpNotes, v.Observations })
+            .ToListAsync();
+
+        if (!concerns.Any())
+            return "✅ No safety concerns have been flagged in home visitations this week.";
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"⚠️ **{concerns.Count} visitation{(concerns.Count == 1 ? "" : "s")} with safety concerns flagged this week:**\n");
+        foreach (var c in concerns)
+        {
+            sb.AppendLine($"• **Resident ID {c.ResidentId}** — {c.VisitDate} | Worker: {c.SocialWorker ?? "N/A"}");
+            if (!string.IsNullOrWhiteSpace(c.Observations)) sb.AppendLine($"  Observations: {c.Observations}");
+            sb.AppendLine($"  Follow-up needed: {(c.FollowUpNeeded == true ? "⚠️ Yes" : "No")}");
+            if (!string.IsNullOrWhiteSpace(c.FollowUpNotes)) sb.AppendLine($"  Notes: {c.FollowUpNotes}");
+        }
+        return sb.ToString();
+    }
+
+    private async Task<string> InstantPendingFollowups()
+    {
+        var pending = await _db.HomeVisitations
+            .Where(v => v.FollowUpNeeded == true)
+            .OrderByDescending(v => v.VisitDate)
+            .Select(v => new { v.ResidentId, v.VisitDate, v.SocialWorker, v.FollowUpNotes, v.VisitType })
+            .ToListAsync();
+
+        if (!pending.Any())
+            return "✅ No pending follow-ups. All home visitation actions are resolved.";
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"📋 **{pending.Count} pending follow-up{(pending.Count == 1 ? "" : "s")} across home visitations:**\n");
+        foreach (var v in pending.Take(20))
+        {
+            sb.AppendLine($"• **Resident ID {v.ResidentId}** — Last visit: {v.VisitDate} ({v.VisitType ?? "N/A"}) | Worker: {v.SocialWorker ?? "N/A"}");
+            if (!string.IsNullOrWhiteSpace(v.FollowUpNotes)) sb.AppendLine($"  Notes: {v.FollowUpNotes}");
+        }
+        if (pending.Count > 20) sb.AppendLine($"\n...and {pending.Count - 20} more.");
+        return sb.ToString();
+    }
+
+    private async Task<string> InstantChurnRisk()
+    {
+        var highRisk = await _db.DonorChurnPredictions
+            .Where(p => p.RiskLevel == "High" || p.ChurnProbability > 0.7m)
+            .Join(_db.Supporters, p => p.SupporterId, s => s.SupporterId,
+                (p, s) => new { s.DisplayName, s.SupporterType, s.Email, p.ChurnProbability, p.RiskLevel, p.ScoredAt })
+            .OrderByDescending(p => p.ChurnProbability)
+            .Take(20)
+            .ToListAsync();
+
+        if (!highRisk.Any())
+            return "✅ No donors are currently flagged as high churn risk.";
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"⚠️ **{highRisk.Count} donor{(highRisk.Count == 1 ? "" : "s")} at high churn risk:**\n");
+        foreach (var d in highRisk)
+            sb.AppendLine($"• **{d.DisplayName}** ({d.SupporterType}) — {d.ChurnProbability:P0} churn probability | Scored: {d.ScoredAt?.ToString("MMM d, yyyy") ?? "N/A"}");
+        sb.AppendLine("\nConsider reaching out with a personalized re-engagement message.");
+        return sb.ToString();
+    }
+
+    private async Task<string> InstantLapsedDonors()
+    {
+        var sixMonthsAgo = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-6));
+        var activeIds = await _db.Donations
+            .Where(d => d.DonationDate >= sixMonthsAgo)
+            .Select(d => d.SupporterId).Distinct().ToListAsync();
+
+        var lapsed = await _db.Supporters
+            .Where(s => s.Status == "Active" && !activeIds.Contains(s.SupporterId))
+            .OrderBy(s => s.FirstDonationDate)
+            .Select(s => new { s.DisplayName, s.SupporterType, s.FirstDonationDate, s.AcquisitionChannel })
+            .Take(20).ToListAsync();
+
+        var totalLapsed = await _db.Supporters
+            .CountAsync(s => s.Status == "Active" && !activeIds.Contains(s.SupporterId));
+
+        if (!lapsed.Any())
+            return "✅ No active donors have lapsed in the last 6 months.";
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"📉 **{totalLapsed} donor{(totalLapsed == 1 ? "" : "s")} haven't given in 6+ months:**\n");
+        foreach (var d in lapsed)
+            sb.AppendLine($"• **{d.DisplayName}** ({d.SupporterType}) — First donated: {d.FirstDonationDate?.ToString() ?? "N/A"} | Channel: {d.AcquisitionChannel ?? "N/A"}");
+        if (totalLapsed > 20) sb.AppendLine($"\n...and {totalLapsed - 20} more.");
+        sb.AppendLine("\nA personal re-engagement email to these donors may help bring them back.");
+        return sb.ToString();
+    }
+
+    private async Task<string> InstantTopContent()
+    {
+        var top = await _db.SocialMediaPosts
+            .OrderByDescending(p => p.EngagementRate)
+            .Take(5)
+            .Select(p => new { p.Platform, p.PostType, p.ContentTopic, p.EngagementRate, p.Reach, p.Likes, p.CreatedAt, p.Caption })
+            .ToListAsync();
+
+        var lastPost = await _db.SocialMediaPosts
+            .OrderByDescending(p => p.CreatedAt)
+            .Select(p => new { p.CreatedAt, p.Platform })
+            .FirstOrDefaultAsync();
+
+        if (!top.Any())
+            return "No social media posts found on record yet.";
+
+        var daysSince = lastPost != null ? (int)(DateTime.UtcNow - lastPost.CreatedAt).TotalDays : -1;
+        var sb = new StringBuilder();
+        if (daysSince >= 0)
+            sb.AppendLine($"📅 Last post: **{daysSince} day{(daysSince == 1 ? "" : "s")} ago** on {lastPost!.Platform}\n");
+
+        sb.AppendLine("🏆 **Top 5 posts by engagement rate:**\n");
+        foreach (var p in top)
+        {
+            sb.AppendLine($"• **{p.CreatedAt:MMM d, yyyy}** | {p.Platform} — {p.PostType} | Topic: {p.ContentTopic ?? "N/A"}");
+            sb.AppendLine($"  Engagement: {p.EngagementRate:P1} | Reach: {p.Reach:N0} | Likes: {p.Likes}");
+            if (!string.IsNullOrWhiteSpace(p.Caption))
+                sb.AppendLine($"  \"{p.Caption[..Math.Min(100, p.Caption.Length)]}…\"");
+        }
+        return sb.ToString();
+    }
+
+    // ─── Tier 2: Pre-aggregated → focused Claude narration ────────────────────
+    // Returns (systemPrompt, userMessage) or null if not a Tier 2 key.
+
+    private record Tier2Prompt(string System, string User);
+
+    private async Task<Tier2Prompt?> TryTier2Response(string key) => key switch
+    {
+        "resident.status_overview" => await BuildResidentStatusOverviewPrompt(),
+        "resident.needs_attention"  => await BuildNeedsAttentionPrompt(),
+        "donor.giving_summary"      => await BuildGivingSummaryPrompt(),
+        _ => null
+    };
+
+    private async Task<Tier2Prompt> BuildResidentStatusOverviewPrompt()
+    {
+        var total   = await _db.Residents.CountAsync();
+        var byStatus = await _db.Residents
+            .Where(r => r.CaseStatus != null)
+            .GroupBy(r => r.CaseStatus!)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.Status, g => g.Count);
+
+        var byReintegration = await _db.Residents
+            .Where(r => r.ReintegrationStatus != null)
+            .GroupBy(r => r.ReintegrationStatus!)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.Status, g => g.Count);
+
+        var bySafehouse = await _db.Residents
+            .Where(r => r.SafehouseId != null)
+            .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, s) => s.Name)
+            .GroupBy(n => n)
+            .Select(g => new { Name = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.Name, g => g.Count);
+
+        var cutoff30 = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
+        var recentAdmissions = await _db.Residents.CountAsync(r => r.DateOfAdmission >= cutoff30);
+
+        var summary = new { total, byStatus, byReintegration, bySafehouse, recentAdmissions };
+        var system = "You are a concise case management assistant for a nonprofit. Write a 3-4 sentence admin briefing from the data below. Be warm but factual. Highlight anything that needs attention.";
+        var user   = $"Resident status data: {JsonSerializer.Serialize(summary)}";
+        return new Tier2Prompt(system, user);
+    }
+
+    private async Task<Tier2Prompt> BuildNeedsAttentionPrompt()
+    {
+        var cutoff30 = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
+        var recentlyVisitedIds = await _db.HomeVisitations
+            .Where(v => v.VisitDate >= cutoff30).Select(v => v.ResidentId).Distinct().ToListAsync();
+
+        var noRecentVisit = await _db.Residents
+            .Where(r => !recentlyVisitedIds.Contains(r.ResidentId))
+            .Select(r => new { r.CaseControlNo, r.InternalCode, r.ResidentId, r.CaseStatus })
+            .ToListAsync();
+
+        var pendingFollowups = await _db.HomeVisitations.CountAsync(v => v.FollowUpNeeded == true);
+        var safetyConcernsThisWeek = await _db.HomeVisitations
+            .CountAsync(v => v.SafetyConcernsNoted == true && v.VisitDate >= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7)));
+        var overdueInterventions = await _db.InterventionPlans
+            .CountAsync(p => p.TargetDate < DateOnly.FromDateTime(DateTime.UtcNow) && p.Status != "Completed");
+        var sessionConcerns = await _db.ProcessRecordings.CountAsync(p => p.ConcernsFlagged == true);
+
+        var summary = new
+        {
+            residentsWithNoVisitIn30Days = noRecentVisit.Select(r => r.CaseControlNo ?? r.InternalCode ?? $"ID {r.ResidentId}"),
+            pendingFollowups,
+            safetyConcernsThisWeek,
+            overdueInterventions,
+            sessionConcerns
+        };
+        var system = "You are a compassionate case management assistant. Based on this data, write a 4-5 sentence briefing highlighting which residents may need urgent attention and why. Be specific. Suggest concrete next steps.";
+        var user   = $"Attention flags: {JsonSerializer.Serialize(summary)}";
+        return new Tier2Prompt(system, user);
+    }
+
+    private async Task<Tier2Prompt> BuildGivingSummaryPrompt()
+    {
+        var now       = DateTime.UtcNow;
+        var yearStart = new DateOnly(now.Year, 1, 1);
+        var monStart  = new DateOnly(now.Year, now.Month, 1);
+
+        var totalThisYear  = await _db.Donations.Where(d => d.DonationDate >= yearStart).CountAsync();
+        var amountThisYear = await _db.Donations.Where(d => d.DonationDate >= yearStart && d.Amount != null).SumAsync(d => (decimal?)d.Amount) ?? 0;
+        var totalThisMonth = await _db.Donations.Where(d => d.DonationDate >= monStart).CountAsync();
+        var amountThisMonth= await _db.Donations.Where(d => d.DonationDate >= monStart && d.Amount != null).SumAsync(d => (decimal?)d.Amount) ?? 0;
+        var recurring      = await _db.Donations.Where(d => d.IsRecurring).Select(d => d.SupporterId).Distinct().CountAsync();
+        var atRisk         = await _db.DonorChurnPredictions.CountAsync(p => p.ChurnProbability > 0.7m);
+        var sixMonthsAgo   = DateOnly.FromDateTime(now.AddMonths(-6));
+        var activeIds      = await _db.Donations.Where(d => d.DonationDate >= sixMonthsAgo).Select(d => d.SupporterId).Distinct().ToListAsync();
+        var lapsed         = await _db.Supporters.CountAsync(s => s.Status == "Active" && !activeIds.Contains(s.SupporterId));
+
+        var byType = await _db.Donations
+            .Where(d => d.DonationDate >= yearStart)
+            .GroupBy(d => d.DonationType)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .ToDictionaryAsync(g => g.Type, g => g.Count);
+
+        var summary = new { totalDonationsThisYear = totalThisYear, amountThisYear, totalDonationsThisMonth = totalThisMonth, amountThisMonth, recurringDonors = recurring, donorsAtChurnRisk = atRisk, lapsedDonors = lapsed, byType };
+        var system  = "You are a nonprofit development assistant. Write a 3-5 sentence giving summary for an admin. Mention highlights, compare month vs year, flag churn risk and lapsed donors as action items.";
+        var user    = $"Giving data: {JsonSerializer.Serialize(summary)}";
+        return new Tier2Prompt(system, user);
+    }
+
+    // ─── Tier 4 domain-scoped context (for creative/draft prompted buttons) ───
+    // Like full GatherContext but only pulls the relevant domain's data.
+
+    private async Task<string> GatherDomainContext(string key, string message)
+    {
+        // Resident creative prompts — only load resident + related data
+        if (key.StartsWith("resident."))
+            return await GetResidentSummary() + "\n\n" + await GetGeneralOverview();
+
+        // Donor creative prompts (thank-you, re-engagement drafts)
+        if (key.StartsWith("donor."))
+            return await GetDonationSummary() + "\n\n" + await GetLapsedDonors() + "\n\n" + await GetDetailedChurnData();
+
+        // Social creative prompts (post drafts, content calendar, tone check)
+        if (key.StartsWith("social."))
+            return await GetSocialMediaContext();
+
+        // Fallback to full context for unrecognised keys
+        return await GatherContext(message);
+    }
+
+    // ─── Context gathering (Tier 4 free-typed) ───────────────────────────────
 
     private async Task<string> GatherContext(string message)
     {
@@ -90,42 +403,157 @@ public class ChatController : ControllerBase
 
         // ── Aggregate / category queries ──────────────────────────────────────
 
-        // Resident / participant queries
-        if (lower.Contains("resident") || lower.Contains("participant") ||
-            lower.Contains("case") || lower.Contains("client") ||
-            lower.Contains("survivor") || lower.Contains("child") ||
-            lower.Contains("admission") || lower.Contains("safehouse occupancy"))
+        // Long-stay / transition planning residents (30+ days)
+        if (lower.Contains("30") || lower.Contains("transition plan") ||
+            lower.Contains("long stay") || lower.Contains("been here") ||
+            lower.Contains("length of stay"))
         {
-            // Only pull the summary if we're not already looking at a specific record,
-            // or if the question is clearly about aggregate stats
-            if (!caseCodeMatch.Success && !idMatch.Success)
+            parts.Add(await GetLongStayResidents());
+        }
+
+        // Safety concerns flagged recently
+        if ((lower.Contains("safety") || lower.Contains("flagged") || lower.Contains("concern")) &&
+            !caseCodeMatch.Success && !idMatch.Success)
+        {
+            parts.Add(await GetRecentSafetyConcerns());
+        }
+
+        // Residents potentially falling through the cracks
+        if (lower.Contains("falling through") || lower.Contains("attention") ||
+            lower.Contains("at risk") || lower.Contains("overlooked") ||
+            lower.Contains("no recent visit"))
+        {
+            parts.Add(await GetResidentsFallingThroughCracks());
+        }
+
+        // Resident / participant aggregate queries
+        if (lower.Contains("resident") || lower.Contains("participant") ||
+            lower.Contains("case status") || lower.Contains("client") ||
+            lower.Contains("survivor") || lower.Contains("admission") ||
+            lower.Contains("reintegration") || lower.Contains("safehouse occupancy"))
+        {
+            if (!caseCodeMatch.Success && !idMatch.Success &&
+                !lower.Contains("30") && !lower.Contains("transition") &&
+                !lower.Contains("falling through") && !lower.Contains("attention"))
                 parts.Add(await GetResidentSummary());
         }
 
-        // Donor / donation / funding queries
+        // Lapsed donor queries
+        if (lower.Contains("lapsed") || lower.Contains("haven't given") ||
+            lower.Contains("6 month") || lower.Contains("six month") ||
+            lower.Contains("re-engage") || lower.Contains("reengage") ||
+            lower.Contains("inactive donor"))
+        {
+            parts.Add(await GetLapsedDonors());
+        }
+
+        // Thank-you / re-engagement drafts — pass to AI with recent donor context
+        if (lower.Contains("thank") || lower.Contains("re-engagement") ||
+            lower.Contains("follow-up email") || lower.Contains("draft"))
+        {
+            parts.Add(await GetDonationSummary());
+        }
+
+        // Health & wellbeing queries
+        if (lower.Contains("health") || lower.Contains("medical") ||
+            lower.Contains("checkup") || lower.Contains("nutrition") ||
+            lower.Contains("sleep") || lower.Contains("psychological") ||
+            lower.Contains("dental") || lower.Contains("wellbeing") ||
+            lower.Contains("well-being") || lower.Contains("energy"))
+        {
+            parts.Add(await GetHealthSummary());
+        }
+
+        // Education queries
+        if (lower.Contains("education") || lower.Contains("school") ||
+            lower.Contains("attendance") || lower.Contains("enrollment") ||
+            lower.Contains("enrolled") || lower.Contains("progress") ||
+            lower.Contains("completion") || lower.Contains("learning"))
+        {
+            parts.Add(await GetEducationSummary());
+        }
+
+        // Case conference queries
+        if (lower.Contains("conference") || lower.Contains("case conference") ||
+            lower.Contains("upcoming") || lower.Contains("scheduled"))
+        {
+            parts.Add(await GetCaseConferenceSummary());
+        }
+
+        // Process / counselling session queries
+        if (lower.Contains("session") || lower.Contains("counsell") ||
+            lower.Contains("therapy") || lower.Contains("emotional") ||
+            lower.Contains("process recording") || lower.Contains("intervention applied") ||
+            lower.Contains("narrative"))
+        {
+            parts.Add(await GetProcessRecordingSummary());
+        }
+
+        // Intervention plan queries
+        if (lower.Contains("intervention") || lower.Contains("plan") ||
+            lower.Contains("services provided") || lower.Contains("overdue") ||
+            lower.Contains("target date"))
+        {
+            parts.Add(await GetInterventionPlanSummary());
+        }
+
+        // In-kind donation queries
+        if (lower.Contains("in-kind") || lower.Contains("in kind") ||
+            lower.Contains("item") || lower.Contains("goods") ||
+            lower.Contains("supply") || lower.Contains("supplies") ||
+            lower.Contains("donated item"))
+        {
+            parts.Add(await GetInKindDonationSummary());
+        }
+
+        // Donation allocation queries
+        if (lower.Contains("allocation") || lower.Contains("allocated") ||
+            lower.Contains("program area") || lower.Contains("where") &&
+            (lower.Contains("money") || lower.Contains("fund")))
+        {
+            parts.Add(await GetDonationAllocationSummary());
+        }
+
+        // Detailed churn prediction queries
+        if (lower.Contains("churn") || lower.Contains("risk level") ||
+            lower.Contains("churn probability") || lower.Contains("prediction"))
+        {
+            parts.Add(await GetDetailedChurnData());
+        }
+
+        // General donor / donation queries
         if (lower.Contains("donor") || lower.Contains("donation") ||
             lower.Contains("supporter") || lower.Contains("contribut") ||
-            lower.Contains("fund") || lower.Contains("money") ||
+            lower.Contains("fund") || lower.Contains("giving") ||
             lower.Contains("amount") || lower.Contains("recurring") ||
-            lower.Contains("campaign") || lower.Contains("churn"))
+            lower.Contains("campaign"))
         {
             parts.Add(await GetDonationSummary());
         }
 
         // Safehouse / facility queries
-        if (lower.Contains("safehouse") || lower.Contains("house") ||
-            lower.Contains("location") || lower.Contains("facility") ||
-            lower.Contains("capacity") || lower.Contains("region"))
+        if (lower.Contains("safehouse") || lower.Contains("capacity") ||
+            lower.Contains("facility") || lower.Contains("location") ||
+            lower.Contains("region") || lower.Contains("occupancy"))
         {
             parts.Add(await GetSafehouseSummary());
+        }
+
+        // Social media queries
+        if (lower.Contains("social media") || lower.Contains("post") ||
+            lower.Contains("content") || lower.Contains("engagement") ||
+            lower.Contains("awareness") || lower.Contains("draft") ||
+            lower.Contains("caption") || lower.Contains("calendar") ||
+            lower.Contains("tone") || lower.Contains("trauma-informed"))
+        {
+            parts.Add(await GetSocialMediaContext());
         }
 
         // Home visitation queries
         if (lower.Contains("visit") || lower.Contains("visitation") ||
             lower.Contains("home visit") || lower.Contains("social worker") ||
-            lower.Contains("follow up") || lower.Contains("safety concern"))
+            lower.Contains("follow up") || lower.Contains("pending"))
         {
-            // If we already found a specific resident, pull their visitation history too
             if (caseCodeMatch.Success || idMatch.Success)
             {
                 Resident? specificResident = null;
@@ -145,12 +573,13 @@ public class ChatController : ControllerBase
             }
         }
 
-        // Fall back to a general overview if nothing matched
+        // Daily briefing / cross-category overview
         if (parts.Count == 0 ||
+            lower.Contains("briefing") || lower.Contains("overview") ||
             lower.Contains("how many") || lower.Contains("total") ||
-            lower.Contains("overview") || lower.Contains("summary") ||
-            lower.Contains("stats") || lower.Contains("report") ||
-            lower.Contains("update"))
+            lower.Contains("summary") || lower.Contains("report") ||
+            lower.Contains("update") || lower.Contains("today") ||
+            lower.Contains("board") || lower.Contains("quarter"))
         {
             parts.Add(await GetGeneralOverview());
         }
@@ -158,59 +587,318 @@ public class ChatController : ControllerBase
         return string.Join("\n\n", parts);
     }
 
+    // ── Residents here 30+ days who may need transition planning ─────────────
+    private async Task<string> GetLongStayResidents()
+    {
+        var cutoff = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
+
+        var longStay = await _db.Residents
+            .Where(r => r.DateOfAdmission != null && r.DateOfAdmission <= cutoff)
+            .OrderBy(r => r.DateOfAdmission)
+            .Select(r => new
+            {
+                r.CaseControlNo,
+                r.InternalCode,
+                r.DateOfAdmission,
+                r.CaseStatus,
+                r.ReintegrationStatus,
+                r.AssignedSocialWorker,
+                r.SafehouseId
+            })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== RESIDENTS HERE 30+ DAYS ===");
+        sb.AppendLine($"Total: {longStay.Count} residents admitted 30 or more days ago");
+
+        foreach (var r in longStay)
+        {
+            var days = r.DateOfAdmission.HasValue
+                ? (DateOnly.FromDateTime(DateTime.UtcNow).DayNumber - r.DateOfAdmission.Value.DayNumber)
+                : 0;
+            sb.AppendLine($"  - {r.CaseControlNo ?? r.InternalCode ?? $"ID {r.SafehouseId}"} | {days} days | Status: {r.CaseStatus ?? "N/A"} | Reintegration: {r.ReintegrationStatus ?? "N/A"} | Worker: {r.AssignedSocialWorker ?? "N/A"}");
+        }
+
+        return sb.ToString();
+    }
+
+    // ── Safety concerns flagged in the last 7 days ────────────────────────────
+    private async Task<string> GetRecentSafetyConcerns()
+    {
+        var weekAgo = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-7));
+
+        var concerns = await _db.HomeVisitations
+            .Where(v => v.SafetyConcernsNoted == true && v.VisitDate >= weekAgo)
+            .OrderByDescending(v => v.VisitDate)
+            .Select(v => new
+            {
+                v.ResidentId,
+                v.VisitDate,
+                v.SocialWorker,
+                v.Observations,
+                v.FollowUpNeeded,
+                v.FollowUpNotes
+            })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== SAFETY CONCERNS FLAGGED THIS WEEK ===");
+        sb.AppendLine($"Total flagged visitations in the last 7 days: {concerns.Count}");
+
+        foreach (var c in concerns)
+        {
+            sb.AppendLine($"  - Resident ID {c.ResidentId} | {c.VisitDate} | Worker: {c.SocialWorker}");
+            if (!string.IsNullOrWhiteSpace(c.Observations))
+                sb.AppendLine($"    Observations: {c.Observations}");
+            sb.AppendLine($"    Follow-up needed: {(c.FollowUpNeeded == true ? "Yes" : "No")}");
+            if (!string.IsNullOrWhiteSpace(c.FollowUpNotes))
+                sb.AppendLine($"    Notes: {c.FollowUpNotes}");
+        }
+
+        return sb.ToString();
+    }
+
+    // ── Residents who may be falling through the cracks ──────────────────────
+    // Criteria: long stay OR no visitation in 30+ days OR pending follow-up
+    private async Task<string> GetResidentsFallingThroughCracks()
+    {
+        var cutoff30 = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
+
+        // Residents with no visitation in 30+ days
+        var recentlyVisitedIds = await _db.HomeVisitations
+            .Where(v => v.VisitDate >= cutoff30)
+            .Select(v => v.ResidentId)
+            .Distinct()
+            .ToListAsync();
+
+        var noRecentVisit = await _db.Residents
+            .Where(r => !recentlyVisitedIds.Contains(r.ResidentId))
+            .Select(r => new { r.CaseControlNo, r.InternalCode, r.ResidentId, r.CaseStatus, r.DateOfAdmission, r.AssignedSocialWorker })
+            .ToListAsync();
+
+        // Residents with pending follow-ups
+        var pendingFollowUpIds = await _db.HomeVisitations
+            .Where(v => v.FollowUpNeeded == true)
+            .Select(v => v.ResidentId)
+            .Distinct()
+            .ToListAsync();
+
+        // Long-stay residents (30+ days)
+        var longStayCount = await _db.Residents
+            .CountAsync(r => r.DateOfAdmission != null && r.DateOfAdmission <= cutoff30);
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== RESIDENTS WHO MAY NEED ATTENTION ===");
+        sb.AppendLine($"Residents with no home visit in the last 30 days: {noRecentVisit.Count}");
+
+        foreach (var r in noRecentVisit.Take(10))
+        {
+            var label = r.CaseControlNo ?? r.InternalCode ?? $"Resident {r.ResidentId}";
+            var admitDays = r.DateOfAdmission.HasValue
+                ? (DateOnly.FromDateTime(DateTime.UtcNow).DayNumber - r.DateOfAdmission.Value.DayNumber)
+                : 0;
+            sb.AppendLine($"  - {label} | {admitDays} days in care | Status: {r.CaseStatus ?? "N/A"} | Worker: {r.AssignedSocialWorker ?? "N/A"}");
+        }
+
+        if (noRecentVisit.Count > 10)
+            sb.AppendLine($"  ... and {noRecentVisit.Count - 10} more.");
+
+        sb.AppendLine($"Residents with unresolved follow-up actions: {pendingFollowUpIds.Count}");
+        sb.AppendLine($"Residents admitted 30+ days ago: {longStayCount}");
+
+        return sb.ToString();
+    }
+
+    // ── Lapsed donors (no donation in 6+ months) ──────────────────────────────
+    private async Task<string> GetLapsedDonors()
+    {
+        var sixMonthsAgo = DateOnly.FromDateTime(DateTime.UtcNow.AddMonths(-6));
+
+        // Find supporter IDs with a donation in the last 6 months
+        var activeIds = await _db.Donations
+            .Where(d => d.DonationDate >= sixMonthsAgo)
+            .Select(d => d.SupporterId)
+            .Distinct()
+            .ToListAsync();
+
+        var lapsed = await _db.Supporters
+            .Where(s => s.Status == "Active" && !activeIds.Contains(s.SupporterId))
+            .OrderBy(s => s.FirstDonationDate)
+            .Select(s => new
+            {
+                s.DisplayName,
+                s.Email,
+                s.SupporterType,
+                s.FirstDonationDate,
+                s.AcquisitionChannel
+            })
+            .Take(20)
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== LAPSED DONORS (NO DONATION IN 6+ MONTHS) ===");
+        sb.AppendLine($"Total lapsed active supporters: {lapsed.Count}{(lapsed.Count == 20 ? "+" : "")}");
+
+        foreach (var s in lapsed)
+        {
+            sb.AppendLine($"  - {s.DisplayName} ({s.SupporterType}) | First donated: {s.FirstDonationDate?.ToString() ?? "N/A"} | Channel: {s.AcquisitionChannel ?? "N/A"}");
+        }
+
+        return sb.ToString();
+    }
+
+    // ── Social media context ──────────────────────────────────────────────────
+    private async Task<string> GetSocialMediaContext()
+    {
+        var totalPosts = await _db.SocialMediaPosts.CountAsync();
+        var lastPost = await _db.SocialMediaPosts
+            .OrderByDescending(p => p.CreatedAt)
+            .FirstOrDefaultAsync();
+
+        var daysSinceLastPost = lastPost != null
+            ? (int)(DateTime.UtcNow - lastPost.CreatedAt).TotalDays
+            : -1;
+
+        // Top performing posts by engagement rate
+        var topPosts = await _db.SocialMediaPosts
+            .OrderByDescending(p => p.EngagementRate)
+            .Take(5)
+            .Select(p => new
+            {
+                p.Platform,
+                p.PostType,
+                p.ContentTopic,
+                p.EngagementRate,
+                p.Likes,
+                p.Shares,
+                p.Reach,
+                p.SentimentTone,
+                p.CreatedAt,
+                p.Caption
+            })
+            .ToListAsync();
+
+        // Platform breakdown
+        var byPlatform = await _db.SocialMediaPosts
+            .GroupBy(p => p.Platform)
+            .Select(g => new { Platform = g.Key, Count = g.Count(), AvgEngagement = g.Average(p => p.EngagementRate) })
+            .ToListAsync();
+
+        // Content topic breakdown
+        var byTopic = await _db.SocialMediaPosts
+            .Where(p => p.ContentTopic != null)
+            .GroupBy(p => p.ContentTopic!)
+            .Select(g => new { Topic = g.Key, Count = g.Count(), AvgEngagement = g.Average(p => p.EngagementRate) })
+            .OrderByDescending(g => g.AvgEngagement)
+            .Take(5)
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== SOCIAL MEDIA DATA ===");
+        sb.AppendLine($"Total posts on record: {totalPosts}");
+        sb.AppendLine($"Days since last post: {(daysSinceLastPost >= 0 ? daysSinceLastPost.ToString() : "No posts on record")}");
+
+        if (lastPost != null)
+            sb.AppendLine($"Last post: {lastPost.CreatedAt:MMMM d, yyyy} on {lastPost.Platform} ({lastPost.PostType})");
+
+        if (byPlatform.Any())
+        {
+            sb.AppendLine("Platform breakdown:");
+            foreach (var p in byPlatform)
+                sb.AppendLine($"  - {p.Platform}: {p.Count} posts, avg engagement {p.AvgEngagement:P1}");
+        }
+
+        if (byTopic.Any())
+        {
+            sb.AppendLine("Top content topics by engagement:");
+            foreach (var t in byTopic)
+                sb.AppendLine($"  - {t.Topic}: {t.Count} posts, avg engagement {t.AvgEngagement:P1}");
+        }
+
+        if (topPosts.Any())
+        {
+            sb.AppendLine("Top 5 posts by engagement rate:");
+            foreach (var p in topPosts)
+            {
+                sb.AppendLine($"  - {p.CreatedAt:MMM d, yyyy} | {p.Platform} | {p.PostType} | Topic: {p.ContentTopic ?? "N/A"} | Engagement: {p.EngagementRate:P1} | Reach: {p.Reach:N0} | Likes: {p.Likes}");
+                if (!string.IsNullOrWhiteSpace(p.Caption))
+                    sb.AppendLine($"    Caption preview: {p.Caption[..Math.Min(120, p.Caption.Length)]}…");
+            }
+        }
+
+        return sb.ToString();
+    }
+
     // ── Look up a specific resident by case control number (e.g. "LS-0002") ────
     private async Task<string> GetSpecificResidentByCode(string caseControlNo)
     {
-        var resident = await _db.Residents
-            .FirstOrDefaultAsync(r => r.CaseControlNo == caseControlNo);
-
+        var resident = await _db.Residents.FirstOrDefaultAsync(r => r.CaseControlNo == caseControlNo);
         if (resident == null)
             return $"=== SPECIFIC RESIDENT LOOKUP ===\nNo resident found with case control number '{caseControlNo}'.";
-
-        return FormatResidentRecord(resident);
+        return await FormatFullResidentRecord(resident);
     }
 
-    // ── Look up a specific resident by numeric ID ─────────────────────────────
     private async Task<string> GetSpecificResidentById(int residentId)
     {
-        var resident = await _db.Residents
-            .FirstOrDefaultAsync(r => r.ResidentId == residentId);
-
+        var resident = await _db.Residents.FirstOrDefaultAsync(r => r.ResidentId == residentId);
         if (resident == null)
             return $"=== SPECIFIC RESIDENT LOOKUP ===\nNo resident found with ID {residentId}.";
-
-        return FormatResidentRecord(resident);
+        return await FormatFullResidentRecord(resident);
     }
 
-    // ── Format a single resident record for the AI prompt ─────────────────────
-    private static string FormatResidentRecord(Resident r)
+    // ── Full resident record — core fields + all related tables ──────────────
+    private async Task<string> FormatFullResidentRecord(Resident r)
     {
         var sb = new StringBuilder();
-        sb.AppendLine("=== SPECIFIC RESIDENT RECORD ===");
+
+        // ── Core demographics & case info ─────────────────────────────────────
+        sb.AppendLine("=== RESIDENT RECORD ===");
         sb.AppendLine($"Case Control No: {r.CaseControlNo ?? "N/A"}");
         sb.AppendLine($"Internal Code: {r.InternalCode ?? "N/A"}");
         sb.AppendLine($"Resident ID: {r.ResidentId}");
-        sb.AppendLine($"Safehouse ID: {r.SafehouseId?.ToString() ?? "N/A"}");
         sb.AppendLine($"Case Status: {r.CaseStatus ?? "N/A"}");
         sb.AppendLine($"Case Category: {r.CaseCategory ?? "N/A"}");
         sb.AppendLine($"Sex: {r.Sex ?? "N/A"}");
         sb.AppendLine($"Date of Birth: {r.DateOfBirth?.ToString() ?? "N/A"}");
         sb.AppendLine($"Present Age: {r.PresentAge ?? "N/A"}");
+        sb.AppendLine($"Place of Birth: {r.PlaceOfBirth ?? "N/A"}");
+        sb.AppendLine($"Religion: {r.Religion ?? "N/A"}");
+        sb.AppendLine($"Birth Status: {r.BirthStatus ?? "N/A"}");
+
+        // Safehouse
+        if (r.SafehouseId.HasValue)
+        {
+            var sh = await _db.Safehouses.FirstOrDefaultAsync(s => s.SafehouseId == r.SafehouseId);
+            sb.AppendLine($"Safehouse: {sh?.Name ?? $"ID {r.SafehouseId}"} ({sh?.City}, {sh?.Region})");
+        }
+
+        // Admission
         sb.AppendLine($"Date of Admission: {r.DateOfAdmission?.ToString() ?? "N/A"}");
         sb.AppendLine($"Age Upon Admission: {r.AgeUponAdmission ?? "N/A"}");
         sb.AppendLine($"Length of Stay: {r.LengthOfStay ?? "N/A"}");
+        sb.AppendLine($"Date Enrolled: {r.DateEnrolled?.ToString() ?? "N/A"}");
+        sb.AppendLine($"Date Closed: {r.DateClosed?.ToString() ?? "N/A"}");
         sb.AppendLine($"Referral Source: {r.ReferralSource ?? "N/A"}");
+        sb.AppendLine($"Referring Agency/Person: {r.ReferringAgencyPerson ?? "N/A"}");
         sb.AppendLine($"Assigned Social Worker: {r.AssignedSocialWorker ?? "N/A"}");
+
+        // Risk & assessment
         sb.AppendLine($"Initial Risk Level: {r.InitialRiskLevel ?? "N/A"}");
+        sb.AppendLine($"Current Risk Level: {r.CurrentRiskLevel ?? "N/A"}");
         sb.AppendLine($"Initial Case Assessment: {r.InitialCaseAssessment ?? "N/A"}");
+        sb.AppendLine($"Date Case Study Prepared: {r.DateCaseStudyPrepared?.ToString() ?? "N/A"}");
+
+        // Reintegration
         sb.AppendLine($"Reintegration Type: {r.ReintegrationType ?? "N/A"}");
         sb.AppendLine($"Reintegration Status: {r.ReintegrationStatus ?? "N/A"}");
+
+        // Disability & special needs
         sb.AppendLine($"Is PWD: {(r.IsPwd ? "Yes" : "No")}");
         if (r.IsPwd) sb.AppendLine($"PWD Type: {r.PwdType ?? "N/A"}");
         sb.AppendLine($"Has Special Needs: {(r.HasSpecialNeeds ? "Yes" : "No")}");
         if (r.HasSpecialNeeds) sb.AppendLine($"Special Needs Diagnosis: {r.SpecialNeedsDiagnosis ?? "N/A"}");
 
-        // Sub-categories of abuse / vulnerability
+        // Vulnerability sub-categories
         var subCats = new List<string>();
         if (r.SubCatOrphaned) subCats.Add("Orphaned");
         if (r.SubCatTrafficked) subCats.Add("Trafficked");
@@ -224,7 +912,7 @@ public class ChatController : ControllerBase
         if (r.SubCatChildWithHiv) subCats.Add("Child with HIV");
         sb.AppendLine($"Vulnerability Sub-categories: {(subCats.Any() ? string.Join(", ", subCats) : "None flagged")}");
 
-        // Family background flags
+        // Family background
         var familyFlags = new List<string>();
         if (r.FamilyIs4ps) familyFlags.Add("4Ps beneficiary");
         if (r.FamilySoloParent) familyFlags.Add("Solo parent");
@@ -232,6 +920,100 @@ public class ChatController : ControllerBase
         if (r.FamilyParentPwd) familyFlags.Add("Parent with PWD");
         if (r.FamilyInformalSettler) familyFlags.Add("Informal settler");
         sb.AppendLine($"Family Background: {(familyFlags.Any() ? string.Join(", ", familyFlags) : "None flagged")}");
+
+        if (!string.IsNullOrWhiteSpace(r.NotesRestricted))
+            sb.AppendLine($"Restricted Notes: {r.NotesRestricted}");
+
+        // ── Health & Wellbeing records ─────────────────────────────────────────
+        var healthRecords = await _db.HealthWellbeingRecords
+            .Where(h => h.ResidentId == r.ResidentId)
+            .OrderByDescending(h => h.RecordDate)
+            .Take(3)
+            .ToListAsync();
+
+        if (healthRecords.Any())
+        {
+            sb.AppendLine("\n--- Health & Wellbeing ---");
+            foreach (var h in healthRecords)
+            {
+                sb.AppendLine($"  Date: {h.RecordDate}");
+                sb.AppendLine($"    General health: {h.GeneralHealthScore}/10 | Nutrition: {h.NutritionScore}/10 | Sleep: {h.SleepQualityScore}/10 | Energy: {h.EnergyLevelScore}/10");
+                sb.AppendLine($"    Medical checkup done: {(h.MedicalCheckupDone == true ? "Yes" : "No")} | Dental: {(h.DentalCheckupDone == true ? "Yes" : "No")} | Psychological: {(h.PsychologicalCheckupDone == true ? "Yes" : "No")}");
+            }
+        }
+
+        // ── Education records ──────────────────────────────────────────────────
+        var educationRecords = await _db.EducationRecords
+            .Where(e => e.ResidentId == r.ResidentId)
+            .OrderByDescending(e => e.RecordDate)
+            .Take(3)
+            .ToListAsync();
+
+        if (educationRecords.Any())
+        {
+            sb.AppendLine("\n--- Education ---");
+            foreach (var e in educationRecords)
+            {
+                sb.AppendLine($"  Date: {e.RecordDate} | Status: {e.EnrollmentStatus ?? "N/A"} | Attendance: {e.AttendanceRate?.ToString("P0") ?? "N/A"} | Progress: {e.ProgressPercent?.ToString("P0") ?? "N/A"} | Completion: {e.CompletionStatus ?? "N/A"}");
+            }
+        }
+
+        // ── Case conferences ───────────────────────────────────────────────────
+        var conferences = await _db.CaseConferences
+            .Where(c => c.ResidentId == r.ResidentId)
+            .OrderByDescending(c => c.ConferenceDate)
+            .Take(5)
+            .ToListAsync();
+
+        if (conferences.Any())
+        {
+            sb.AppendLine("\n--- Case Conferences ---");
+            foreach (var c in conferences)
+            {
+                sb.AppendLine($"  {c.ConferenceDate} | Type: {c.ConferenceType ?? "N/A"} | Worker: {c.SocialWorker ?? "N/A"}");
+                if (!string.IsNullOrWhiteSpace(c.Summary)) sb.AppendLine($"    Summary: {c.Summary}");
+                if (!string.IsNullOrWhiteSpace(c.DecisionsMade)) sb.AppendLine($"    Decisions: {c.DecisionsMade}");
+                if (c.NextConferenceDate.HasValue) sb.AppendLine($"    Next conference: {c.NextConferenceDate}");
+            }
+        }
+
+        // ── Process (therapy/counselling) sessions ─────────────────────────────
+        var sessions = await _db.ProcessRecordings
+            .Where(p => p.ResidentId == r.ResidentId)
+            .OrderByDescending(p => p.SessionDate)
+            .Take(5)
+            .ToListAsync();
+
+        if (sessions.Any())
+        {
+            sb.AppendLine("\n--- Counselling / Process Sessions ---");
+            foreach (var s in sessions)
+            {
+                sb.AppendLine($"  {s.SessionDate} | Type: {s.SessionType ?? "N/A"} | Duration: {s.SessionDurationMinutes} min | Worker: {s.SocialWorker ?? "N/A"}");
+                sb.AppendLine($"    Emotional state (start → end): {s.EmotionalStateObserved ?? "N/A"} → {s.EmotionalStateEnd ?? "N/A"}");
+                if (!string.IsNullOrWhiteSpace(s.InterventionsApplied)) sb.AppendLine($"    Interventions: {s.InterventionsApplied}");
+                if (!string.IsNullOrWhiteSpace(s.SessionNarrative)) sb.AppendLine($"    Narrative: {s.SessionNarrative}");
+                if (!string.IsNullOrWhiteSpace(s.FollowUpActions)) sb.AppendLine($"    Follow-up actions: {s.FollowUpActions}");
+                sb.AppendLine($"    Progress noted: {(s.ProgressNoted == true ? "Yes" : "No")} | Concerns flagged: {(s.ConcernsFlagged == true ? "Yes" : "No")} | Referral made: {(s.ReferralMade == true ? "Yes" : "No")}");
+            }
+        }
+
+        // ── Intervention plans ─────────────────────────────────────────────────
+        var plans = await _db.InterventionPlans
+            .Where(p => p.ResidentId == r.ResidentId)
+            .OrderByDescending(p => p.CreatedAt)
+            .ToListAsync();
+
+        if (plans.Any())
+        {
+            sb.AppendLine("\n--- Intervention Plans ---");
+            foreach (var p in plans)
+            {
+                sb.AppendLine($"  Category: {p.PlanCategory ?? "N/A"} | Status: {p.Status ?? "N/A"} | Target date: {p.TargetDate?.ToString() ?? "N/A"}");
+                if (!string.IsNullOrWhiteSpace(p.PlanDescription)) sb.AppendLine($"    Description: {p.PlanDescription}");
+                if (!string.IsNullOrWhiteSpace(p.ServicesProvided)) sb.AppendLine($"    Services: {p.ServicesProvided}");
+            }
+        }
 
         return sb.ToString();
     }
@@ -491,24 +1273,321 @@ public class ChatController : ControllerBase
         return sb.ToString();
     }
 
-    private async Task<string> GetGeneralOverview()
+    // ── Health & Wellbeing aggregate ──────────────────────────────────────────
+    private async Task<string> GetHealthSummary()
     {
-        var totalResidents = await _db.Residents.CountAsync();
-        var activeResidents = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
-        var totalSupporters = await _db.Supporters.CountAsync();
-        var totalDonations = await _db.Donations.CountAsync();
-        var totalSafehouses = await _db.Safehouses.CountAsync();
-        var pendingFollowUps = await _db.HomeVisitations.CountAsync(v => v.FollowUpNeeded == true);
-        var atRiskDonors = await _db.DonorChurnPredictions.CountAsync(p => p.ChurnProbability > 0.7m);
+        var totalRecords = await _db.HealthWellbeingRecords.CountAsync();
+        var avgHealth    = await _db.HealthWellbeingRecords.Where(h => h.GeneralHealthScore != null).AverageAsync(h => (double?)h.GeneralHealthScore) ?? 0;
+        var avgNutrition = await _db.HealthWellbeingRecords.Where(h => h.NutritionScore != null).AverageAsync(h => (double?)h.NutritionScore) ?? 0;
+        var avgSleep     = await _db.HealthWellbeingRecords.Where(h => h.SleepQualityScore != null).AverageAsync(h => (double?)h.SleepQualityScore) ?? 0;
+        var medicalDone  = await _db.HealthWellbeingRecords.CountAsync(h => h.MedicalCheckupDone == true);
+        var dentalDone   = await _db.HealthWellbeingRecords.CountAsync(h => h.DentalCheckupDone == true);
+        var psychDone    = await _db.HealthWellbeingRecords.CountAsync(h => h.PsychologicalCheckupDone == true);
 
         var sb = new StringBuilder();
-        sb.AppendLine("=== GENERAL OVERVIEW ===");
-        sb.AppendLine($"Total residents/participants: {totalResidents} ({activeResidents} active)");
-        sb.AppendLine($"Active safehouses: {totalSafehouses}");
-        sb.AppendLine($"Total supporters/donors: {totalSupporters}");
-        sb.AppendLine($"Total donations on record: {totalDonations}");
-        sb.AppendLine($"Home visitation follow-ups pending: {pendingFollowUps}");
-        sb.AppendLine($"Donors at churn risk: {atRiskDonors}");
+        sb.AppendLine("=== HEALTH & WELLBEING SUMMARY ===");
+        sb.AppendLine($"Total health records: {totalRecords}");
+        sb.AppendLine($"Average general health score: {avgHealth:F1}/10");
+        sb.AppendLine($"Average nutrition score: {avgNutrition:F1}/10");
+        sb.AppendLine($"Average sleep quality score: {avgSleep:F1}/10");
+        sb.AppendLine($"Residents with medical checkup completed: {medicalDone}");
+        sb.AppendLine($"Residents with dental checkup completed: {dentalDone}");
+        sb.AppendLine($"Residents with psychological checkup completed: {psychDone}");
+        return sb.ToString();
+    }
+
+    // ── Education aggregate ───────────────────────────────────────────────────
+    private async Task<string> GetEducationSummary()
+    {
+        var totalRecords = await _db.EducationRecords.CountAsync();
+        var enrolled     = await _db.EducationRecords.CountAsync(e => e.EnrollmentStatus == "Enrolled");
+        var avgAttendance = await _db.EducationRecords.Where(e => e.AttendanceRate != null).AverageAsync(e => (double?)e.AttendanceRate) ?? 0;
+        var avgProgress  = await _db.EducationRecords.Where(e => e.ProgressPercent != null).AverageAsync(e => (double?)e.ProgressPercent) ?? 0;
+
+        var byStatus = await _db.EducationRecords
+            .Where(e => e.CompletionStatus != null)
+            .GroupBy(e => e.CompletionStatus!)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== EDUCATION SUMMARY ===");
+        sb.AppendLine($"Total education records: {totalRecords}");
+        sb.AppendLine($"Currently enrolled: {enrolled}");
+        sb.AppendLine($"Average attendance rate: {avgAttendance:P0}");
+        sb.AppendLine($"Average progress: {avgProgress:P0}");
+        if (byStatus.Any())
+        {
+            sb.AppendLine("Completion status breakdown:");
+            foreach (var s in byStatus) sb.AppendLine($"  - {s.Status}: {s.Count}");
+        }
+        return sb.ToString();
+    }
+
+    // ── Case conference aggregate ─────────────────────────────────────────────
+    private async Task<string> GetCaseConferenceSummary()
+    {
+        var total = await _db.CaseConferences.CountAsync();
+        var upcoming = await _db.CaseConferences
+            .Where(c => c.NextConferenceDate >= DateOnly.FromDateTime(DateTime.UtcNow))
+            .OrderBy(c => c.NextConferenceDate)
+            .Take(10)
+            .Select(c => new { c.ResidentId, c.NextConferenceDate, c.ConferenceType, c.SocialWorker })
+            .ToListAsync();
+
+        var byType = await _db.CaseConferences
+            .Where(c => c.ConferenceType != null)
+            .GroupBy(c => c.ConferenceType!)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== CASE CONFERENCE SUMMARY ===");
+        sb.AppendLine($"Total case conferences on record: {total}");
+        if (byType.Any())
+        {
+            sb.AppendLine("By type:");
+            foreach (var t in byType) sb.AppendLine($"  - {t.Type}: {t.Count}");
+        }
+        if (upcoming.Any())
+        {
+            sb.AppendLine("Upcoming conferences:");
+            foreach (var u in upcoming)
+                sb.AppendLine($"  - Resident ID {u.ResidentId} | {u.NextConferenceDate} | {u.ConferenceType ?? "N/A"} | Worker: {u.SocialWorker ?? "N/A"}");
+        }
+        else
+        {
+            sb.AppendLine("No upcoming conferences scheduled.");
+        }
+        return sb.ToString();
+    }
+
+    // ── Process (counselling) session aggregate ───────────────────────────────
+    private async Task<string> GetProcessRecordingSummary()
+    {
+        var total         = await _db.ProcessRecordings.CountAsync();
+        var concernsCount = await _db.ProcessRecordings.CountAsync(p => p.ConcernsFlagged == true);
+        var referralCount = await _db.ProcessRecordings.CountAsync(p => p.ReferralMade == true);
+        var progressCount = await _db.ProcessRecordings.CountAsync(p => p.ProgressNoted == true);
+
+        var thisMonthStart = new DateOnly(DateTime.UtcNow.Year, DateTime.UtcNow.Month, 1);
+        var thisMonth      = await _db.ProcessRecordings.CountAsync(p => p.SessionDate >= thisMonthStart);
+
+        var byType = await _db.ProcessRecordings
+            .Where(p => p.SessionType != null)
+            .GroupBy(p => p.SessionType!)
+            .Select(g => new { Type = g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .ToListAsync();
+
+        var recentConcerns = await _db.ProcessRecordings
+            .Where(p => p.ConcernsFlagged == true)
+            .OrderByDescending(p => p.SessionDate)
+            .Take(5)
+            .Select(p => new { p.ResidentId, p.SessionDate, p.SessionType, p.FollowUpActions })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== PROCESS / COUNSELLING SESSION SUMMARY ===");
+        sb.AppendLine($"Total sessions on record: {total}");
+        sb.AppendLine($"Sessions this month: {thisMonth}");
+        sb.AppendLine($"Sessions with progress noted: {progressCount}");
+        sb.AppendLine($"Sessions with concerns flagged: {concernsCount}");
+        sb.AppendLine($"Sessions resulting in a referral: {referralCount}");
+        if (byType.Any())
+        {
+            sb.AppendLine("Session types:");
+            foreach (var t in byType) sb.AppendLine($"  - {t.Type}: {t.Count}");
+        }
+        if (recentConcerns.Any())
+        {
+            sb.AppendLine("Most recent sessions with concerns flagged:");
+            foreach (var c in recentConcerns)
+                sb.AppendLine($"  - Resident ID {c.ResidentId} | {c.SessionDate} | {c.SessionType ?? "N/A"} | Follow-up: {c.FollowUpActions ?? "N/A"}");
+        }
+        return sb.ToString();
+    }
+
+    // ── Intervention plan aggregate ───────────────────────────────────────────
+    private async Task<string> GetInterventionPlanSummary()
+    {
+        var total = await _db.InterventionPlans.CountAsync();
+        var byStatus = await _db.InterventionPlans
+            .Where(p => p.Status != null)
+            .GroupBy(p => p.Status!)
+            .Select(g => new { Status = g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
+            .ToListAsync();
+
+        var overdue = await _db.InterventionPlans
+            .Where(p => p.TargetDate < DateOnly.FromDateTime(DateTime.UtcNow) && p.Status != "Completed")
+            .CountAsync();
+
+        var upcoming = await _db.InterventionPlans
+            .Where(p => p.TargetDate >= DateOnly.FromDateTime(DateTime.UtcNow) &&
+                        p.TargetDate <= DateOnly.FromDateTime(DateTime.UtcNow.AddDays(30)) &&
+                        p.Status != "Completed")
+            .OrderBy(p => p.TargetDate)
+            .Take(10)
+            .Select(p => new { p.ResidentId, p.PlanCategory, p.TargetDate, p.Status })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== INTERVENTION PLAN SUMMARY ===");
+        sb.AppendLine($"Total intervention plans: {total}");
+        sb.AppendLine($"Overdue plans (past target date, not completed): {overdue}");
+        if (byStatus.Any())
+        {
+            sb.AppendLine("Plans by status:");
+            foreach (var s in byStatus) sb.AppendLine($"  - {s.Status}: {s.Count}");
+        }
+        if (upcoming.Any())
+        {
+            sb.AppendLine("Plans due in the next 30 days:");
+            foreach (var u in upcoming)
+                sb.AppendLine($"  - Resident ID {u.ResidentId} | {u.PlanCategory ?? "N/A"} | Due: {u.TargetDate} | Status: {u.Status ?? "N/A"}");
+        }
+        return sb.ToString();
+    }
+
+    // ── Donation allocations aggregate ────────────────────────────────────────
+    private async Task<string> GetDonationAllocationSummary()
+    {
+        var byProgramArea = await _db.DonationAllocations
+            .Where(a => a.ProgramArea != null)
+            .GroupBy(a => a.ProgramArea!)
+            .Select(g => new { Area = g.Key, Total = g.Sum(a => a.AmountAllocated ?? 0), Count = g.Count() })
+            .OrderByDescending(g => g.Total)
+            .ToListAsync();
+
+        var bySafehouse = await _db.DonationAllocations
+            .Where(a => a.SafehouseId != null)
+            .Join(_db.Safehouses, a => a.SafehouseId, s => s.SafehouseId, (a, s) => new { s.Name, a.AmountAllocated })
+            .GroupBy(x => x.Name)
+            .Select(g => new { Safehouse = g.Key, Total = g.Sum(x => x.AmountAllocated ?? 0) })
+            .OrderByDescending(g => g.Total)
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== DONATION ALLOCATION SUMMARY ===");
+        if (byProgramArea.Any())
+        {
+            sb.AppendLine("Allocations by program area:");
+            foreach (var a in byProgramArea) sb.AppendLine($"  - {a.Area}: ${a.Total:N2} across {a.Count} donations");
+        }
+        if (bySafehouse.Any())
+        {
+            sb.AppendLine("Allocations by safehouse:");
+            foreach (var s in bySafehouse) sb.AppendLine($"  - {s.Safehouse}: ${s.Total:N2}");
+        }
+        return sb.ToString();
+    }
+
+    // ── In-kind donations aggregate ───────────────────────────────────────────
+    private async Task<string> GetInKindDonationSummary()
+    {
+        var total = await _db.InKindDonationItems.CountAsync();
+        var byCategory = await _db.InKindDonationItems
+            .Where(i => i.ItemCategory != null)
+            .GroupBy(i => i.ItemCategory!)
+            .Select(g => new { Category = g.Key, Count = g.Count(), TotalValue = g.Sum(i => (i.EstimatedUnitValue ?? 0) * (i.Quantity ?? 1)) })
+            .OrderByDescending(g => g.TotalValue)
+            .ToListAsync();
+
+        var recentItems = await _db.InKindDonationItems
+            .Include(i => i.Donation)
+            .OrderByDescending(i => i.Donation.DonationDate)
+            .Take(5)
+            .Select(i => new { i.ItemName, i.ItemCategory, i.Quantity, i.UnitOfMeasure, i.IntendedUse, i.ReceivedCondition, i.Donation.DonationDate })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== IN-KIND DONATION SUMMARY ===");
+        sb.AppendLine($"Total in-kind items on record: {total}");
+        if (byCategory.Any())
+        {
+            sb.AppendLine("By category:");
+            foreach (var c in byCategory)
+                sb.AppendLine($"  - {c.Category}: {c.Count} items, estimated value ${c.TotalValue:N2}");
+        }
+        if (recentItems.Any())
+        {
+            sb.AppendLine("5 most recent in-kind items:");
+            foreach (var i in recentItems)
+                sb.AppendLine($"  - {i.DonationDate} | {i.ItemName} ({i.ItemCategory ?? "N/A"}) | Qty: {i.Quantity} {i.UnitOfMeasure} | Use: {i.IntendedUse ?? "N/A"} | Condition: {i.ReceivedCondition ?? "N/A"}");
+        }
+        return sb.ToString();
+    }
+
+    // ── Detailed churn predictions ────────────────────────────────────────────
+    private async Task<string> GetDetailedChurnData()
+    {
+        var predictions = await _db.DonorChurnPredictions
+            .Join(_db.Supporters, p => p.SupporterId, s => s.SupporterId,
+                (p, s) => new { s.DisplayName, s.Email, s.SupporterType, p.ChurnProbability, p.RiskLevel, p.ScoredAt })
+            .OrderByDescending(p => p.ChurnProbability)
+            .Take(20)
+            .ToListAsync();
+
+        var byRisk = await _db.DonorChurnPredictions
+            .GroupBy(p => p.RiskLevel)
+            .Select(g => new { Level = g.Key, Count = g.Count() })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== DONOR CHURN PREDICTIONS ===");
+        if (byRisk.Any())
+        {
+            sb.AppendLine("Donors by risk level:");
+            foreach (var r in byRisk) sb.AppendLine($"  - {r.Level}: {r.Count}");
+        }
+        sb.AppendLine("Top 20 donors by churn probability:");
+        foreach (var p in predictions)
+            sb.AppendLine($"  - {p.DisplayName} ({p.SupporterType}) | Churn probability: {p.ChurnProbability:P0} | Risk: {p.RiskLevel} | Scored: {p.ScoredAt?.ToString("MMM d, yyyy") ?? "N/A"}");
+        return sb.ToString();
+    }
+
+    private async Task<string> GetGeneralOverview()
+    {
+        var totalResidents    = await _db.Residents.CountAsync();
+        var activeResidents   = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
+        var totalSupporters   = await _db.Supporters.CountAsync();
+        var totalDonations    = await _db.Donations.CountAsync();
+        var totalSafehouses   = await _db.Safehouses.CountAsync();
+        var pendingFollowUps  = await _db.HomeVisitations.CountAsync(v => v.FollowUpNeeded == true);
+        var atRiskDonors      = await _db.DonorChurnPredictions.CountAsync(p => p.ChurnProbability > 0.7m);
+        var sessionConcerns   = await _db.ProcessRecordings.CountAsync(p => p.ConcernsFlagged == true);
+        var overdueInterventions = await _db.InterventionPlans
+            .CountAsync(p => p.TargetDate < DateOnly.FromDateTime(DateTime.UtcNow) && p.Status != "Completed");
+        var upcomingConferences = await _db.CaseConferences
+            .CountAsync(c => c.NextConferenceDate >= DateOnly.FromDateTime(DateTime.UtcNow));
+        var cutoff30 = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
+        var recentlyVisitedIds = await _db.HomeVisitations
+            .Where(v => v.VisitDate >= cutoff30)
+            .Select(v => v.ResidentId)
+            .Distinct()
+            .ToListAsync();
+        var noRecentVisit = await _db.Residents
+            .CountAsync(r => !recentlyVisitedIds.Contains(r.ResidentId));
+
+        var sb = new StringBuilder();
+        sb.AppendLine("=== DAILY BRIEFING / GENERAL OVERVIEW ===");
+        sb.AppendLine($"Date: {DateTime.UtcNow:MMMM d, yyyy}");
+        sb.AppendLine();
+        sb.AppendLine("── Residents ──");
+        sb.AppendLine($"  Total residents: {totalResidents} ({activeResidents} active)");
+        sb.AppendLine($"  Active safehouses: {totalSafehouses}");
+        sb.AppendLine($"  Residents with no visit in 30+ days: {noRecentVisit}");
+        sb.AppendLine($"  Home visitation follow-ups pending: {pendingFollowUps}");
+        sb.AppendLine($"  Counselling sessions with concerns flagged: {sessionConcerns}");
+        sb.AppendLine($"  Overdue intervention plans: {overdueInterventions}");
+        sb.AppendLine($"  Upcoming case conferences: {upcomingConferences}");
+        sb.AppendLine();
+        sb.AppendLine("── Donors ──");
+        sb.AppendLine($"  Total supporters: {totalSupporters}");
+        sb.AppendLine($"  Total donations on record: {totalDonations}");
+        sb.AppendLine($"  Donors at high churn risk (>70%): {atRiskDonors}");
 
         return sb.ToString();
     }
@@ -560,7 +1639,7 @@ public class ChatController : ControllerBase
         var requestBody = new
         {
             model = ModelName,
-            max_tokens = 1024,
+            max_tokens = 4096,
             temperature = 0.4,
             system = systemPrompt,
             messages
@@ -585,7 +1664,9 @@ public class ChatController : ControllerBase
 
 // ─── Request / Response DTOs ──────────────────────────────────────────────────
 
-public record ChatRequest(string Message, List<ChatHistoryItem>? History);
+// PromptKey identifies which predetermined button was clicked.
+// null = free-typed → always goes to Tier 4 full AI.
+public record ChatRequest(string Message, List<ChatHistoryItem>? History, string? PromptKey = null);
 public record ChatHistoryItem(string Role, string Content);
 
 internal class ClaudeResponse
