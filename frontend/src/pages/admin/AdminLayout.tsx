@@ -1,6 +1,6 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useState } from 'react'
-import { Users, Home, FileText, MapPin, LogOut, KeyRound, LayoutDashboard, UserCog, Share2, Menu, X } from 'lucide-react'
+import { Users, Home, FileText, MapPin, LogOut, LayoutDashboard, UserCog, Share2, Menu, X } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import SiteNav from '../../components/layout/SiteNav'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
@@ -44,10 +44,6 @@ export default function AdminLayout() {
           <NavLink to="/admin/home-visitations" className={navClass}>
             <MapPin size={18} />
             Home Visitations
-          </NavLink>
-          <NavLink to="/admin/stripe" className={navClass}>
-            <KeyRound size={18} />
-            Stripe
           </NavLink>
           <NavLink to="/admin/social-media" className={navClass}>
             <Share2 size={18} />
@@ -140,10 +136,6 @@ export default function AdminLayout() {
               <NavLink to="/admin/home-visitations" className={navClass} onClick={() => setMobileNavOpen(false)}>
                 <MapPin size={18} />
                 Home Visitations
-              </NavLink>
-              <NavLink to="/admin/stripe" className={navClass} onClick={() => setMobileNavOpen(false)}>
-                <KeyRound size={18} />
-                Stripe
               </NavLink>
               <NavLink to="/admin/social-media" className={navClass} onClick={() => setMobileNavOpen(false)}>
                 <Share2 size={18} />

@@ -18,7 +18,6 @@ import DonorsPage from './pages/admin/DonorsPage';
 import ResidentsPage from './pages/admin/ResidentsPage';
 import ProcessRecordingsPage from './pages/admin/ProcessRecordingsPage';
 import HomeVisitationsPage from './pages/admin/HomeVisitationsPage';
-import StripeSettingsPage from './pages/admin/StripeSettingsPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import SocialMediaPage from './pages/admin/SocialMediaPage';
@@ -79,7 +78,6 @@ export default function App() {
               <Route path="residents" element={<ResidentsPage />} />
               <Route path="process-recordings" element={<ProcessRecordingsPage />} />
               <Route path="home-visitations" element={<HomeVisitationsPage />} />
-              <Route path="stripe" element={<StripeSettingsPage />} />
               <Route path="social-media" element={<SocialMediaPage />} />
               <Route path="users" element={<UserManagementPage />} />
             </Route>
