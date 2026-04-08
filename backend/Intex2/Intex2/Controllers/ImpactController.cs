@@ -1,5 +1,7 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using System.Data.Common;
 using System.Globalization;
 using System.Text.Json;
@@ -9,10 +11,13 @@ using System.Text.Json;
 public class ImpactController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly IMemoryCache _cache;
+    private const string DashboardCacheKey = "impact_dashboard_v1";
 
-    public ImpactController(AppDbContext db)
+    public ImpactController(AppDbContext db, IMemoryCache cache)
     {
         _db = db;
+        _cache = cache;
     }
 
     [HttpGet("summary")]
@@ -38,9 +43,25 @@ public class ImpactController : ControllerBase
         });
     }
 
+    /// <summary>
+    /// Admin endpoint — clears the cached impact dashboard so the next request re-fetches from DB.
+    /// Call this after publishing a new snapshot or importing new data.
+    /// </summary>
+    [HttpPost("dashboard/refresh")]
+    [Authorize(Policy = "AdminOnly")]
+    public IActionResult RefreshDashboardCache()
+    {
+        _cache.Remove(DashboardCacheKey);
+        return Ok(new { message = "Impact dashboard cache cleared. Next request will re-query the database." });
+    }
+
     [HttpGet("dashboard")]
     public async Task<IActionResult> GetDashboard()
     {
+        // Serve from cache (refreshes once per day or when an admin calls /refresh)
+        if (_cache.TryGetValue(DashboardCacheKey, out object? cached) && cached is not null)
+            return Ok(cached);
+
         var today = DateOnly.FromDateTime(DateTime.Today);
 
         var snapshots = await _db.PublicImpactSnapshots
@@ -257,7 +278,7 @@ public class ImpactController : ControllerBase
                     resolvedCount = ReadNullableInt(r, "resolved_count")
                 }));
 
-        return Ok(new
+        var result = new
         {
             latestSnapshot = latest == null ? null : new
             {
@@ -283,7 +304,16 @@ public class ImpactController : ControllerBase
             interventionPlanByMonth,
             educationAttendanceByMonth,
             incidentResolutionByMonth
+        };
+
+        // Cache until midnight (so data feels "as of today" without hitting DB on every page load)
+        var midnight = DateTime.Today.AddDays(1);
+        _cache.Set(DashboardCacheKey, result, new MemoryCacheEntryOptions
+        {
+            AbsoluteExpiration = midnight
         });
+
+        return Ok(result);
     }
 
     private async Task<List<T>> QueryListAsync<T>(string sql, Func<DbDataReader, T> map)

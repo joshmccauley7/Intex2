@@ -236,7 +236,7 @@ const MODAL_CONFIG: Record<string, SectionConfig> = {
     ],
   },
   'okr-recent': {
-    title: 'Donor Retention (Last 3 Months)',
+    title: 'Donor Retention',
     linkTo: '/admin/donors', linkLabel: 'View all donors',
     columns: [
       { key: 'displayName',      label: 'Name' },
@@ -248,7 +248,7 @@ const MODAL_CONFIG: Record<string, SectionConfig> = {
     ],
   },
   'okr-lapsed': {
-    title: 'Lapsed Donors (No Gift in 3 Months)',
+    title: 'Lapsed Donors',
     linkTo: '/admin/donors', linkLabel: 'View all donors',
     columns: [
       { key: 'displayName',      label: 'Name' },
@@ -296,7 +296,7 @@ function CollapsibleSection({
 // ── Stat card ─────────────────────────────────────────────────────────────────
 
 function StatCard({
-  icon, label, value, sub, highlight = false, onClick,
+  icon, label, value, sub, highlight = false, onClick, action,
 }: {
   icon: React.ReactNode
   label: string
@@ -304,6 +304,7 @@ function StatCard({
   sub?: string
   highlight?: boolean
   onClick?: () => void
+  action?: React.ReactNode
 }) {
   return (
     <div
@@ -316,6 +317,11 @@ function StatCard({
       </div>
       <div className={`text-3xl font-bold ${highlight ? 'text-red-600' : 'text-[#0f172a]'}`}>{value}</div>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
+      {action && (
+        <div className="mt-3" onClick={(e) => e.stopPropagation()}>
+          {action}
+        </div>
+      )}
     </div>
   )
 }
@@ -325,12 +331,11 @@ function StatCard({
 const PAGE_SIZE = 100
 
 const PERIOD_OPTIONS = [
-  { label: 'Last 30 Days',   value: '30d'  },
+  { label: 'All Time',       value: 'all'  },
   { label: 'Last 3 Months',  value: '3mo'  },
   { label: 'Last 6 Months',  value: '6mo'  },
   { label: 'Last 12 Months', value: '12mo' },
 ]
-const PERIOD_SECTIONS = ['okr-recent', 'okr-lapsed']
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
@@ -346,7 +351,7 @@ export default function AdminDashboardPage() {
   const [modalCharts, setModalCharts] = useState<ChartData[]>([])
   const [modalPage, setModalPage] = useState(1)
   const [modalLoadingMore, setModalLoadingMore] = useState(false)
-  const [modalPeriod, setModalPeriod] = useState('3mo')
+  const [modalPeriod, setModalPeriod] = useState('all')
   const pendingModal = useRef<string | null>(null)
 
   async function fetchModalData(section: string, page: number, period: string, append = false) {
@@ -356,7 +361,7 @@ export default function AdminDashboardPage() {
       section,
       pageSize: String(PAGE_SIZE),
       page: String(page),
-      ...(PERIOD_SECTIONS.includes(section) ? { period } : {}),
+      period,
     })
     try {
       const result = await apiFetch(`/api/admin/dashboard/detail?${qs}`)
@@ -408,8 +413,15 @@ export default function AdminDashboardPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // okr sections default to 3mo; everything else defaults to all
+  function getDefaultPeriod(section: string) {
+    return section === 'okr-recent' || section === 'okr-lapsed' ? '3mo' : 'all'
+  }
+
   async function openModal(section: string) {
-    const period = PERIOD_SECTIONS.includes(section) ? modalPeriod : '3mo'
+    const defaultPeriod = getDefaultPeriod(section)
+    setModalPeriod(defaultPeriod)
+    const period = defaultPeriod
     pendingModal.current = section
     setActiveModal(section)
     setModalItems([])
@@ -444,7 +456,7 @@ export default function AdminDashboardPage() {
     setModalItems([])
     setModalKpis([])
     setModalCharts([])
-    setModalPeriod('3mo')
+    setModalPeriod('all')
   }
 
   if (loading) return <p className="text-slate-400 text-sm">Loading dashboard…</p>
@@ -463,44 +475,63 @@ export default function AdminDashboardPage() {
         <p className="text-sm text-slate-500 mt-1">Operations overview for Safira staff</p>
       </div>
 
-      {/* ── Primary OKR ── */}
-      <div
-        className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
-        onClick={() => openModal(data.donorOkrPercent != null ? 'okr-recent' : 'donors')}
-        title="Click to see donor detail"
-      >
-        <div className="flex items-center gap-2 mb-3">
-          <Percent size={20} className="text-safira-blue" />
-          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
-            Donors active in last 3 mo.
-          </span>
+      {/* ── Primary OKR + High Churn Risk ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
+          onClick={() => openModal(data.donorOkrPercent != null ? 'okr-recent' : 'donors')}
+          title="Click to see donor detail"
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Percent size={20} className="text-safira-blue" />
+            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+              Donors active in last 3 mo.
+            </span>
+          </div>
+          {data.donorOkrPercent != null ? (
+            <>
+              <div className="text-3xl font-bold tabular-nums text-[#0f172a]">
+                {data.donorOkrPercent.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+                <span className="text-xl font-bold text-slate-600">%</span>
+              </div>
+              <p className="text-xs text-slate-400 mt-1">
+                Primary OKR — {data.donorOkrRecentCount} of {data.activeDonors} active donor
+                {data.activeDonors === 1 ? '' : 's'} with a donation in the last 3 months
+              </p>
+            </>
+          ) : (
+            <>
+              <div className="text-3xl font-bold text-slate-400">—</div>
+              <p className="text-xs text-slate-400 mt-1">No active donors to measure yet.</p>
+            </>
+          )}
+          <p className="text-xs text-slate-600 mt-3 leading-relaxed border-t border-slate-100 pt-3">
+            <span className="font-medium text-[#0f172a]">Why this matters most:</span> Mission delivery
+            depends on steady funding. The share of donors who gave recently reflects engagement and
+            predictable support better than total donor count alone.
+          </p>
         </div>
-        {data.donorOkrPercent != null ? (
-          <>
-            <div className="text-3xl font-bold tabular-nums text-[#0f172a]">
-              {data.donorOkrPercent.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-              <span className="text-xl font-bold text-slate-600">%</span>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Primary OKR — {data.donorOkrRecentCount} of {data.activeDonors} active donor
-              {data.activeDonors === 1 ? '' : 's'} with a donation in the last 3 months
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="text-3xl font-bold text-slate-400">—</div>
-            <p className="text-xs text-slate-400 mt-1">No active donors to measure yet.</p>
-          </>
-        )}
-        <p className="text-xs text-slate-600 mt-3 leading-relaxed border-t border-slate-100 pt-3">
-          <span className="font-medium text-[#0f172a]">Why this matters most:</span> Mission delivery
-          depends on steady funding. The share of donors who gave recently reflects engagement and
-          predictable support better than total donor count alone.
-        </p>
+
+        <StatCard
+          icon={<AlertTriangle size={20} className="text-red-500" />}
+          label="High Churn Risk"
+          value={data.highChurnCount}
+          sub="donors at risk of lapsing"
+          highlight
+          onClick={() => openModal('churn-high')}
+          action={
+            <button
+              className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-left"
+              onClick={() => navigate('/admin/donors?tab=outreach')}
+            >
+              Go to Outreach Queue →
+            </button>
+          }
+        />
       </div>
 
       {/* ── Stat cards ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <StatCard
           icon={<Users size={20} className="text-safira-blue" />}
           label="Active Residents"
@@ -519,14 +550,6 @@ export default function AdminDashboardPage() {
           label="Active Donors"
           value={data.activeDonors}
           onClick={() => openModal('donors')}
-        />
-        <StatCard
-          icon={<AlertTriangle size={20} className="text-red-500" />}
-          label="High Churn Risk"
-          value={data.highChurnCount}
-          sub="donors at risk of lapsing"
-          highlight
-          onClick={() => openModal('churn-high')}
         />
       </div>
 
@@ -825,7 +848,9 @@ export default function AdminDashboardPage() {
       {/* ── Detail modal ── */}
       {activeModal && activeConfig && (
         <DashboardDetailModal
-          title={activeConfig.title}
+          title={activeConfig.title + (PERIOD_OPTIONS.find(o => o.value === modalPeriod)
+            ? ` (${PERIOD_OPTIONS.find(o => o.value === modalPeriod)!.label})`
+            : '')}
           linkTo={activeConfig.linkTo}
           linkLabel={activeConfig.linkLabel}
           columns={activeConfig.columns}
@@ -839,9 +864,10 @@ export default function AdminDashboardPage() {
           loadingMore={modalLoadingMore}
           onRowClick={(row) => handleRowClick(activeModal, row)}
           isRowClickable={(row) => resolveRowClickable(activeModal, row)}
-          periodOptions={PERIOD_SECTIONS.includes(activeModal) ? PERIOD_OPTIONS : undefined}
+          periodOptions={PERIOD_OPTIONS}
           period={modalPeriod}
           onPeriodChange={handlePeriodChange}
+          extraAction={activeModal === 'churn-high' ? { label: 'Go to Outreach Queue', to: '/admin/donors?tab=outreach' } : undefined}
         />
       )}
     </div>

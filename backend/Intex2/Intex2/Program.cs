@@ -125,6 +125,9 @@ builder.Services.Configure<ResendClientOptions>(o =>
 builder.Services.AddTransient<IResend, ResendClient>();
 builder.Services.AddTransient<ImpactEmailService>();
 
+// ─── In-memory cache (used for impact dashboard daily snapshot) ───────────────
+builder.Services.AddMemoryCache();
+
 // ─── Controllers ─────────────────────────────────────────────────────────────
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
