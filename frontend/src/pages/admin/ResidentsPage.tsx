@@ -461,11 +461,18 @@ export default function ResidentsPage() {
               <h2 className="text-xl font-bold text-[#0f172a]">{selectedResident.internalCode ?? 'Resident'}</h2>
               <p className="text-sm text-slate-500">{selectedResident.caseCategory ?? '—'}</p>
             </div>
-            {selectedResident.caseStatus && (
-              <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[selectedResident.caseStatus] ?? 'bg-slate-100 text-slate-500'}`}>
-                {selectedResident.caseStatus}
-              </span>
-            )}
+            <div className="flex items-center gap-2">
+              {selectedResident.caseStatus && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[selectedResident.caseStatus] ?? 'bg-slate-100 text-slate-500'}`}>
+                  {selectedResident.caseStatus}
+                </span>
+              )}
+              {selectedResident.currentRiskLevel && (
+                <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${RISK_COLOR[selectedResident.currentRiskLevel] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+                  {selectedResident.currentRiskLevel} Risk
+                </span>
+              )}
+            </div>
           </div>
 
           {/* Tabs */}
@@ -736,15 +743,12 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   }) {
     return (
       <div>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
-          <p className="text-xs font-semibold text-[#0f172a]">
-            {count}/{dots.length}
-            <span className="text-slate-400 font-normal"> recent · </span>
-            {total}
-            <span className="text-slate-400 font-normal"> {totalLabel}</span>
-          </p>
-        </div>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+        <p className="text-xs text-slate-500 mb-2">
+          <span className="font-semibold text-[#0f172a]">{count}/{dots.length}</span> recent
+          <span className="text-slate-300 mx-1">·</span>
+          <span className="font-semibold text-[#0f172a]">{total}</span> {totalLabel}
+        </p>
         <div className="flex gap-1.5">{dots}</div>
       </div>
     )
@@ -786,17 +790,23 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
               ]}
             />
           )}
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Risk Improvement</p>
-            <div className="flex items-center gap-2">
-              <span className={`text-2xl font-bold ${riskDelta > 0 ? 'text-emerald-600' : riskDelta < 0 ? 'text-red-500' : 'text-slate-400'}`}>
-                {riskDelta > 0 ? `↓ ${riskDelta}` : riskDelta < 0 ? `↑ ${Math.abs(riskDelta)}` : '—'}
-              </span>
-              <span className="text-xs text-slate-400">
-                {resident.initialRiskLevel} → {resident.currentRiskLevel}
-              </span>
-            </div>
-          </div>
+          {recentSessions.length > 0 && (
+            <DotRow
+              label="Counseling Progress"
+              count={progressCount}
+              total={totalSessions}
+              totalLabel="total sessions"
+              dots={[
+                ...recentSessions.map((s, i) => (
+                  <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
+                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                )),
+                ...Array.from({ length: DOTS - recentSessions.length }).map((_, i) => (
+                  <div key={`e-${i}`} className="w-4 h-4 rounded-full bg-slate-100" />
+                )),
+              ]}
+            />
+          )}
         </div>
       )
     }
@@ -844,16 +854,9 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
 
     if (reType === 'Adoption (Domestic)' || reType === 'Adoption (Inter-Country)') {
       return (
-        <div className="grid grid-cols-3 gap-6 pt-3 border-t border-slate-100">
+        <div className="grid grid-cols-2 gap-6 pt-3 border-t border-slate-100">
           <StatBlock label="Home Visits" value={totalVisits} sub="total conducted" />
           <StatBlock label="Counseling Sessions" value={totalSessions} sub="total attended" />
-          <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Risk Trajectory</p>
-            <p className={`text-2xl font-bold ${riskDelta > 0 ? 'text-emerald-600' : riskDelta < 0 ? 'text-red-500' : 'text-slate-400'}`}>
-              {riskDelta > 0 ? `↓ ${riskDelta} levels` : riskDelta < 0 ? `↑ ${Math.abs(riskDelta)} levels` : 'Unchanged'}
-            </p>
-            <p className="text-xs text-slate-400">{resident.initialRiskLevel} → {resident.currentRiskLevel}</p>
-          </div>
         </div>
       )
     }
@@ -1151,32 +1154,39 @@ function RiskJourney({ initial, current }: { initial: string | null; current: st
     <div className="mb-5">
       <SectionHeading>Risk Journey</SectionHeading>
       <div className="rounded-xl border border-slate-200 overflow-hidden">
-      <div className="flex">
-        {/* At admission */}
-        <div className="flex-1 flex flex-col items-center py-4 px-3 bg-slate-50 border-r border-slate-200">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">At Admission</p>
-          <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[initial ?? ''] ?? 'bg-slate-300'}`} />
-          <p className={`text-lg font-bold ${RISK_COLOR[initial ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>
-            {initial ?? '—'}
-          </p>
+        <div className="flex">
+          {/* At admission */}
+          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-slate-50 border-r border-slate-200">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">At Admission</p>
+            <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[initial ?? ''] ?? 'bg-slate-300'}`} />
+            <p className={`text-lg font-bold ${RISK_COLOR[initial ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{initial ?? '—'}</p>
+          </div>
+
+          {/* Center */}
+          <div className="flex flex-col items-center justify-center px-6 bg-white">
+            <ArrowRight size={20} className="text-slate-300" />
+          </div>
+
+          {/* Current */}
+          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-slate-50 border-l border-slate-200">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Current</p>
+            <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[current ?? ''] ?? 'bg-slate-300'}`} />
+            <p className={`text-lg font-bold ${RISK_COLOR[current ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{current ?? '—'}</p>
+          </div>
         </div>
 
-        {/* Trend */}
-        <div className="flex flex-col items-center justify-center px-6 bg-white">
-          <ArrowRight size={20} className={trendArrowColor} />
-          <p className={`text-xs font-semibold mt-1 ${trendColor}`}>{trendLabel}</p>
-        </div>
-
-        {/* Current */}
-        <div className="flex-1 flex flex-col items-center py-4 px-3 bg-slate-50 border-l border-slate-200">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Current</p>
-          <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[current ?? ''] ?? 'bg-slate-300'}`} />
-          <p className={`text-lg font-bold ${RISK_COLOR[current ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>
-            {current ?? '—'}
-          </p>
-        </div>
+        {/* Trend badge */}
+        {(improved || worsened) && (() => {
+          const delta = Math.abs((RISK_RANK[current ?? ''] ?? 0) - (RISK_RANK[initial ?? ''] ?? 0))
+          return (
+            <div className={`flex justify-center py-2 border-t border-slate-100 ${improved ? 'bg-emerald-50' : 'bg-red-50'}`}>
+              <span className={`text-xs font-semibold ${improved ? 'text-emerald-700' : 'text-red-600'}`}>
+                {improved ? '↑' : '↓'} {trendLabel} · {delta} level{delta > 1 ? 's' : ''}
+              </span>
+            </div>
+          )
+        })()}
       </div>
-    </div>
     </div>
   )
 }
