@@ -3,6 +3,14 @@ import { useSearchParams } from 'react-router-dom'
 import { apiFetch } from '../../api'
 import { Plus, Eye, Pencil, Trash2, Mail, CheckCircle, AlertTriangle, RefreshCw, ArrowUpDown } from 'lucide-react'
 
+/** Strip non-digits, cap at 10, then format as (XXX) XXX-XXXX */
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 10)
+  if (digits.length < 4) return digits
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+}
+
 // ── Outreach queue types ──────────────────────────────────────────────────────
 
 interface OutreachEntry {
@@ -919,7 +927,7 @@ function SupporterFormModal({ existing, onClose, onSaved }: SupporterFormModalPr
           <input className={inputClass} type="email" value={form.email} onChange={(e) => setForm({ ...form, email: e.target.value })} />
         </FormField>
         <FormField label="Phone">
-          <input className={inputClass} value={form.phone} onChange={(e) => setForm({ ...form, phone: e.target.value })} />
+          <input className={inputClass} type="tel" placeholder="(555) 123-4567" value={form.phone} onChange={(e) => setForm({ ...form, phone: formatPhone(e.target.value) })} />
         </FormField>
         <FormField label="Acquisition Channel">
           <input className={inputClass} value={form.acquisitionChannel} onChange={(e) => setForm({ ...form, acquisitionChannel: e.target.value })} />

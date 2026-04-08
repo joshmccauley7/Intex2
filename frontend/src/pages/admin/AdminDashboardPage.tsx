@@ -2,7 +2,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api'
 import {
-  Users, Home, Heart, AlertTriangle, Calendar, TrendingUp, Activity,
+  Users, Home, Heart, Calendar, TrendingUp, Activity,
   BookOpen, MessageSquare, ShieldAlert, Percent, ChevronDown, ChevronRight,
 } from 'lucide-react'
 import {
@@ -337,6 +337,9 @@ const PERIOD_OPTIONS = [
   { label: 'Last 12 Months', value: '12mo' },
 ]
 
+// Sections where current state doesn't meaningfully change by period — hide the dropdown
+const NO_PERIOD_SECTIONS = ['residents', 'safehouses', 'risk-high', 'risk-medium', 'risk-low', 'churn-high', 'churn-medium', 'churn-low']
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -511,23 +514,22 @@ export default function AdminDashboardPage() {
             predictable support better than total donor count alone.
           </p>
         </div>
-        {data.donorOkrPercent != null ? (
-          <>
-            <div className="text-3xl font-bold tabular-nums text-[#0f172a]">
-              {data.donorOkrPercent.toLocaleString('en-US', { maximumFractionDigits: 1 })}
-              <span className="text-xl font-bold text-slate-600">%</span>
-            </div>
-            <p className="text-xs text-slate-400 mt-1">
-              Primary OKR — {data.donorOkrRecentCount} of {data.activeDonors} active donor
-              {data.activeDonors === 1 ? '' : 's'} with a donation in the last 3 months
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="text-3xl font-bold text-slate-400">—</div>
-            <p className="text-xs text-slate-400 mt-1">No active donors to measure yet.</p>
-          </>
-        )}
+        <StatCard
+          icon={<ShieldAlert size={20} className="text-red-500" />}
+          label="High Churn Risk"
+          value={data.highChurnCount}
+          sub="donors at risk of lapsing"
+          highlight
+          onClick={() => openModal('churn-high')}
+          action={
+            <button
+              className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-left"
+              onClick={() => navigate('/admin/donors?tab=outreach')}
+            >
+              Go to Outreach Queue →
+            </button>
+          }
+        />
       </div>
 
       {/* ── Stat cards ── */}
@@ -848,7 +850,7 @@ export default function AdminDashboardPage() {
       {/* ── Detail modal ── */}
       {activeModal && activeConfig && (
         <DashboardDetailModal
-          title={activeConfig.title + (PERIOD_OPTIONS.find(o => o.value === modalPeriod)
+          title={activeConfig.title + (!NO_PERIOD_SECTIONS.includes(activeModal) && PERIOD_OPTIONS.find(o => o.value === modalPeriod)
             ? ` (${PERIOD_OPTIONS.find(o => o.value === modalPeriod)!.label})`
             : '')}
           linkTo={activeConfig.linkTo}
@@ -864,7 +866,7 @@ export default function AdminDashboardPage() {
           loadingMore={modalLoadingMore}
           onRowClick={(row) => handleRowClick(activeModal, row)}
           isRowClickable={(row) => resolveRowClickable(activeModal, row)}
-          periodOptions={PERIOD_OPTIONS}
+          periodOptions={NO_PERIOD_SECTIONS.includes(activeModal) ? undefined : PERIOD_OPTIONS}
           period={modalPeriod}
           onPeriodChange={handlePeriodChange}
           extraAction={activeModal === 'churn-high' ? { label: 'Go to Outreach Queue', to: '/admin/donors?tab=outreach' } : undefined}
