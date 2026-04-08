@@ -1,4 +1,5 @@
-import { useState, useRef, useEffect, FormEvent } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import type { FormEvent } from 'react';
 import { MessageSquare, X, Send, Loader2, Bot } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../api';

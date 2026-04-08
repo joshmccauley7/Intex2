@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apiFetch } from '../../api'
 import { Plus, Eye, Pencil, Trash2, Mail, CheckCircle, AlertTriangle, RefreshCw, ArrowUpDown } from 'lucide-react'
 
@@ -92,6 +93,7 @@ const DONATION_TYPE_BADGE: Record<string, string> = {
 const PAGE_SIZE = 20
 
 export default function DonorsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [activeTab, setActiveTab] = useState<'donors' | 'outreach'>('donors')
 
   // ── Donors tab state ────────────────────────────────────────────────────────
@@ -277,6 +279,15 @@ export default function DonorsPage() {
           return 0
       }
     })
+
+  // Auto-open specific record when navigated from dashboard modal
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    if (openId) {
+      openDetail(Number(openId))
+      setSearchParams((prev) => { prev.delete('open'); return prev }, { replace: true })
+    }
+  }, [supporters])
 
   const openDetail = (id: number) => {
     setDetailLoading(true)

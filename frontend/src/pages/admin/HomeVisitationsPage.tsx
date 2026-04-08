@@ -172,7 +172,7 @@ export default function HomeVisitationsPage() {
                 onClick={() => handleSelectResident(r.residentId)}
                 className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                   selectedResidentId === r.residentId
-                    ? 'bg-navy-DEFAULT text-white'
+                    ? 'bg-navy text-white'
                     : 'hover:bg-slate-100 text-slate-700'
                 }`}
               >
