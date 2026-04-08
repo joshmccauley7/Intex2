@@ -255,13 +255,27 @@ public class ResidentsController : ControllerBase
             })
             .ToListAsync();
 
+        var interventionPlans = await _db.InterventionPlans
+            .AsNoTracking()
+            .Where(p => p.ResidentId == id)
+            .OrderBy(p => p.PlanCategory)
+            .Select(p => new {
+                p.PlanCategory,
+                p.PlanDescription,
+                p.TargetValue,
+                p.TargetDate,
+                p.Status
+            })
+            .ToListAsync();
+
         return Ok(new {
             riskJourney = new { initial = resident.InitialRiskLevel, current = resident.CurrentRiskLevel },
             statusIndicators = new { health = si.Health, education = si.Education, counseling = si.Counseling, risk = si.Risk },
             health,
             sessions,
             visitations,
-            education
+            education,
+            interventionPlans
         });
     }
 
