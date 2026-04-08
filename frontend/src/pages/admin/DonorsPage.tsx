@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api'
-import { Plus, Eye, Pencil, Trash2, Mail, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, Mail, CheckCircle, AlertTriangle, RefreshCw, ArrowUpDown } from 'lucide-react'
 
 // ── Outreach queue types ──────────────────────────────────────────────────────
 
@@ -103,6 +103,8 @@ export default function DonorsPage() {
   const [filterField, setFilterField] = useState('type')
   const [activeFilters, setActiveFilters] = useState<{ field: string; label: string; value: string }[]>([])
   const [currentPage, setCurrentPage] = useState(1)
+  const [sortBy, setSortBy] = useState<'name' | 'type' | 'status' | 'region' | 'email' | 'donationDate' | 'churnRisk'>('name')
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
 
   const [selectedSupporter, setSelectedSupporter] = useState<SupporterDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -208,6 +210,18 @@ export default function DonorsPage() {
     setCurrentPage(1)
   }
 
+  const onSort = (column: typeof sortBy) => {
+    setCurrentPage(1)
+    setSortBy((prev) => {
+      if (prev === column) {
+        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+        return prev
+      }
+      setSortDir('asc')
+      return column
+    })
+  }
+
   const hasDonationFilter = activeFilters.some((f) => f.field === 'donation')
 
   const filteredSupporters = supporters
@@ -235,10 +249,33 @@ export default function DonorsPage() {
       }
     }))
     .sort((a, b) => {
-      if (!hasDonationFilter) return 0
-      const da = a.mostRecentDonationDate ?? ''
-      const db = b.mostRecentDonationDate ?? ''
-      return db.localeCompare(da) // most recent first
+      const dir = sortDir === 'asc' ? 1 : -1
+      switch (sortBy) {
+        case 'name':
+          return a.displayName.localeCompare(b.displayName) * dir
+        case 'type':
+          return a.supporterType.localeCompare(b.supporterType) * dir
+        case 'status':
+          return a.status.localeCompare(b.status) * dir
+        case 'region':
+          return (a.region ?? '').localeCompare(b.region ?? '') * dir
+        case 'email':
+          return (a.email ?? '').localeCompare(b.email ?? '') * dir
+        case 'churnRisk':
+          return ((a.churnProbability ?? -1) - (b.churnProbability ?? -1)) * dir
+        case 'donationDate': {
+          const ta = a.mostRecentDonationDate ? new Date(a.mostRecentDonationDate).getTime() : -1
+          const tb = b.mostRecentDonationDate ? new Date(b.mostRecentDonationDate).getTime() : -1
+          return (ta - tb) * dir
+        }
+        default:
+          if (hasDonationFilter) {
+            const da = a.mostRecentDonationDate ?? ''
+            const db = b.mostRecentDonationDate ?? ''
+            return db.localeCompare(da)
+          }
+          return 0
+      }
     })
 
   const openDetail = (id: number) => {
@@ -457,13 +494,41 @@ export default function DonorsPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Region</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Most Recent Donation</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Churn Risk</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <button onClick={() => onSort('name')} className="inline-flex items-center gap-1 hover:text-slate-700">
+                        Name <ArrowUpDown size={12} />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <button onClick={() => onSort('type')} className="inline-flex items-center gap-1 hover:text-slate-700">
+                        Type <ArrowUpDown size={12} />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <button onClick={() => onSort('status')} className="inline-flex items-center gap-1 hover:text-slate-700">
+                        Status <ArrowUpDown size={12} />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <button onClick={() => onSort('region')} className="inline-flex items-center gap-1 hover:text-slate-700">
+                        Region <ArrowUpDown size={12} />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <button onClick={() => onSort('email')} className="inline-flex items-center gap-1 hover:text-slate-700">
+                        Email <ArrowUpDown size={12} />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <button onClick={() => onSort('donationDate')} className="inline-flex items-center gap-1 hover:text-slate-700">
+                        Most Recent Donation <ArrowUpDown size={12} />
+                      </button>
+                    </th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                      <button onClick={() => onSort('churnRisk')} className="inline-flex items-center gap-1 hover:text-slate-700">
+                        Churn Risk <ArrowUpDown size={12} />
+                      </button>
+                    </th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                   </tr>
                 </thead>
