@@ -5,6 +5,7 @@ import { apiFetch } from '../../api'
 import {
   Users, Home, Heart, AlertTriangle, Calendar, TrendingUp, Activity,
   BookOpen, MessageSquare, ShieldAlert, Percent, X, ChevronDown, ChevronRight,
+  Download, Printer, Search,
 } from 'lucide-react'
 
 interface DashboardData {
@@ -47,6 +48,8 @@ interface DashboardData {
   donorOkrRecentCount: number
 }
 
+type KpiItem = { label: string; value: string }
+
 const CHURN_BADGE: Record<string, string> = {
   High: 'bg-red-100 text-red-700',
   Medium: 'bg-yellow-100 text-yellow-700',
@@ -59,11 +62,13 @@ const STATUS_BADGE: Record<string, string> = {
   Transferred: 'bg-blue-100 text-blue-700',
 }
 
-// ── Modal ─────────────────────────────────────────────────────────────────────
+const interactiveCardClass =
+  'cursor-pointer hover:shadow-md hover:border-safira-blue/30 transition-all'
+
+// ── Modal config ──────────────────────────────────────────────────────────────
 
 interface ModalDetail {
   title: string
-  subtitle?: string
   linkTo?: string
   linkLabel?: string
   columns: { key: string; label: string; fmt?: (v: unknown) => string }[]
@@ -128,7 +133,7 @@ const MODAL_CONFIG: Record<string, ModalDetail> = {
     ],
   },
   donations: {
-    title: 'Recent Donations',
+    title: 'All Donations',
     linkTo: '/admin/donors', linkLabel: 'View all donors',
     columns: [
       { key: 'displayName', label: 'Donor' },
@@ -148,7 +153,7 @@ const MODAL_CONFIG: Record<string, ModalDetail> = {
     ],
   },
   health: {
-    title: 'Health Records',
+    title: 'Health & Wellbeing Records',
     columns: [
       { key: 'residentCode', label: 'Resident' },
       { key: 'recordDate', label: 'Date' },
@@ -225,67 +230,160 @@ const MODAL_CONFIG: Record<string, ModalDetail> = {
   },
 }
 
+// ── Modal ─────────────────────────────────────────────────────────────────────
+
 function DashboardDetailModal({
   section,
   items,
   totalCount,
   loading,
+  summary,
   onClose,
+  onLoadMore,
+  loadingMore,
 }: {
   section: string
   items: Record<string, unknown>[]
   totalCount: number
   loading: boolean
+  summary: KpiItem[]
   onClose: () => void
+  onLoadMore: () => void
+  loadingMore: boolean
 }) {
   const navigate = useNavigate()
+  const [search, setSearch] = useState('')
   const config = MODAL_CONFIG[section]
   if (!config) return null
 
-  const subtitle = !loading && totalCount > 0
-    ? `Showing ${Math.min(items.length, 20)} of ${totalCount}`
-    : undefined
+  const filtered = search
+    ? items.filter((row) =>
+        config.columns.some((col) => {
+          const val = row[col.key]
+          return val != null && String(val).toLowerCase().includes(search.toLowerCase())
+        })
+      )
+    : items
+
+  function exportCsv() {
+    const header = config.columns.map((c) => `"${c.label}"`).join(',')
+    const rows = filtered.map((row) =>
+      config.columns
+        .map((col) => {
+          const raw = row[col.key]
+          const display = col.fmt ? col.fmt(raw) : raw != null ? String(raw) : ''
+          return `"${display.replace(/"/g, '""')}"`
+        })
+        .join(',')
+    )
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${section}-${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  function handlePrint() {
+    window.print()
+  }
 
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-16 px-4">
-      <div className="absolute inset-0 bg-black/40" />
+    <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 px-4 pb-6">
+      {/* Backdrop — no onClick so only the X button closes */}
+      <div className="absolute inset-0 bg-black/50" />
+
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[75vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200"
+        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
           <div>
             <h2 className="text-lg font-bold text-[#0f172a]">{config.title}</h2>
-            {subtitle && <p className="text-xs text-slate-400 mt-0.5">{subtitle}</p>}
+            {!loading && (
+              <p className="text-xs text-slate-400 mt-0.5">
+                {totalCount.toLocaleString()} total record{totalCount === 1 ? '' : 's'}
+              </p>
+            )}
           </div>
-          <button
-            onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
-          >
-            <X size={18} />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={exportCsv}
+              disabled={loading || filtered.length === 0}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors disabled:opacity-40"
+            >
+              <Download size={13} />
+              Export CSV
+            </button>
+            <button
+              onClick={handlePrint}
+              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
+            >
+              <Printer size={13} />
+              Print
+            </button>
+            <button
+              onClick={onClose}
+              className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors"
+            >
+              <X size={18} />
+            </button>
+          </div>
         </div>
 
-        {/* Body */}
+        {/* KPI summary row */}
+        {!loading && summary.length > 0 && (
+          <div className="px-6 py-3 border-b border-slate-100 shrink-0 flex flex-wrap gap-6">
+            {summary.map((kpi, i) => (
+              <div key={i} className="flex flex-col">
+                <span className="text-xl font-bold text-[#0f172a] tabular-nums">{kpi.value}</span>
+                <span className="text-xs text-slate-400 mt-0.5">{kpi.label}</span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Search bar */}
+        <div className="px-6 py-3 border-b border-slate-100 shrink-0">
+          <div className="relative max-w-sm">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              type="text"
+              placeholder="Search within loaded records…"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-safira-blue/30 bg-white"
+            />
+          </div>
+        </div>
+
+        {/* Table body */}
         <div className="overflow-y-auto flex-1">
           {loading ? (
-            <p className="text-sm text-slate-400 px-6 py-8 text-center">Loading…</p>
-          ) : items.length === 0 ? (
-            <p className="text-sm text-slate-400 px-6 py-8 text-center">No data available.</p>
+            <p className="text-sm text-slate-400 px-6 py-10 text-center">Loading…</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-sm text-slate-400 px-6 py-10 text-center">
+              {search ? 'No records match your search.' : 'No data available.'}
+            </p>
           ) : (
             <table className="w-full text-sm">
-              <thead className="sticky top-0 bg-slate-50 border-b border-slate-100">
+              <thead className="sticky top-0 bg-slate-50 border-b border-slate-100 z-10">
                 <tr>
                   {config.columns.map((col) => (
-                    <th key={col.key} className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">
+                    <th
+                      key={col.key}
+                      className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap"
+                    >
                       {col.label}
                     </th>
                   ))}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
-                {items.map((row, i) => (
+                {filtered.map((row, i) => (
                   <tr key={i} className="hover:bg-slate-50 transition-colors">
                     {config.columns.map((col) => {
                       const raw = row[col.key]
@@ -304,16 +402,35 @@ function DashboardDetailModal({
         </div>
 
         {/* Footer */}
-        {config.linkTo && (
-          <div className="px-6 py-3 border-t border-slate-100 shrink-0">
-            <button
-              onClick={() => { onClose(); navigate(config.linkTo!) }}
-              className="text-sm font-medium text-safira-blue hover:underline"
-            >
-              {config.linkLabel ?? 'View all'} →
-            </button>
+        <div className="px-6 py-3 border-t border-slate-100 shrink-0 flex items-center justify-between">
+          <span className="text-xs text-slate-400">
+            {search
+              ? `${filtered.length} match${filtered.length === 1 ? '' : 'es'} in ${items.length} loaded`
+              : `Showing ${items.length.toLocaleString()} of ${totalCount.toLocaleString()}`}
+          </span>
+          <div className="flex items-center gap-4">
+            {items.length < totalCount && !search && (
+              <button
+                onClick={onLoadMore}
+                disabled={loadingMore}
+                className="text-sm font-medium text-safira-blue hover:underline disabled:opacity-50"
+              >
+                {loadingMore ? 'Loading…' : `Load more (${(totalCount - items.length).toLocaleString()} remaining)`}
+              </button>
+            )}
+            {config.linkTo && (
+              <button
+                onClick={() => {
+                  onClose()
+                  navigate(config.linkTo!)
+                }}
+                className="text-sm font-medium text-safira-blue hover:underline"
+              >
+                {config.linkLabel ?? 'View all'} →
+              </button>
+            )}
           </div>
-        )}
+        </div>
       </div>
     </div>,
     document.body
@@ -345,9 +462,15 @@ function CollapsibleSection({
         {icon}
         <h2 className="font-semibold text-slate-800 text-sm flex-1 text-left">{title}</h2>
         {badge && (
-          <span className="text-xs font-semibold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">{badge}</span>
+          <span className="text-xs font-semibold bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">
+            {badge}
+          </span>
         )}
-        {open ? <ChevronDown size={14} className="text-slate-400" /> : <ChevronRight size={14} className="text-slate-400" />}
+        {open ? (
+          <ChevronDown size={14} className="text-slate-400" />
+        ) : (
+          <ChevronRight size={14} className="text-slate-400" />
+        )}
       </button>
       {open && children}
     </div>
@@ -355,6 +478,8 @@ function CollapsibleSection({
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 100
 
 export default function AdminDashboardPage() {
   const [data, setData] = useState<DashboardData | null>(null)
@@ -365,6 +490,9 @@ export default function AdminDashboardPage() {
   const [modalItems, setModalItems] = useState<Record<string, unknown>[]>([])
   const [modalTotal, setModalTotal] = useState(0)
   const [modalLoading, setModalLoading] = useState(false)
+  const [modalSummary, setModalSummary] = useState<KpiItem[]>([])
+  const [modalPage, setModalPage] = useState(1)
+  const [modalLoadingMore, setModalLoadingMore] = useState(false)
   const pendingModal = useRef<string | null>(null)
 
   useEffect(() => {
@@ -379,12 +507,17 @@ export default function AdminDashboardPage() {
     setActiveModal(section)
     setModalItems([])
     setModalTotal(0)
+    setModalSummary([])
+    setModalPage(1)
     setModalLoading(true)
     try {
-      const result = await apiFetch(`/api/admin/dashboard/detail?section=${section}`)
+      const result = await apiFetch(
+        `/api/admin/dashboard/detail?section=${encodeURIComponent(section)}&pageSize=${PAGE_SIZE}&page=1`
+      )
       if (pendingModal.current !== section) return
       setModalItems(result.items ?? [])
       setModalTotal(result.totalCount ?? 0)
+      setModalSummary(result.summary ?? [])
     } catch {
       setModalItems([])
     } finally {
@@ -392,10 +525,29 @@ export default function AdminDashboardPage() {
     }
   }
 
+  async function loadMoreModal() {
+    if (!activeModal || modalLoadingMore) return
+    const nextPage = modalPage + 1
+    setModalPage(nextPage)
+    setModalLoadingMore(true)
+    try {
+      const result = await apiFetch(
+        `/api/admin/dashboard/detail?section=${encodeURIComponent(activeModal)}&pageSize=${PAGE_SIZE}&page=${nextPage}`
+      )
+      if (pendingModal.current !== activeModal) return
+      setModalItems((prev) => [...prev, ...(result.items ?? [])])
+    } catch {
+      // silently ignore load-more failures
+    } finally {
+      setModalLoadingMore(false)
+    }
+  }
+
   function closeModal() {
     pendingModal.current = null
     setActiveModal(null)
     setModalItems([])
+    setModalSummary([])
   }
 
   if (loading) return <p className="text-slate-400 text-sm">Loading dashboard…</p>
@@ -405,9 +557,15 @@ export default function AdminDashboardPage() {
   const totalResidents = data.residentStatusCounts.reduce((s, x) => s + x.count, 0)
   const totalChurn = data.churnCounts.reduce((s, x) => s + x.count, 0)
 
-  const barColors: Record<string, string> = { High: 'bg-red-500', Medium: 'bg-yellow-400', Low: 'bg-green-500' }
+  const barColors: Record<string, string> = {
+    High: 'bg-red-500',
+    Medium: 'bg-yellow-400',
+    Low: 'bg-green-500',
+  }
   const riskBadge: Record<string, string> = {
-    High: 'bg-red-100 text-red-700', Medium: 'bg-yellow-100 text-yellow-700', Low: 'bg-green-100 text-green-700',
+    High: 'bg-red-100 text-red-700',
+    Medium: 'bg-yellow-100 text-yellow-700',
+    Low: 'bg-green-100 text-green-700',
   }
 
   return (
@@ -419,7 +577,7 @@ export default function AdminDashboardPage() {
 
       {/* Primary OKR */}
       <div
-        className="bg-white rounded-xl border border-slate-200 p-5 cursor-pointer hover:shadow-md hover:border-safira-blue/30 transition-all"
+        className={`bg-white rounded-xl border border-slate-200 p-5 ${interactiveCardClass}`}
         onClick={() => openModal(data.donorOkrPercent != null ? 'okr-recent' : 'donors')}
         title="Click to see donor detail"
       >
@@ -447,9 +605,10 @@ export default function AdminDashboardPage() {
           </>
         )}
         <p className="text-xs text-slate-600 mt-3 leading-relaxed border-t border-slate-100 pt-3">
-          <span className="font-medium text-[#0f172a]">Why this matters most:</span> Mission delivery depends on steady
-          funding. The share of donors who gave recently reflects engagement and predictable support better than total
-          donor count alone—so we prioritize keeping supporters connected, not just growing the list.
+          <span className="font-medium text-[#0f172a]">Why this matters most:</span> Mission delivery
+          depends on steady funding. The share of donors who gave recently reflects engagement and
+          predictable support better than total donor count alone—so we prioritize keeping supporters
+          connected, not just growing the list.
         </p>
       </div>
 
@@ -486,7 +645,6 @@ export default function AdminDashboardPage() {
 
       {/* Middle row */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-
         {/* Recent donations — collapsible, default closed */}
         <div className="lg:col-span-2">
           <CollapsibleSection
@@ -498,30 +656,49 @@ export default function AdminDashboardPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-slate-50 border-b border-slate-100">
-                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Donor</th>
-                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Date</th>
-                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Amount</th>
-                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">Type</th>
+                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Donor
+                  </th>
+                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Date
+                  </th>
+                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Amount
+                  </th>
+                  <th className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                    Type
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {data.recentDonations.length === 0 ? (
-                  <tr><td colSpan={4} className="px-5 py-6 text-center text-slate-400 text-xs">No recent donations.</td></tr>
-                ) : data.recentDonations.map((d) => (
-                  <tr key={d.donationId} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-3 font-medium text-slate-800">{d.donorName}</td>
-                    <td className="px-5 py-3 text-slate-500">{d.donationDate}</td>
-                    <td className="px-5 py-3 text-slate-800 font-medium">
-                      {d.amount != null ? `$${d.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—'}
+                  <tr>
+                    <td colSpan={4} className="px-5 py-6 text-center text-slate-400 text-xs">
+                      No recent donations.
                     </td>
-                    <td className="px-5 py-3 text-slate-500">{d.donationType ?? '—'}</td>
                   </tr>
-                ))}
+                ) : (
+                  data.recentDonations.map((d) => (
+                    <tr key={d.donationId} className="hover:bg-slate-50 transition-colors">
+                      <td className="px-5 py-3 font-medium text-slate-800">{d.donorName}</td>
+                      <td className="px-5 py-3 text-slate-500">{d.donationDate}</td>
+                      <td className="px-5 py-3 text-slate-800 font-medium">
+                        {d.amount != null
+                          ? `$${d.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                          : '—'}
+                      </td>
+                      <td className="px-5 py-3 text-slate-500">{d.donationType ?? '—'}</td>
+                    </tr>
+                  ))
+                )}
               </tbody>
             </table>
             <div className="px-5 py-3 border-t border-slate-100">
-              <button onClick={() => openModal('donations')} className="text-xs font-medium text-safira-blue hover:underline">
-                View more donations →
+              <button
+                onClick={() => openModal('donations')}
+                className="text-xs font-medium text-safira-blue hover:underline"
+              >
+                View all donations →
               </button>
             </div>
           </CollapsibleSection>
@@ -536,22 +713,32 @@ export default function AdminDashboardPage() {
         >
           <div className="divide-y divide-slate-50">
             {data.upcomingConferences.length === 0 ? (
-              <p className="px-5 py-6 text-center text-slate-400 text-xs">No upcoming conferences scheduled.</p>
-            ) : data.upcomingConferences.map((c) => (
-              <div key={c.conferenceId} className="px-5 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-slate-800 text-sm">{c.residentCode ?? `Resident ${c.conferenceId}`}</span>
-                  <span className="text-xs text-slate-400">{c.nextConferenceDate}</span>
+              <p className="px-5 py-6 text-center text-slate-400 text-xs">
+                No upcoming conferences scheduled.
+              </p>
+            ) : (
+              data.upcomingConferences.map((c) => (
+                <div key={c.conferenceId} className="px-5 py-3">
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="font-medium text-slate-800 text-sm">
+                      {c.residentCode ?? `Resident ${c.conferenceId}`}
+                    </span>
+                    <span className="text-xs text-slate-400">{c.nextConferenceDate}</span>
+                  </div>
+                  <div className="text-xs text-slate-500 mt-0.5">
+                    {c.conferenceType ?? 'Conference'}
+                    {c.socialWorker ? ` · ${c.socialWorker}` : ''}
+                  </div>
                 </div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  {c.conferenceType ?? 'Conference'}{c.socialWorker ? ` · ${c.socialWorker}` : ''}
-                </div>
-              </div>
-            ))}
+              ))
+            )}
           </div>
           <div className="px-5 py-3 border-t border-slate-100">
-            <button onClick={() => openModal('conferences')} className="text-xs font-medium text-safira-blue hover:underline">
-              View more conferences →
+            <button
+              onClick={() => openModal('conferences')}
+              className="text-xs font-medium text-safira-blue hover:underline"
+            >
+              View all conferences →
             </button>
           </div>
         </CollapsibleSection>
@@ -560,22 +747,25 @@ export default function AdminDashboardPage() {
       {/* Bottom row: breakdowns */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
 
-        {/* Resident status breakdown */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+        {/* Resident status breakdown — interactive card */}
+        <div
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${interactiveCardClass}`}
+          onClick={() => openModal('residents')}
+          title="Click to explore resident status detail"
+        >
           <h2 className="font-semibold text-slate-800 text-sm mb-4">Resident Status Breakdown</h2>
           <div className="flex flex-col gap-3">
             {data.residentStatusCounts.map((s) => (
-              <div
-                key={s.status}
-                className="cursor-pointer group"
-                onClick={() => openModal('residents')}
-                title={`View ${s.status} residents`}
-              >
+              <div key={s.status} className="group">
                 <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[s.status ?? ''] ?? 'bg-slate-100 text-slate-600'}`}>
+                  <span
+                    className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[s.status ?? ''] ?? 'bg-slate-100 text-slate-600'}`}
+                  >
                     {s.status ?? 'Unknown'}
                   </span>
-                  <span className="text-xs text-slate-500">{s.count} / {totalResidents}</span>
+                  <span className="text-xs text-slate-500">
+                    {s.count} / {totalResidents}
+                  </span>
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                   <div
@@ -586,10 +776,15 @@ export default function AdminDashboardPage() {
               </div>
             ))}
           </div>
+          <p className="text-xs text-slate-400 mt-4">Click to view full resident roster</p>
         </div>
 
-        {/* Churn risk breakdown */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+        {/* Donor churn risk breakdown — interactive card */}
+        <div
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${interactiveCardClass}`}
+          onClick={() => openModal('churn-high')}
+          title="Click to explore churn risk detail"
+        >
           <h2 className="font-semibold text-slate-800 text-sm mb-4">Donor Churn Risk Breakdown</h2>
           {data.churnCounts.length === 0 ? (
             <p className="text-xs text-slate-400">No churn predictions available.</p>
@@ -598,17 +793,24 @@ export default function AdminDashboardPage() {
               {['High', 'Medium', 'Low'].map((level) => {
                 const entry = data.churnCounts.find((c) => c.riskLevel === level)
                 const count = entry?.count ?? 0
-                const sectionKey = `churn-${level.toLowerCase()}` as string
+                const sectionKey = `churn-${level.toLowerCase()}`
                 return (
                   <div
                     key={level}
-                    className="cursor-pointer group"
-                    onClick={() => openModal(sectionKey)}
+                    className="group"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      openModal(sectionKey)
+                    }}
                     title={`View ${level} churn risk donors`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CHURN_BADGE[level]}`}>{level}</span>
-                      <span className="text-xs text-slate-500">{count} / {totalChurn}</span>
+                      <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CHURN_BADGE[level]}`}>
+                        {level}
+                      </span>
+                      <span className="text-xs text-slate-500">
+                        {count} / {totalChurn}
+                      </span>
                     </div>
                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                       <div
@@ -621,6 +823,7 @@ export default function AdminDashboardPage() {
               })}
             </div>
           )}
+          <p className="text-xs text-slate-400 mt-4">Click a bar or card to drill into risk tier</p>
         </div>
       </div>
 
@@ -629,7 +832,7 @@ export default function AdminDashboardPage() {
 
         {/* Health */}
         <div
-          className="bg-white rounded-xl border border-slate-200 p-5 cursor-pointer hover:shadow-md hover:border-safira-blue/30 transition-all"
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${interactiveCardClass}`}
           onClick={() => openModal('health')}
         >
           <div className="flex items-center gap-2 mb-4">
@@ -652,7 +855,10 @@ export default function AdminDashboardPage() {
                     <span className="text-xs font-medium text-slate-700">{value} / 5</span>
                   </div>
                   <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                    <div className="h-full bg-safira-blue rounded-full" style={{ width: `${(value / 5) * 100}%` }} />
+                    <div
+                      className="h-full bg-safira-blue rounded-full"
+                      style={{ width: `${(value / 5) * 100}%` }}
+                    />
                   </div>
                 </div>
               ))}
@@ -662,7 +868,7 @@ export default function AdminDashboardPage() {
 
         {/* Education */}
         <div
-          className="bg-white rounded-xl border border-slate-200 p-5 cursor-pointer hover:shadow-md hover:border-safira-blue/30 transition-all"
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${interactiveCardClass}`}
           onClick={() => openModal('education')}
         >
           <div className="flex items-center gap-2 mb-4">
@@ -676,19 +882,29 @@ export default function AdminDashboardPage() {
               <div>
                 <div className="flex justify-between mb-1">
                   <span className="text-xs text-slate-500">Avg Attendance</span>
-                  <span className="text-xs font-medium text-slate-700">{data.educationAvg.avgAttendanceRate}%</span>
+                  <span className="text-xs font-medium text-slate-700">
+                    {data.educationAvg.avgAttendanceRate}%
+                  </span>
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-safira-blue rounded-full" style={{ width: `${data.educationAvg.avgAttendanceRate}%` }} />
+                  <div
+                    className="h-full bg-safira-blue rounded-full"
+                    style={{ width: `${data.educationAvg.avgAttendanceRate}%` }}
+                  />
                 </div>
               </div>
               <div>
                 <div className="flex justify-between mb-1">
                   <span className="text-xs text-slate-500">Avg Progress</span>
-                  <span className="text-xs font-medium text-slate-700">{data.educationAvg.avgProgressPercent}%</span>
+                  <span className="text-xs font-medium text-slate-700">
+                    {data.educationAvg.avgProgressPercent}%
+                  </span>
                 </div>
                 <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-green-500 rounded-full" style={{ width: `${data.educationAvg.avgProgressPercent}%` }} />
+                  <div
+                    className="h-full bg-green-500 rounded-full"
+                    style={{ width: `${data.educationAvg.avgProgressPercent}%` }}
+                  />
                 </div>
               </div>
               <div className="flex flex-col gap-1 mt-1">
@@ -705,7 +921,7 @@ export default function AdminDashboardPage() {
 
         {/* Counseling */}
         <div
-          className="bg-white rounded-xl border border-slate-200 p-5 cursor-pointer hover:shadow-md hover:border-safira-blue/30 transition-all"
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${interactiveCardClass}`}
           onClick={() => openModal('counseling')}
         >
           <div className="flex items-center gap-2 mb-4">
@@ -722,23 +938,35 @@ export default function AdminDashboardPage() {
                   <div key={c.sessionType}>
                     <div className="flex justify-between mb-1">
                       <span className="text-xs text-slate-500">{c.sessionType ?? 'Unknown'}</span>
-                      <span className="text-xs font-medium text-slate-700">{c.count.toLocaleString()}</span>
+                      <span className="text-xs font-medium text-slate-700">
+                        {c.count.toLocaleString()}
+                      </span>
                     </div>
                     <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                      <div className="h-full bg-purple-400 rounded-full" style={{ width: `${(c.count / total) * 100}%` }} />
+                      <div
+                        className="h-full bg-purple-400 rounded-full"
+                        style={{ width: `${(c.count / total) * 100}%` }}
+                      />
                     </div>
                   </div>
                 ))
               })()}
               <p className="text-xs text-slate-400 mt-1">
-                {data.counselingCounts.reduce((s, c) => s + c.count, 0).toLocaleString()} total sessions recorded
+                {data.counselingCounts
+                  .reduce((s, c) => s + c.count, 0)
+                  .toLocaleString()}{' '}
+                total sessions recorded
               </p>
             </div>
           )}
         </div>
 
-        {/* Active resident risk */}
-        <div className="bg-white rounded-xl border border-slate-200 p-5">
+        {/* Active resident risk — interactive card */}
+        <div
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${interactiveCardClass}`}
+          onClick={() => openModal('risk-high')}
+          title="Click to explore resident risk detail"
+        >
           <div className="flex items-center gap-2 mb-4">
             <ShieldAlert size={16} className="text-safira-blue" />
             <h2 className="font-semibold text-slate-800 text-sm">Active Resident Risk</h2>
@@ -756,13 +984,22 @@ export default function AdminDashboardPage() {
                   return (
                     <div
                       key={level}
-                      className="cursor-pointer group"
-                      onClick={() => openModal(sectionKey)}
+                      className="group"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        openModal(sectionKey)
+                      }}
                       title={`View ${level} risk residents`}
                     >
                       <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${riskBadge[level]}`}>{level}</span>
-                        <span className="text-xs text-slate-500">{count} / {total}</span>
+                        <span
+                          className={`text-xs font-medium px-2 py-0.5 rounded-full ${riskBadge[level]}`}
+                        >
+                          {level}
+                        </span>
+                        <span className="text-xs text-slate-500">
+                          {count} / {total}
+                        </span>
                       </div>
                       <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
                         <div
@@ -776,6 +1013,7 @@ export default function AdminDashboardPage() {
               })()}
             </div>
           )}
+          <p className="text-xs text-slate-400 mt-4">Click a bar or card to drill into risk level</p>
         </div>
       </div>
 
@@ -786,7 +1024,10 @@ export default function AdminDashboardPage() {
           items={modalItems}
           totalCount={modalTotal}
           loading={modalLoading}
+          summary={modalSummary}
           onClose={closeModal}
+          onLoadMore={loadMoreModal}
+          loadingMore={modalLoadingMore}
         />
       )}
     </div>
@@ -794,7 +1035,12 @@ export default function AdminDashboardPage() {
 }
 
 function StatCard({
-  icon, label, value, sub, highlight = false, onClick,
+  icon,
+  label,
+  value,
+  sub,
+  highlight = false,
+  onClick,
 }: {
   icon: React.ReactNode
   label: string
@@ -805,11 +1051,16 @@ function StatCard({
 }) {
   return (
     <div
-      className={`bg-white rounded-xl border p-5 transition-all ${highlight ? 'border-red-200' : 'border-slate-200'} ${onClick ? 'cursor-pointer hover:shadow-md hover:border-safira-blue/30' : ''}`}
+      className={`bg-white rounded-xl border p-5 transition-all ${highlight ? 'border-red-200' : 'border-slate-200'} ${onClick ? `cursor-pointer hover:shadow-md hover:border-safira-blue/30` : ''}`}
       onClick={onClick}
     >
-      <div className="flex items-center gap-2 mb-3">{icon}<span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span></div>
-      <div className={`text-3xl font-bold ${highlight ? 'text-red-600' : 'text-[#0f172a]'}`}>{value}</div>
+      <div className="flex items-center gap-2 mb-3">
+        {icon}
+        <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{label}</span>
+      </div>
+      <div className={`text-3xl font-bold ${highlight ? 'text-red-600' : 'text-[#0f172a]'}`}>
+        {value}
+      </div>
       {sub && <p className="text-xs text-slate-400 mt-1">{sub}</p>}
     </div>
   )
