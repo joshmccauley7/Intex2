@@ -113,12 +113,18 @@ function DonationFormWithGate() {
 
   const isAuthenticated = session.isAuthenticated;
 
-  // Pre-fill email from logged-in session once available
+  // Pre-fill from logged-in session + supporter profile
   useEffect(() => {
-    if (session.isAuthenticated && session.userName && !email) {
-      setEmail(session.userName);
-    }
-  }, [session.isAuthenticated, session.userName, email]);
+    if (!session.isAuthenticated || !session.userName) return;
+    setEmail(session.userName);
+    apiFetch('/api/donations/my-profile')
+      .then((profile: { displayName: string | null; phone: string | null }) => {
+        if (profile.displayName && !saved.fullName) setFullName(profile.displayName);
+        if (profile.phone && !saved.phone) setPhone(profile.phone);
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session.isAuthenticated, session.userName]);
 
   // Clear saved form once user is authenticated and on this page
   useEffect(() => {
@@ -263,14 +269,22 @@ function DonationFormWithGate() {
             placeholder="Jane Doe"
             required
           />
+          {isAuthenticated && !fullName && (
+            <p className="text-xs text-slate-400 mt-1">Enter your name as it should appear on the donation.</p>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Email</label>
           <input
             type="email"
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
+            onChange={(e) => { if (!isAuthenticated) setEmail(e.target.value); }}
+            readOnly={isAuthenticated}
+            className={`w-full rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue ${
+              isAuthenticated
+                ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                : 'bg-white dark:bg-slate-800'
+            }`}
             placeholder="you@example.com"
             required
           />
@@ -325,9 +339,13 @@ function DonationFormWithGate() {
             required
           />
         </div>
-        {frequency === 'one_time' && (
-          <div>
-            <label className="block text-sm font-medium mb-1">Card details</label>
+        <div>
+          <label className="block text-sm font-medium mb-1">Card details</label>
+          {frequency === 'monthly' ? (
+            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-3 text-sm text-slate-500 dark:text-slate-400">
+              You'll enter your card securely on Stripe's checkout page after clicking the button below.
+            </div>
+          ) : (
             <div className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-3">
               <CardElement
                 options={{
@@ -340,8 +358,8 @@ function DonationFormWithGate() {
                 }}
               />
             </div>
-          </div>
-        )}
+          )}
+        </div>
         <div>
           <label className="block text-sm font-medium mb-1">Message (optional)</label>
           <textarea

@@ -1,6 +1,6 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { LogOut } from 'lucide-react';
+import { LogOut, Globe } from 'lucide-react';
 import navLogoImg from '../../images/background.jpg';
 import ThemeToggle from '../theme/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
@@ -49,6 +49,16 @@ export default function SiteNav() {
 
       {/* Right side */}
       <div className="flex items-center gap-2">
+        <button
+          onClick={() => {
+            const url = encodeURIComponent(window.location.href);
+            window.open(`https://translate.google.com/translate?sl=en&u=${url}`, '_blank');
+          }}
+          title="Translate this page"
+          className="flex items-center text-slate-300 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+        >
+          <Globe size={16} />
+        </button>
         <ThemeToggle />
         {session.isAuthenticated ? (
           <>

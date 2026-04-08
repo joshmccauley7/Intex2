@@ -18,6 +18,22 @@ public class DonationsController : ControllerBase
         _logger = logger;
     }
 
+    [HttpGet("my-profile")]
+    public async Task<IActionResult> GetMyProfile()
+    {
+        var userName = User.Identity?.Name;
+        if (string.IsNullOrWhiteSpace(userName)) return Unauthorized();
+
+        var supporter = await _db.Supporters
+            .AsNoTracking()
+            .FirstOrDefaultAsync(s => s.Email == userName);
+
+        if (supporter == null)
+            return Ok(new { displayName = (string?)null, phone = (string?)null });
+
+        return Ok(new { displayName = supporter.DisplayName, phone = supporter.Phone });
+    }
+
     [HttpPost("create-payment-intent")]
     public async Task<IActionResult> CreatePaymentIntent([FromBody] CreatePaymentIntentRequest req)
     {

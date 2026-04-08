@@ -14,6 +14,195 @@ public class AdminDashboardController : ControllerBase
         _db = db;
     }
 
+    [HttpGet("detail")]
+    public async Task<IActionResult> GetDetail([FromQuery] string section)
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+        var threeMonthsAgo = today.AddMonths(-3);
+
+        switch (section)
+        {
+            case "residents":
+            {
+                var total = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
+                var items = await _db.Residents
+                    .Where(r => r.CaseStatus == "Active")
+                    .OrderBy(r => r.InternalCode)
+                    .Take(20)
+                    .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId,
+                        (r, s) => new { r.InternalCode, Safehouse = s.Name, r.CurrentRiskLevel, r.CaseStatus, r.DateOfAdmission })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "safehouses":
+            {
+                var items = await _db.Safehouses
+                    .Where(s => s.Status == "Active")
+                    .OrderBy(s => s.Name)
+                    .Select(s => new {
+                        s.Name, s.City, s.Region, s.Status,
+                        Residents = s.CurrentOccupancy, Capacity = s.CapacityGirls,
+                        OccupancyPct = s.CapacityGirls > 0 ? Math.Round((double)s.CurrentOccupancy / s.CapacityGirls * 100, 1) : 0
+                    })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = items.Count });
+            }
+            case "donors":
+            {
+                var total = await _db.Supporters.CountAsync(s => s.Status == "Active");
+                var items = await _db.Supporters
+                    .Where(s => s.Status == "Active")
+                    .OrderByDescending(s => s.Donations.Max(d => (DateOnly?)d.DonationDate))
+                    .Take(20)
+                    .Select(s => new {
+                        s.DisplayName, s.Status, s.Country,
+                        LastDonation = s.Donations.Max(d => (DateOnly?)d.DonationDate),
+                        TotalDonated = s.Donations.Where(d => d.Amount != null).Sum(d => (decimal?)d.Amount) ?? 0
+                    })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "churn-high":
+            case "churn-medium":
+            case "churn-low":
+            {
+                var level = section == "churn-high" ? "High" : section == "churn-medium" ? "Medium" : "Low";
+                var total = await _db.DonorChurnPredictions.CountAsync(p => p.RiskLevel == level);
+                var items = await _db.DonorChurnPredictions
+                    .Where(p => p.RiskLevel == level)
+                    .OrderByDescending(p => p.ChurnProbability)
+                    .Take(20)
+                    .Join(_db.Supporters, p => p.SupporterId, s => s.SupporterId,
+                        (p, s) => new {
+                            s.DisplayName, p.RiskLevel,
+                            ChurnProbability = Math.Round((double)p.ChurnProbability * 100, 1),
+                            LastDonation = s.Donations.Max(d => (DateOnly?)d.DonationDate)
+                        })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "donations":
+            {
+                var total = await _db.Donations.CountAsync();
+                var items = await _db.Donations
+                    .Where(d => d.DonationDate != null)
+                    .OrderByDescending(d => d.DonationDate)
+                    .Take(20)
+                    .Join(_db.Supporters, d => d.SupporterId, s => s.SupporterId,
+                        (d, s) => new { s.DisplayName, d.DonationDate, d.Amount, d.DonationType, d.IsRecurring })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "conferences":
+            {
+                var total = await _db.CaseConferences.CountAsync(c => c.NextConferenceDate >= today);
+                var items = await _db.CaseConferences
+                    .Where(c => c.NextConferenceDate != null && c.NextConferenceDate >= today)
+                    .OrderBy(c => c.NextConferenceDate)
+                    .Take(20)
+                    .Join(_db.Residents, c => c.ResidentId, r => r.ResidentId,
+                        (c, r) => new { ResidentCode = r.InternalCode, c.ConferenceType, c.NextConferenceDate, c.SocialWorker })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "health":
+            {
+                var total = await _db.HealthWellbeingRecords.CountAsync();
+                var items = await _db.HealthWellbeingRecords
+                    .Where(h => h.RecordDate != null)
+                    .OrderByDescending(h => h.RecordDate)
+                    .Take(20)
+                    .Join(_db.Residents, h => h.ResidentId, r => r.ResidentId,
+                        (h, r) => new {
+                            ResidentCode = r.InternalCode, h.RecordDate,
+                            GeneralHealth = h.GeneralHealthScore,
+                            Nutrition = h.NutritionScore,
+                            Sleep = h.SleepQualityScore,
+                            Energy = h.EnergyLevelScore
+                        })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "education":
+            {
+                var total = await _db.EducationRecords.CountAsync();
+                var items = await _db.EducationRecords
+                    .Where(e => e.RecordDate != null)
+                    .OrderByDescending(e => e.RecordDate)
+                    .Take(20)
+                    .Join(_db.Residents, e => e.ResidentId, r => r.ResidentId,
+                        (e, r) => new {
+                            ResidentCode = r.InternalCode, e.RecordDate, e.EnrollmentStatus,
+                            AttendancePct = e.AttendanceRate != null ? Math.Round((double)e.AttendanceRate * 100, 1) : (double?)null,
+                            Progress = e.ProgressPercent
+                        })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "counseling":
+            {
+                var total = await _db.ProcessRecordings.CountAsync();
+                var items = await _db.ProcessRecordings
+                    .Where(p => p.SessionDate != null)
+                    .OrderByDescending(p => p.SessionDate)
+                    .Take(20)
+                    .Join(_db.Residents, p => p.ResidentId, r => r.ResidentId,
+                        (p, r) => new { ResidentCode = r.InternalCode, p.SessionType, p.SessionDate, p.SocialWorker, p.SessionDurationMinutes })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "risk-high":
+            case "risk-medium":
+            case "risk-low":
+            {
+                var level = section == "risk-high" ? "High" : section == "risk-medium" ? "Medium" : "Low";
+                var total = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == level);
+                var items = await _db.Residents
+                    .Where(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == level)
+                    .OrderBy(r => r.InternalCode)
+                    .Take(20)
+                    .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId,
+                        (r, s) => new { r.InternalCode, Safehouse = s.Name, r.CurrentRiskLevel, r.CaseStatus })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "okr-recent":
+            {
+                var total = await _db.Supporters
+                    .CountAsync(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= threeMonthsAgo));
+                var items = await _db.Supporters
+                    .Where(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
+                    .OrderByDescending(s => s.Donations.Max(d => (DateOnly?)d.DonationDate))
+                    .Take(20)
+                    .Select(s => new {
+                        s.DisplayName, s.Status,
+                        LastDonation = s.Donations.Max(d => (DateOnly?)d.DonationDate),
+                        DonationLabel = "Recent"
+                    })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            case "okr-lapsed":
+            {
+                var total = await _db.Supporters
+                    .CountAsync(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= threeMonthsAgo));
+                var items = await _db.Supporters
+                    .Where(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
+                    .OrderByDescending(s => s.Donations.Max(d => (DateOnly?)d.DonationDate))
+                    .Take(20)
+                    .Select(s => new {
+                        s.DisplayName, s.Status,
+                        LastDonation = s.Donations.Max(d => (DateOnly?)d.DonationDate),
+                        DonationLabel = "Lapsed"
+                    })
+                    .ToListAsync();
+                return Ok(new { items, totalCount = total });
+            }
+            default:
+                return BadRequest(new { message = $"Unknown section: {section}" });
+        }
+    }
+
     [HttpGet]
     public async Task<IActionResult> Get()
     {

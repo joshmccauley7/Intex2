@@ -249,25 +249,36 @@ public class SocialMediaController : ControllerBase
             var (featureRates, overallRate, avgValue) = await LoadFeatureRatesAsync();
 
             // ── Phase 1: anchor to real (platform × post_type) data ─────────────
+            // Bayesian shrinkage blends the observed combo rate toward the overall mean
+            // in proportion to sample size. Small samples (e.g. 37 posts) get pulled
+            // toward the overall average; large samples trust the observed data more.
+            // priorStrength = 50 is equivalent to "act as if you've seen 50 extra
+            // observations at the overall rate before trusting this specific combo."
+            const double priorStrength = 50.0;
+
             var combo = await GetComboRateAsync(req.Platform, req.PostType);
 
             double anchorRate;
             string anchorDescription;
             if (combo is { N: >= 5 })
             {
-                anchorRate        = combo.Value.Rate;
-                anchorDescription = $"{req.Platform} × {req.PostType} ({combo.Value.N} posts)";
+                var shrunkRate    = (combo.Value.N * combo.Value.Rate + priorStrength * overallRate)
+                                    / (combo.Value.N + priorStrength);
+                anchorRate        = shrunkRate;
+                anchorDescription = $"{req.Platform} × {req.PostType} ({combo.Value.N} posts, shrunk toward {overallRate:P0} avg)";
             }
             else if (featureRates.TryGetValue("post_type", out var ptRates) &&
                      ptRates.TryGetValue(req.PostType, out var ptStat) && ptStat.N >= 5)
             {
-                anchorRate        = ptStat.Rate;
-                anchorDescription = $"{req.PostType} overall (combo had < 5 posts)";
+                var shrunkRate    = (ptStat.N * ptStat.Rate + priorStrength * overallRate)
+                                    / (ptStat.N + priorStrength);
+                anchorRate        = shrunkRate;
+                anchorDescription = $"{req.PostType} overall ({ptStat.N} posts, shrunk toward avg)";
             }
             else
             {
                 anchorRate        = overallRate;
-                anchorDescription = "overall average (insufficient data)";
+                anchorDescription = "overall average (insufficient data for this combination)";
             }
 
             // ── Phase 2: small secondary adjustments from remaining features ────
@@ -395,14 +406,6 @@ public class SocialMediaController : ControllerBase
             rate    = Convert.ToDouble(r["conv_rate"]),
         });
 
-        var rates = new Dictionary<string, Dictionary<string, (double Rate, int N)>>();
-        foreach (var row in rows)
-        {
-            if (!rates.ContainsKey(row.feature))
-                rates[row.feature] = new Dictionary<string, (double, int)>();
-            rates[row.feature][row.value] = (row.rate, row.n);
-        }
-
         double overallRate = 0.5, avgValue = 0;
         var overallRows = await QueryListAsync(overallSql, r => new
         {
@@ -410,6 +413,19 @@ public class SocialMediaController : ControllerBase
             avg     = r["avg_value"]    == DBNull.Value ? 0.0 : Convert.ToDouble(r["avg_value"]),
         });
         if (overallRows.Count > 0) { overallRate = overallRows[0].overall; avgValue = overallRows[0].avg; }
+
+        // Apply Bayesian shrinkage to every feature rate so badges and scoring
+        // reflect realistic uncertainty — small feature groups are pulled toward
+        // the overall mean; large groups keep most of their observed rate.
+        const double featurePrior = 30.0;
+        var rates = new Dictionary<string, Dictionary<string, (double Rate, int N)>>();
+        foreach (var row in rows)
+        {
+            if (!rates.ContainsKey(row.feature))
+                rates[row.feature] = new Dictionary<string, (double, int)>();
+            var shrunk = (row.n * row.rate + featurePrior * overallRate) / (row.n + featurePrior);
+            rates[row.feature][row.value] = (shrunk, row.n);
+        }
 
         return (rates, overallRate, avgValue);
     }
