@@ -6,38 +6,92 @@ import ThemeToggle from '../theme/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
 import ConfirmDialog from '../ui/ConfirmDialog';
 
-export default function SiteNav() {
+type HomeLang = 'en' | 'pt' | 'fil';
+
+interface SiteNavProps {
+  homeLang?: HomeLang;
+}
+
+const navCopy: Record<HomeLang, {
+  home: string
+  impact: string
+  donate: string
+  myDonations: string
+  adminTools: string
+  login: string
+  admin: string
+  donor: string
+  chooseLangTitle: string
+  signOutTitle: string
+  signOutDialogTitle: string
+  signOutDialogMessage: string
+  signOutConfirm: string
+}> = {
+  en: {
+    home: 'Home',
+    impact: 'Impact',
+    donate: 'Donate',
+    myDonations: 'My Donations',
+    adminTools: 'Admin Tools',
+    login: 'Login',
+    admin: 'Admin',
+    donor: 'Donor',
+    chooseLangTitle: 'Choose homepage language',
+    signOutTitle: 'Sign out',
+    signOutDialogTitle: 'Sign out?',
+    signOutDialogMessage: 'Are you sure you want to sign out of your account?',
+    signOutConfirm: 'Sign Out',
+  },
+  pt: {
+    home: 'Inicio',
+    impact: 'Impacto',
+    donate: 'Doar',
+    myDonations: 'Minhas doacoes',
+    adminTools: 'Ferramentas admin',
+    login: 'Entrar',
+    admin: 'Admin',
+    donor: 'Doador',
+    chooseLangTitle: 'Escolher idioma da pagina inicial',
+    signOutTitle: 'Sair',
+    signOutDialogTitle: 'Sair da conta?',
+    signOutDialogMessage: 'Tem certeza que deseja sair da sua conta?',
+    signOutConfirm: 'Sair',
+  },
+  fil: {
+    home: 'Home',
+    impact: 'Epekto',
+    donate: 'Mag-donate',
+    myDonations: 'Aking donasyon',
+    adminTools: 'Admin tools',
+    login: 'Mag-login',
+    admin: 'Admin',
+    donor: 'Donor',
+    chooseLangTitle: 'Pumili ng wika ng home page',
+    signOutTitle: 'Mag-sign out',
+    signOutDialogTitle: 'Mag-sign out?',
+    signOutDialogMessage: 'Sigurado ka bang gusto mong mag-sign out sa account mo?',
+    signOutConfirm: 'Sign Out',
+  },
+};
+
+export default function SiteNav({ homeLang = 'en' }: SiteNavProps) {
   const { session, isAdmin, isDonor, logout } = useAuth();
   const navigate = useNavigate();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
+  const copy = navCopy[homeLang];
 
   async function handleLogout() {
     await logout();
     navigate('/');
   }
 
-  function handleTranslateClick() {
-    const rawUrl = window.location.href;
-    const isLocalHost =
-      window.location.hostname === 'localhost' ||
-      window.location.hostname === '127.0.0.1' ||
-      window.location.hostname === '::1';
-
-    if (isLocalHost) {
-      // Google Translate cannot fetch localhost/private URLs.
-      alert('Google Translate cannot open local development pages. Use a deployed URL to translate the full page.');
-      return;
-    }
-
-    const url = encodeURIComponent(rawUrl);
-    const translateUrl = `https://translate.google.com/?sl=auto&tl=fil&op=websites&url=${url}`;
-    const opened = window.open(translateUrl, '_blank', 'noopener,noreferrer');
-
-    // Fallback when popup blockers prevent opening a new tab.
-    if (!opened) {
-      window.location.href = translateUrl;
-    }
+  function switchHomeLanguage(lang: 'en' | 'pt' | 'fil') {
+    localStorage.setItem('homeLanguage', lang);
+    setLanguageMenuOpen(false);
+    setMobileMenuOpen(false);
+    navigate(`/?lang=${lang}`);
   }
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
@@ -45,7 +99,7 @@ export default function SiteNav() {
       ? 'text-safira-blue dark:text-blue-300 transition-colors'
       : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors';
 
-  const roleLabel = isAdmin ? 'Admin' : isDonor ? 'Donor' : null;
+  const roleLabel = isAdmin ? copy.admin : isDonor ? copy.donor : null;
   const roleBadgeClass = isAdmin
     ? 'bg-blue-600 text-white'
     : 'bg-emerald-600 text-white';
@@ -60,26 +114,35 @@ export default function SiteNav() {
 
       {/* Nav links */}
       <div className="hidden md:flex items-center gap-8 text-sm font-medium">
-        <NavLink to="/" end className={linkClass}>Home</NavLink>
-        <NavLink to="/impact" className={linkClass}>Impact</NavLink>
-        <NavLink to="/donate" className={linkClass}>Donate</NavLink>
+        <NavLink to="/" end className={linkClass}>{copy.home}</NavLink>
+        <NavLink to="/impact" className={linkClass}>{copy.impact}</NavLink>
+        <NavLink to="/donate" className={linkClass}>{copy.donate}</NavLink>
         {session.isAuthenticated && (
-          <NavLink to="/my-donations" className={linkClass}>My Donations</NavLink>
+          <NavLink to="/my-donations" className={linkClass}>{copy.myDonations}</NavLink>
         )}
         {isAdmin && (
-          <NavLink to="/admin/dashboard" className={linkClass}>Admin Tools</NavLink>
+          <NavLink to="/admin/dashboard" className={linkClass}>{copy.adminTools}</NavLink>
         )}
       </div>
 
       {/* Right side (desktop) */}
       <div className="hidden md:flex items-center gap-2">
-        <button
-          onClick={handleTranslateClick}
-          title="Translate this page"
-          className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          <Globe size={16} />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setLanguageMenuOpen((open) => !open)}
+            title={copy.chooseLangTitle}
+            className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <Globe size={16} />
+          </button>
+          {languageMenuOpen && (
+            <div className="absolute right-0 top-full mt-2 min-w-40 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1 z-50">
+              <button onClick={() => switchHomeLanguage('en')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">English</button>
+              <button onClick={() => switchHomeLanguage('pt')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Portugues</button>
+              <button onClick={() => switchHomeLanguage('fil')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Filipino</button>
+            </div>
+          )}
+        </div>
         <ThemeToggle />
         {session.isAuthenticated ? (
           <>
@@ -96,7 +159,7 @@ export default function SiteNav() {
             </Link>
             <button
               onClick={() => setLogoutConfirmOpen(true)}
-              title="Sign out"
+              title={copy.signOutTitle}
               className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <LogOut size={16} />
@@ -107,20 +170,29 @@ export default function SiteNav() {
             to="/login"
             className="text-sm font-semibold text-white bg-safira-blue hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
           >
-            Login
+            {copy.login}
           </Link>
         )}
       </div>
 
       {/* Mobile controls */}
       <div className="md:hidden flex items-center gap-2">
-        <button
-          onClick={handleTranslateClick}
-          title="Translate this page"
-          className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-        >
-          <Globe size={16} />
-        </button>
+        <div className="relative">
+          <button
+            onClick={() => setLanguageMenuOpen((open) => !open)}
+            title={copy.chooseLangTitle}
+            className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+          >
+            <Globe size={16} />
+          </button>
+          {languageMenuOpen && (
+            <div className="absolute right-0 top-full mt-2 min-w-40 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1 z-50">
+              <button onClick={() => switchHomeLanguage('en')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">English</button>
+              <button onClick={() => switchHomeLanguage('pt')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Portugues</button>
+              <button onClick={() => switchHomeLanguage('fil')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Filipino</button>
+            </div>
+          )}
+        </div>
         <ThemeToggle />
         <button
           type="button"
@@ -141,17 +213,17 @@ export default function SiteNav() {
           className="md:hidden absolute left-0 right-0 top-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-4 shadow-xl"
         >
           <div className="flex flex-col gap-1 text-sm font-medium">
-            <NavLink to="/" end className={linkClass} onClick={() => setMobileMenuOpen(false)}>Home</NavLink>
-            <NavLink to="/impact" className={linkClass} onClick={() => setMobileMenuOpen(false)}>Impact</NavLink>
-            <NavLink to="/donate" className={linkClass} onClick={() => setMobileMenuOpen(false)}>Donate</NavLink>
+            <NavLink to="/" end className={linkClass} onClick={() => setMobileMenuOpen(false)}>{copy.home}</NavLink>
+            <NavLink to="/impact" className={linkClass} onClick={() => setMobileMenuOpen(false)}>{copy.impact}</NavLink>
+            <NavLink to="/donate" className={linkClass} onClick={() => setMobileMenuOpen(false)}>{copy.donate}</NavLink>
             {session.isAuthenticated && (
               <NavLink to="/my-donations" className={linkClass} onClick={() => setMobileMenuOpen(false)}>
-                My Donations
+                {copy.myDonations}
               </NavLink>
             )}
             {isAdmin && (
               <NavLink to="/admin/dashboard" className={linkClass} onClick={() => setMobileMenuOpen(false)}>
-                Admin Tools
+                {copy.adminTools}
               </NavLink>
             )}
           </div>
@@ -176,7 +248,7 @@ export default function SiteNav() {
                     setMobileMenuOpen(false);
                     setLogoutConfirmOpen(true);
                   }}
-                  title="Sign out"
+                  title={copy.signOutTitle}
                   className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <LogOut size={16} />
@@ -188,7 +260,7 @@ export default function SiteNav() {
                 onClick={() => setMobileMenuOpen(false)}
                 className="inline-flex text-sm font-semibold text-white bg-safira-blue hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
               >
-                Login
+                {copy.login}
               </Link>
             )}
           </div>
@@ -196,9 +268,9 @@ export default function SiteNav() {
       )}
       <ConfirmDialog
         open={logoutConfirmOpen}
-        title="Sign out?"
-        message="Are you sure you want to sign out of your account?"
-        confirmLabel="Sign Out"
+        title={copy.signOutDialogTitle}
+        message={copy.signOutDialogMessage}
+        confirmLabel={copy.signOutConfirm}
         isDanger={false}
         onCancel={() => setLogoutConfirmOpen(false)}
         onConfirm={async () => {

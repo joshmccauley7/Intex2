@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import '../App.css';
 import { ChevronLeft, ChevronRight, Users, Home, Shield, type LucideIcon } from 'lucide-react';
+import { useLocation } from 'react-router-dom';
 import safiraLogoImg from '../images/safira cropped.png';
 import valuesSafetyImg from '../images/values/safety.jpg';
 import valuesRestorationImg from '../images/values/restoration.jpg';
@@ -18,11 +19,7 @@ const imageModules = import.meta.glob(
 
 const heroImages = Object.values(imageModules).map((m) => m.default);
 
-const homepageImpactStats: { icon: LucideIcon; value: string; label: string }[] = [
-  { icon: Users, value: '77+', label: 'Children Served' },
-  { icon: Home, value: '9', label: 'Safe Homes' },
-  { icon: Shield, value: '8', label: 'Years of Impact' },
-];
+type HomeLang = 'en' | 'pt' | 'fil';
 
 // ─────────────────────────────────────────────
 // FAQ Data
@@ -32,38 +29,123 @@ interface FAQItem {
   answer: string;
 }
 
-const faqs: FAQItem[] = [
-  {
-    question: 'What is Safira and who do you serve?',
-    answer:
-      'Safira is a nonprofit organization that provides safe housing, holistic care, and a path toward restoration for girls who have survived sex trafficking, sexual abuse, and online exploitation. We operate in Brazil, inspired by the pioneering work of Lighthouse Sanctuary in the Philippines.',
+const homepageCopy: Record<HomeLang, {
+  heroTitle: string
+  heroBody: string
+  donateNow: string
+  standFor: string
+  coreValuesTitle: string
+  coreValues: { title: string; desc: string; img: string; imgAlt: string }[]
+  nameBehindMission: string
+  whySafiraTitle: string
+  whySafiraBody: string
+  impactStats: { icon: LucideIcon; value: string; label: string }[]
+  faqIntro: string
+  faqTitle1: string
+  faqTitle2: string
+  faqItems: FAQItem[]
+  faqContactTitle: string
+}> = {
+  en: {
+    heroTitle: 'Every Child Deserves Safety',
+    heroBody: 'Safira protects children who are victims of sexual abuse in Brazil, providing shelter, healing, and a path to a brighter future.',
+    donateNow: 'Donate Now',
+    standFor: 'What we stand for',
+    coreValuesTitle: 'Our Core Values',
+    coreValues: [
+      { title: 'Safety', desc: 'A stable, nurturing home is the first step. Every child who comes to us is safe from harm from day one.', img: valuesSafetyImg, imgAlt: 'Shield with clasped hands - Safety' },
+      { title: 'Restoration', desc: 'We walk alongside each child through their healing journey - at their pace, on their terms, with full dignity.', img: valuesRestorationImg, imgAlt: 'Hands holding a growing plant - Restoration' },
+      { title: 'Justice', desc: 'We support survivors in pursuing what justice means to them - without pressure, with unwavering advocacy.', img: valuesJusticeImg, imgAlt: 'Scales of justice with laurel wreath - Justice' },
+      { title: 'Empowerment', desc: 'Our goal is to help each child move from surviving to thriving - becoming leaders and advocates for themselves.', img: valuesEmpowermentImg, imgAlt: 'Raised fist with rays of light - Empowerment' },
+    ],
+    nameBehindMission: 'The name behind the mission',
+    whySafiraTitle: 'Why we chose Safira',
+    whySafiraBody: 'Safira is the Portuguese word for sapphire - a symbol of protection and dignity. Safety and dignity are not privileges, they are fundamental rights. Safira exists as a promise: to safeguard these principles and stand by those we serve.',
+    impactStats: [
+      { icon: Users, value: '77+', label: 'Children Served' },
+      { icon: Home, value: '9', label: 'Safe Homes' },
+      { icon: Shield, value: '8', label: 'Years of Impact' },
+    ],
+    faqIntro: 'Got questions?',
+    faqTitle1: 'Frequently asked',
+    faqTitle2: 'questions',
+    faqItems: [
+      { question: 'What is Safira and who do you serve?', answer: 'Safira is a nonprofit organization that provides safe housing, holistic care, and a path toward restoration for girls who have survived sex trafficking, sexual abuse, and online exploitation. We operate in Brazil, inspired by the pioneering work of Lighthouse Sanctuary in the Philippines.' },
+      { question: 'How are donations used?', answer: 'Every contribution goes directly toward the care of the children in our shelters - covering shelter, nutritious meals, clothing, education support, counseling, and spiritual development. We publish transparent impact reports so you can see exactly where your money goes.' },
+      { question: 'How do I know my donation is making a real difference?', answer: 'Our impact dashboard tracks key outcomes in real time: residents served, safe houses operating, educational milestones reached, and more. Donors with accounts can access their full giving history and see the specific programs their contributions support.' },
+      { question: 'Can I volunteer or visit a shelter?', answer: 'Due to the sensitive nature of our work and the privacy of the girls in our care, in-person visits are limited and carefully coordinated. If you are interested in volunteering or partnering with Safira, reach out through our contact form and our team will get back to you.' },
+      { question: "How does Safira protect residents' privacy?", answer: 'Protecting the identity and safety of every child in our care is our highest priority. We never publish identifying information about residents, all staff undergo background checks and trauma-informed care training, and our digital systems are secured with role-based access controls and GDPR-compliant data practices.' },
+      { question: 'How can my organization or church partner with Safira?', answer: 'We actively welcome partnerships with churches, businesses, schools, and community organizations. Partners can provide financial support, in-kind donations, or awareness campaigns. Contact us to explore how we can work together toward a world where every child is safe.' },
+    ],
+    faqContactTitle: 'Still have questions? Reach us directly:',
   },
-  {
-    question: 'How are donations used?',
-    answer:
-      'Every contribution goes directly toward the care of the children in our shelters — covering shelter, nutritious meals, clothing, education support, counseling, and spiritual development. We publish transparent impact reports so you can see exactly where your money goes.',
+  pt: {
+    heroTitle: 'Toda crianca merece seguranca',
+    heroBody: 'A Safira protege criancas vitimas de abuso sexual no Brasil, oferecendo abrigo, cura e um caminho para um futuro melhor.',
+    donateNow: 'Doar agora',
+    standFor: 'No que acreditamos',
+    coreValuesTitle: 'Nossos valores',
+    coreValues: [
+      { title: 'Seguranca', desc: 'Um lar estavel e acolhedor e o primeiro passo. Toda crianca que chega ate nos fica segura desde o primeiro dia.', img: valuesSafetyImg, imgAlt: 'Escudo com maos unidas - Seguranca' },
+      { title: 'Restauracao', desc: 'Caminhamos ao lado de cada crianca em sua jornada de cura - no ritmo dela, nos termos dela, com plena dignidade.', img: valuesRestorationImg, imgAlt: 'Maos segurando uma planta - Restauracao' },
+      { title: 'Justica', desc: 'Apoiamos sobreviventes na busca pela justica que faz sentido para elas - sem pressao e com defesa constante.', img: valuesJusticeImg, imgAlt: 'Balanca da justica com louros - Justica' },
+      { title: 'Empoderamento', desc: 'Nosso objetivo e ajudar cada crianca a sair da sobrevivencia para uma vida plena - tornando-se lider e defensora de si mesma.', img: valuesEmpowermentImg, imgAlt: 'Punho erguido com raios de luz - Empoderamento' },
+    ],
+    nameBehindMission: 'O nome por tras da missao',
+    whySafiraTitle: 'Por que escolhemos Safira',
+    whySafiraBody: 'Safira e a palavra em portugues para sapphire - simbolo de protecao e dignidade. Seguranca e dignidade nao sao privilegios: sao direitos fundamentais. Safira existe como uma promessa de proteger esses principios e permanecer ao lado de quem servimos.',
+    impactStats: [
+      { icon: Users, value: '77+', label: 'Criancas atendidas' },
+      { icon: Home, value: '9', label: 'Lares seguros' },
+      { icon: Shield, value: '8', label: 'Anos de impacto' },
+    ],
+    faqIntro: 'Tem duvidas?',
+    faqTitle1: 'Perguntas',
+    faqTitle2: 'frequentes',
+    faqItems: [
+      { question: 'O que e a Safira e a quem ela atende?', answer: 'A Safira e uma organizacao sem fins lucrativos que oferece moradia segura, cuidado integral e restauracao para meninas sobreviventes de trafico sexual, abuso sexual e exploracao online.' },
+      { question: 'Como as doacoes sao utilizadas?', answer: 'Cada contribuicao vai diretamente para o cuidado das criancas em nossos abrigos: moradia, alimentacao, roupas, apoio educacional, aconselhamento e desenvolvimento espiritual.' },
+      { question: 'Como sei que minha doacao gera impacto real?', answer: 'Nosso painel de impacto acompanha indicadores em tempo real, como residentes atendidas, casas seguras em operacao e marcos educacionais alcancados.' },
+      { question: 'Posso ser voluntario(a) ou visitar um abrigo?', answer: 'Devido a sensibilidade do trabalho e a privacidade das meninas, visitas presenciais sao limitadas e cuidadosamente coordenadas.' },
+      { question: 'Como a Safira protege a privacidade das residentes?', answer: 'Proteger a identidade e a seguranca de cada crianca e nossa prioridade maxima. Nao divulgamos informacoes de identificacao e usamos controles de acesso baseados em papeis.' },
+      { question: 'Como minha organizacao ou igreja pode fazer parceria com a Safira?', answer: 'Recebemos parcerias com igrejas, empresas, escolas e organizacoes comunitarias para apoio financeiro, doacoes e campanhas de conscientizacao.' },
+    ],
+    faqContactTitle: 'Ainda tem perguntas? Fale conosco:',
   },
-  {
-    question: 'How do I know my donation is making a real difference?',
-    answer:
-      'Our impact dashboard tracks key outcomes in real time: residents served, safe houses operating, educational milestones reached, and more. Donors with accounts can access their full giving history and see the specific programs their contributions support.',
+  fil: {
+    heroTitle: 'Bawat bata ay nararapat sa kaligtasan',
+    heroBody: 'Pinoprotektahan ng Safira ang mga batang biktima ng pang-aabusong sekswal sa Brazil sa pamamagitan ng tahanan, paggaling, at pag-asa para sa mas magandang kinabukasan.',
+    donateNow: 'Mag-donate ngayon',
+    standFor: 'Mga pinahahalagahan namin',
+    coreValuesTitle: 'Aming pangunahing halaga',
+    coreValues: [
+      { title: 'Kaligtasan', desc: 'Ang matatag at mapagkalingang tahanan ang unang hakbang. Ligtas ang bawat batang dumarating sa amin mula sa unang araw.', img: valuesSafetyImg, imgAlt: 'Kalasag na may magkahawak na kamay - Kaligtasan' },
+      { title: 'Pagpapanumbalik', desc: 'Kasama namin ang bawat bata sa kanilang paghilom - sa sarili nilang bilis, sa paraang may dignidad.', img: valuesRestorationImg, imgAlt: 'Kamay na may hawak na tumutubong halaman - Pagpapanumbalik' },
+      { title: 'Katarungan', desc: 'Sinusuportahan namin ang mga survivor sa paghanap ng katarungang nararapat sa kanila - walang pamimilit, may matatag na pagtatanggol.', img: valuesJusticeImg, imgAlt: 'Timbangan ng katarungan - Katarungan' },
+      { title: 'Pagpapalakas', desc: 'Layunin naming tulungan ang bawat bata na umunlad mula sa pag-survive tungo sa pag-thrive at pagiging lider para sa sarili.', img: valuesEmpowermentImg, imgAlt: 'Nakataas na kamao - Pagpapalakas' },
+    ],
+    nameBehindMission: 'Ang pangalang nasa likod ng misyon',
+    whySafiraTitle: 'Bakit Safira ang pangalan',
+    whySafiraBody: 'Ang Safira ay salitang Portuges para sa sapphire - simbolo ng proteksyon at dignidad. Ang kaligtasan at dignidad ay pangunahing karapatan. Ang Safira ay pangakong pangalagaan ang mga prinsipyong ito at tumindig para sa aming pinaglilingkuran.',
+    impactStats: [
+      { icon: Users, value: '77+', label: 'Batang natulungan' },
+      { icon: Home, value: '9', label: 'Ligtas na tahanan' },
+      { icon: Shield, value: '8', label: 'Taon ng epekto' },
+    ],
+    faqIntro: 'May tanong ka?',
+    faqTitle1: 'Mga madalas',
+    faqTitle2: 'itanong',
+    faqItems: [
+      { question: 'Ano ang Safira at sino ang inyong pinaglilingkuran?', answer: 'Ang Safira ay nonprofit na nagbibigay ng ligtas na tirahan, holistic na pag-aalaga, at daan sa pagpapanumbalik para sa mga batang nakaligtas sa trafficking at pang-aabuso.' },
+      { question: 'Paano ginagamit ang mga donasyon?', answer: 'Direktang napupunta ang bawat donasyon sa pangangalaga ng mga bata sa aming mga tahanan - tirahan, pagkain, damit, edukasyon, counseling, at espiritwal na paghubog.' },
+      { question: 'Paano ko malalaman na may tunay na epekto ang donasyon ko?', answer: 'Sinusubaybayan ng impact dashboard ang mahahalagang resulta sa real time, kabilang ang dami ng residenteng natulungan at mga bahay na ligtas na tumatakbo.' },
+      { question: 'Pwede ba akong mag-volunteer o bumisita sa shelter?', answer: 'Dahil sensitibo ang aming trabaho at mahalaga ang privacy ng mga bata, limitado at maingat ang pagkoordina ng personal na pagbisita.' },
+      { question: 'Paano pinoprotektahan ng Safira ang privacy ng residents?', answer: 'Pinakamataas naming prayoridad ang seguridad at pagkakakilanlan ng bawat bata. May role-based access controls at mahigpit na data protection practices kami.' },
+      { question: 'Paano makikipag-partner ang aming organisasyon o simbahan sa Safira?', answer: 'Malugod naming tinatanggap ang pakikipagtulungan mula sa simbahan, negosyo, paaralan, at komunidad sa pinansyal na suporta, in-kind donations, at awareness campaigns.' },
+    ],
+    faqContactTitle: 'May iba ka pang tanong? Makipag-ugnayan sa amin:',
   },
-  {
-    question: 'Can I volunteer or visit a shelter?',
-    answer:
-      'Due to the sensitive nature of our work and the privacy of the girls in our care, in-person visits are limited and carefully coordinated. If you are interested in volunteering or partnering with Safira, reach out through our contact form and our team will get back to you.',
-  },
-  {
-    question: "How does Safira protect residents' privacy?",
-    answer:
-      'Protecting the identity and safety of every child in our care is our highest priority. We never publish identifying information about residents, all staff undergo background checks and trauma-informed care training, and our digital systems are secured with role-based access controls and GDPR-compliant data practices.',
-  },
-  {
-    question: 'How can my organization or church partner with Safira?',
-    answer:
-      'We actively welcome partnerships with churches, businesses, schools, and community organizations. Partners can provide financial support, in-kind donations, or awareness campaigns. Contact us to explore how we can work together toward a world where every child is safe.',
-  },
-];
+};
 
 // ─────────────────────────────────────────────
 // FAQ Accordion
@@ -160,7 +242,7 @@ function AccordionItem({ question, answer, isOpen, onToggle }: AccordionItemProp
   );
 }
 
-function FAQAccordion() {
+function FAQAccordion({ copy }: { copy: (typeof homepageCopy)['en'] }) {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
   const toggle = (i: number) => setOpenIndex(openIndex === i ? null : i);
 
@@ -189,7 +271,7 @@ function FAQAccordion() {
               marginBottom: '0.5rem',
             }}
           >
-            Got questions?
+            {copy.faqIntro}
           </p>
           <h2
             style={{
@@ -201,14 +283,14 @@ function FAQAccordion() {
               margin: 0,
             }}
           >
-            Frequently asked
+            {copy.faqTitle1}
             <br />
-            <em>questions</em>
+            <em>{copy.faqTitle2}</em>
           </h2>
         </div>
 
         <div style={{ borderTop: '1px solid #c9c2b4' }}>
-          {faqs.map((faq, i) => (
+          {copy.faqItems.map((faq, i) => (
             <AccordionItem
               key={i}
               question={faq.question}
@@ -230,7 +312,7 @@ function FAQAccordion() {
             gap: '0.35rem',
           }}
         >
-          <p style={{ margin: 0, fontWeight: 600, color: '#1a1a18' }}>Still have questions? Reach us directly:</p>
+          <p style={{ margin: 0, fontWeight: 600, color: '#1a1a18' }}>{copy.faqContactTitle}</p>
           <p style={{ margin: 0 }}>📞 555-555-5555</p>
           <p style={{ margin: 0 }}>✉️ safira@email.com</p>
         </div>
@@ -243,8 +325,22 @@ function FAQAccordion() {
 // Home Page
 // ─────────────────────────────────────────────
 export default function HomePage() {
+  const location = useLocation();
   const [currentImg, setCurrentImg] = useState(0);
   const [imagesReady, setImagesReady] = useState(heroImages.length === 0);
+  const [lang, setLang] = useState<HomeLang>('en');
+
+  useEffect(() => {
+    const urlLang = new URLSearchParams(location.search).get('lang');
+    const stored = localStorage.getItem('homeLanguage');
+    const resolved = (urlLang === 'pt' || urlLang === 'fil' || urlLang === 'en')
+      ? urlLang
+      : (stored === 'pt' || stored === 'fil' || stored === 'en' ? stored : 'en');
+    setLang(resolved);
+    localStorage.setItem('homeLanguage', resolved);
+  }, [location.search]);
+
+  const copy = homepageCopy[lang];
 
   useEffect(() => {
     if (heroImages.length === 0) return;
@@ -274,7 +370,7 @@ export default function HomePage() {
   return (
     <div className="min-h-screen flex flex-col font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100 transition-colors">
 
-      <SiteNav />
+      <SiteNav homeLang={lang} />
 
       {/* ── Hero Carousel ── */}
       <section className="relative overflow-hidden h-[420px] md:h-[560px]">
@@ -308,18 +404,17 @@ export default function HomePage() {
             }}
           >
             <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2 text-[#0f172a] dark:text-slate-100 hero-animate">
-              Every Child Deserves Safety
+              {copy.heroTitle}
             </h1>
             <p className="text-slate-700 dark:text-slate-200 mb-4 leading-relaxed text-sm sm:text-base hero-animate-delay">
-              Safira protects children who are victims of sexual abuse in Brazil, providing
-              shelter, healing, and a path to a brighter future.
+              {copy.heroBody}
             </p>
             <div className="hero-animate-delay-2">
               <a
                 href="/donate"
                 className="inline-flex items-center bg-safira-blue hover:bg-safira-blue-dark text-white font-semibold px-6 py-3 rounded-lg transition-colors text-sm shadow"
               >
-                Donate Now
+                {copy.donateNow}
               </a>
             </div>
           </div>
@@ -331,14 +426,14 @@ export default function HomePage() {
             <button
               onClick={() => goTo(currentImg - 1)}
               className="hidden md:block absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-white/30 hover:bg-white/60 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
-              aria-label="Previous image"
+              aria-label={lang === 'pt' ? 'Imagem anterior' : lang === 'fil' ? 'Nakaraang larawan' : 'Previous image'}
             >
               <ChevronLeft size={20} />
             </button>
             <button
               onClick={() => goTo(currentImg + 1)}
               className="hidden md:block absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-white/30 hover:bg-white/60 text-white rounded-full p-1.5 transition-colors backdrop-blur-sm"
-              aria-label="Next image"
+              aria-label={lang === 'pt' ? 'Proxima imagem' : lang === 'fil' ? 'Susunod na larawan' : 'Next image'}
             >
               <ChevronRight size={20} />
             </button>
@@ -347,7 +442,13 @@ export default function HomePage() {
                 <button
                   key={i}
                   onClick={() => goTo(i)}
-                  aria-label={`Go to image ${i + 1}`}
+                  aria-label={
+                    lang === 'pt'
+                      ? `Ir para imagem ${i + 1}`
+                      : lang === 'fil'
+                      ? `Pumunta sa larawan ${i + 1}`
+                      : `Go to image ${i + 1}`
+                  }
                   className="rounded-full transition-all"
                   style={{
                     width: i === currentImg ? '20px' : '8px',
@@ -365,16 +466,11 @@ export default function HomePage() {
       <section className="px-6 pt-20 pb-16 bg-white dark:bg-slate-900">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
-            <p className="text-sm font-semibold tracking-widest uppercase text-safira-blue mb-3">What we stand for</p>
-            <h2 className="text-4xl font-bold text-[#0f172a] dark:text-white">Our Core Values</h2>
+            <p className="text-sm font-semibold tracking-widest uppercase text-safira-blue mb-3">{copy.standFor}</p>
+            <h2 className="text-4xl font-bold text-[#0f172a] dark:text-white">{copy.coreValuesTitle}</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { title: 'Safety', desc: 'A stable, nurturing home is the first step. Every child who comes to us is safe from harm from day one.', img: valuesSafetyImg, imgAlt: 'Shield with clasped hands — Safety' },
-              { title: 'Restoration', desc: 'We walk alongside each child through their healing journey — at their pace, on their terms, with full dignity.', img: valuesRestorationImg, imgAlt: 'Hands holding a growing plant — Restoration' },
-              { title: 'Justice', desc: 'We support survivors in pursuing what justice means to them — without pressure, with unwavering advocacy.', img: valuesJusticeImg, imgAlt: 'Scales of justice with laurel wreath — Justice' },
-              { title: 'Empowerment', desc: 'Our goal is to help each child move from surviving to thriving — becoming leaders and advocates for themselves.', img: valuesEmpowermentImg, imgAlt: 'Raised fist with rays of light — Empowerment' },
-            ].map(({ title, desc, img, imgAlt }) => (
+            {copy.coreValues.map(({ title, desc, img, imgAlt }) => (
               <div key={title} className="bg-white dark:bg-slate-800 rounded-2xl p-9 text-center border border-slate-100 dark:border-slate-700 shadow-sm">
                 <div className="mx-auto mb-6 flex items-center justify-center" style={{ width: 132, height: 132 }}>
                   <img src={img} alt={imgAlt} style={{ width: 132, height: 132, objectFit: 'contain', borderRadius: '0.75rem' }} />
@@ -418,20 +514,19 @@ export default function HomePage() {
             {/* Text — right column */}
             <div className="w-full md:w-1/2">
               <p className="text-xs font-semibold tracking-widest uppercase text-blue-300 mb-3">
-                The name behind the mission
+                {copy.nameBehindMission}
               </p>
               <h2
                 className="text-4xl md:text-5xl font-bold text-white mb-6"
                 style={{ lineHeight: '1.15' }}
               >
-                Why we chose{' '}
-                <span style={{ color: '#93c5fd', fontStyle: 'italic' }}>Safira</span>
+                <span style={{ color: '#93c5fd', fontStyle: 'italic' }}>{copy.whySafiraTitle}</span>
               </h2>
               <p
                 className="text-blue-100"
                 style={{ fontSize: '1.25rem', lineHeight: '1.75' }}
               >
-                <em>Safira</em> is the Portuguese word for <strong style={{ color: '#fff' }}>sapphire</strong> — a symbol of protection and dignity. Safety and dignity aren’t privileges—they’re fundamental rights. <strong style={{ color: '#fff' }}>Safira exists as a promise:</strong> to safeguard these principles and stand by those we serve.
+                {copy.whySafiraBody}
               </p>
             </div>
           </div>
@@ -441,7 +536,7 @@ export default function HomePage() {
       {/* ── Impact stats (intersecting row) ── */}
       <div className="relative z-10 -mt-24 mb-14 w-full max-w-5xl mx-auto px-5 sm:px-8">
         <div className="grid grid-cols-1 gap-5 sm:grid-cols-3 sm:gap-5 lg:gap-6">
-          {homepageImpactStats.map(({ icon: Icon, value, label }) => (
+          {copy.impactStats.map(({ icon: Icon, value, label }) => (
             <div
               key={label}
               className="group relative flex flex-col items-center rounded-2xl border border-slate-200/90 bg-white px-6 pb-9 pt-10 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-4px_rgba(15,23,42,0.1)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.14)]"
@@ -464,14 +559,14 @@ export default function HomePage() {
       </div>
 
       {/* ── About Tabs ── */}
-      <SafiraTabbedContent />
+      <SafiraTabbedContent homeLang={lang} />
 
       {/* ── FAQ ── */}
       <div style={{ background: '#f7f3ec' }}>
-        <FAQAccordion />
+        <FAQAccordion copy={copy} />
       </div>
 
-      <SiteFooter />
+      <SiteFooter homeLang={lang} />
     </div>
   );
 }
