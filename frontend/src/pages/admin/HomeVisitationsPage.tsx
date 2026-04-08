@@ -305,11 +305,11 @@ export default function HomeVisitationsPage() {
               </div>
 
               {activeTab === 'visits' ? (
-                <button onClick={openNewVisit} className="flex items-center gap-2 bg-navy-DEFAULT hover:bg-navy-light text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                <button onClick={openNewVisit} className="flex items-center gap-2 bg-navy hover:bg-navy-light text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                   <Plus size={16} /> Log Visit
                 </button>
               ) : (
-                <button onClick={openNewConf} className="flex items-center gap-2 bg-navy-DEFAULT hover:bg-navy-light text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
+                <button onClick={openNewConf} className="flex items-center gap-2 bg-navy hover:bg-navy-light text-white text-sm font-medium px-4 py-2 rounded-lg transition-colors">
                   <Plus size={16} /> Add Conference
                 </button>
               )}
@@ -493,7 +493,7 @@ export default function HomeVisitationsPage() {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowVisitForm(false)} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 transition-colors">Cancel</button>
-              <button onClick={handleSaveVisit} className="px-5 py-2 bg-navy-DEFAULT hover:bg-navy-light text-white text-sm font-medium rounded-lg transition-colors">{editVisit ? 'Save Changes' : 'Log Visit'}</button>
+              <button onClick={handleSaveVisit} className="px-5 py-2 bg-navy hover:bg-navy-light text-white text-sm font-medium rounded-lg transition-colors">{editVisit ? 'Save Changes' : 'Log Visit'}</button>
             </div>
           </div>
         </div>
@@ -540,7 +540,7 @@ export default function HomeVisitationsPage() {
             </div>
             <div className="flex justify-end gap-3 mt-6">
               <button onClick={() => setShowConfForm(false)} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800 transition-colors">Cancel</button>
-              <button onClick={handleSaveConf} className="px-5 py-2 bg-navy-DEFAULT hover:bg-navy-light text-white text-sm font-medium rounded-lg transition-colors">{editConf ? 'Save Changes' : 'Add Conference'}</button>
+              <button onClick={handleSaveConf} className="px-5 py-2 bg-navy hover:bg-navy-light text-white text-sm font-medium rounded-lg transition-colors">{editConf ? 'Save Changes' : 'Add Conference'}</button>
             </div>
           </div>
         </div>
