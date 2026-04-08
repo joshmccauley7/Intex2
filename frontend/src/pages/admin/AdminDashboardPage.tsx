@@ -102,7 +102,7 @@ const MODAL_CONFIG: Record<string, ModalDetail> = {
       { key: 'displayName', label: 'Name' },
       { key: 'country', label: 'Country' },
       { key: 'lastDonation', label: 'Last Donation' },
-      { key: 'totalDonated', label: 'Total', fmt: (v) => v != null ? `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—' },
+      { key: 'totalDonated', label: 'Total', fmt: (v) => v != null ? `₱${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—' },
     ],
   },
   'churn-high': {
@@ -138,7 +138,7 @@ const MODAL_CONFIG: Record<string, ModalDetail> = {
     columns: [
       { key: 'displayName', label: 'Donor' },
       { key: 'donationDate', label: 'Date' },
-      { key: 'amount', label: 'Amount', fmt: (v) => v != null ? `$${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—' },
+      { key: 'amount', label: 'Amount', fmt: (v) => v != null ? `₱${Number(v).toLocaleString('en-US', { minimumFractionDigits: 2 })}` : '—' },
       { key: 'donationType', label: 'Type' },
     ],
   },
@@ -684,7 +684,7 @@ export default function AdminDashboardPage() {
                       <td className="px-5 py-3 text-slate-500">{d.donationDate}</td>
                       <td className="px-5 py-3 text-slate-800 font-medium">
                         {d.amount != null
-                          ? `$${d.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
+                          ? `₱${d.amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}`
                           : '—'}
                       </td>
                       <td className="px-5 py-3 text-slate-500">{d.donationType ?? '—'}</td>

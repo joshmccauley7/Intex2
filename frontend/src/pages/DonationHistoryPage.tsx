@@ -85,7 +85,7 @@ function formatDate(dateStr: string) {
 function formatRoundedCurrency(amount: number | null, currency: string | null) {
   if (amount == null) return '—';
   const rounded = Math.round(amount);
-  const code = (currency ?? 'USD').toUpperCase();
+  const code = (currency ?? 'PHP').toUpperCase();
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(rounded);
 }
 
