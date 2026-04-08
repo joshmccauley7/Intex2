@@ -769,10 +769,6 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   const psychCount = recentHealth.filter(h => h.psychologicalCheckupDone).length
   const goodAttendanceCount = recentEducation.filter(e => (e.attendanceRate ?? 0) >= 0.8).length
 
-  const RISK_RANK: Record<string, number> = { Low: 1, Medium: 2, High: 3, Critical: 4 }
-  const initialRisk = RISK_RANK[resident.initialRiskLevel ?? ''] ?? 0
-  const currentRisk = RISK_RANK[resident.currentRiskLevel ?? ''] ?? 0
-  const riskDelta = initialRisk - currentRisk // positive = improved
 
   // ── Dot row helper ──────────────────────────────────────────────────────────
   function DotRow({ label, count, total, totalLabel, dots }: {
@@ -1184,8 +1180,7 @@ function RiskJourney({ initial, current }: { initial: string | null; current: st
   const worsened = initial && current ? RISK_RANK[current] > RISK_RANK[initial] : false
 
   const trendLabel = improved ? 'Improving' : worsened ? 'Escalated' : 'Unchanged'
-  const trendColor = improved ? 'text-green-600' : worsened ? 'text-red-500' : 'text-slate-400'
-  const trendArrowColor = improved ? 'text-green-500' : worsened ? 'text-red-400' : 'text-slate-300'
+
 
   return (
     <div className="mb-5">
