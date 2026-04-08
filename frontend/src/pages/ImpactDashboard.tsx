@@ -34,8 +34,6 @@ const SAFIRA_IMPACT_NOTES = [
   },
 ];
 
-const PHP_TO_USD = 56;
-
 interface MonthValue {
   month: string | null;
 }
@@ -115,8 +113,8 @@ function monthLabelWithYear(v: string | null): string {
   if (Number.isNaN(d.getTime())) return v;
   return d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' });
 }
-function usdFromPhp(v: number | null | undefined): number {
-  return (v ?? 0) / PHP_TO_USD;
+function php(v: number | null | undefined): number {
+  return v ?? 0;
 }
 function number(v: unknown): number {
   if (typeof v === 'number' && Number.isFinite(v)) return v;
@@ -126,10 +124,10 @@ function number(v: unknown): number {
   }
   return 0;
 }
-function formatUSD(v: number): string {
+function formatPHP(v: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
-    currency: 'USD',
+    currency: 'PHP',
     maximumFractionDigits: 0,
   }).format(v);
 }
@@ -330,24 +328,24 @@ export default function ImpactDashboard() {
       .finally(() => setLoading(false));
   }, []);
 
-  const totalSupportUsd = useMemo(() => {
+  const totalSupportPhp = useMemo(() => {
     const breakdown = (data?.donationTypeBreakdown ?? []).reduce(
       (sum, row) => sum + (row.totalValue ?? 0),
       0
     );
-    if (breakdown > 0) return usdFromPhp(breakdown);
+    if (breakdown > 0) return php(breakdown);
     const months = (data?.donationsByMonth ?? []).reduce(
       (sum, row) => sum + (row.totalAmountPhp ?? 0),
       0
     );
-    return usdFromPhp(months);
+    return php(months);
   }, [data?.donationTypeBreakdown, data?.donationsByMonth]);
 
   const donationSeries = useMemo<Point[]>(
     () =>
       (data?.donationsByMonth ?? []).slice(-12).map((m) => ({
         label: monthLabel(m.month),
-        value: usdFromPhp(m.totalAmountPhp),
+        value: php(m.totalAmountPhp),
       })),
     [data?.donationsByMonth]
   );
@@ -518,7 +516,7 @@ export default function ImpactDashboard() {
               <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
                 <MetricCard
                   title="Total Program Revenue"
-                  value={formatUSD(totalSupportUsd)}
+                  value={formatPHP(totalSupportPhp)}
                   accent="text-safira-blue"
                   footnote={`${percentDiff(donationSeries).toFixed(1)}% trend over recent period`}
                   icon={<TrendingUp size={18} />}
@@ -556,7 +554,7 @@ export default function ImpactDashboard() {
                     data={donationSeries}
                     stroke="#00B7EB"
                     fill="#00B7EB"
-                    valueFormatter={(v) => formatUSD(v)}
+                    valueFormatter={(v) => formatPHP(v)}
                   />
                 </div>
                 <div className="rounded-xl border border-slate-100 dark:border-slate-700 bg-white dark:bg-slate-900 p-5 shadow-sm">
@@ -568,7 +566,7 @@ export default function ImpactDashboard() {
                     data={cumulativeDonations}
                     stroke="#0f172a"
                     fill="#0f172a"
-                    valueFormatter={(v) => formatUSD(v)}
+                    valueFormatter={(v) => formatPHP(v)}
                   />
                 </div>
               </section>
