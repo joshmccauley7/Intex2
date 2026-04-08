@@ -1,6 +1,6 @@
 import { Link, NavLink, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
-import { LogOut, Globe } from 'lucide-react';
+import { LogOut, Globe, Menu, X } from 'lucide-react';
 import navLogoImg from '../../images/background.jpg';
 import ThemeToggle from '../theme/ThemeToggle';
 import { useAuth } from '../../context/AuthContext';
@@ -10,6 +10,7 @@ export default function SiteNav() {
   const { session, isAdmin, isDonor, logout } = useAuth();
   const navigate = useNavigate();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   async function handleLogout() {
     await logout();
@@ -47,8 +48,8 @@ export default function SiteNav() {
         )}
       </div>
 
-      {/* Right side */}
-      <div className="flex items-center gap-2">
+      {/* Right side (desktop) */}
+      <div className="hidden md:flex items-center gap-2">
         <button
           onClick={() => {
             const url = encodeURIComponent(window.location.href);
@@ -90,6 +91,92 @@ export default function SiteNav() {
           </Link>
         )}
       </div>
+
+      {/* Mobile controls */}
+      <div className="md:hidden flex items-center gap-2">
+        <button
+          onClick={() => {
+            const url = encodeURIComponent(window.location.href);
+            window.open(`https://translate.google.com/translate?sl=en&u=${url}`, '_blank');
+          }}
+          title="Translate this page"
+          className="flex items-center text-slate-300 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+        >
+          <Globe size={16} />
+        </button>
+        <ThemeToggle />
+        <button
+          type="button"
+          onClick={() => setMobileMenuOpen((open) => !open)}
+          className="flex items-center text-slate-300 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+          aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+          aria-expanded={mobileMenuOpen}
+          aria-controls="mobile-site-nav-menu"
+        >
+          {mobileMenuOpen ? <X size={18} /> : <Menu size={18} />}
+        </button>
+      </div>
+
+      {/* Mobile menu */}
+      {mobileMenuOpen && (
+        <div
+          id="mobile-site-nav-menu"
+          className="md:hidden absolute left-0 right-0 top-full border-b border-slate-800 bg-[#0f172a] dark:bg-slate-950 px-4 py-4 shadow-xl"
+        >
+          <div className="flex flex-col gap-1 text-sm font-medium">
+            <NavLink to="/" end className={linkClass} onClick={() => setMobileMenuOpen(false)}>Home</NavLink>
+            <NavLink to="/impact" className={linkClass} onClick={() => setMobileMenuOpen(false)}>Impact</NavLink>
+            <NavLink to="/donate" className={linkClass} onClick={() => setMobileMenuOpen(false)}>Donate</NavLink>
+            {session.isAuthenticated && (
+              <NavLink to="/my-donations" className={linkClass} onClick={() => setMobileMenuOpen(false)}>
+                My Donations
+              </NavLink>
+            )}
+            {isAdmin && (
+              <NavLink to="/admin/dashboard" className={linkClass} onClick={() => setMobileMenuOpen(false)}>
+                Admin Tools
+              </NavLink>
+            )}
+          </div>
+
+          <div className="mt-4 pt-3 border-t border-slate-800">
+            {session.isAuthenticated ? (
+              <div className="flex items-center justify-between gap-3">
+                <Link
+                  to="/profile"
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
+                >
+                  {session.userName}
+                  {roleLabel && (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${roleBadgeClass}`}>
+                      {roleLabel}
+                    </span>
+                  )}
+                </Link>
+                <button
+                  onClick={() => {
+                    setMobileMenuOpen(false);
+                    setLogoutConfirmOpen(true);
+                  }}
+                  title="Sign out"
+                  className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+                >
+                  <LogOut size={16} />
+                </button>
+              </div>
+            ) : (
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="inline-flex text-sm font-semibold text-white bg-safira-blue hover:bg-blue-700 px-4 py-2 rounded-lg transition-colors"
+              >
+                Login
+              </Link>
+            )}
+          </div>
+        </div>
+      )}
       <ConfirmDialog
         open={logoutConfirmOpen}
         title="Sign out?"
