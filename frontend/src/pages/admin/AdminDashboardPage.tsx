@@ -324,6 +324,14 @@ function StatCard({
 
 const PAGE_SIZE = 100
 
+const PERIOD_OPTIONS = [
+  { label: 'Last 30 Days',   value: '30d'  },
+  { label: 'Last 3 Months',  value: '3mo'  },
+  { label: 'Last 6 Months',  value: '6mo'  },
+  { label: 'Last 12 Months', value: '12mo' },
+]
+const PERIOD_SECTIONS = ['okr-recent', 'okr-lapsed']
+
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
   const [data, setData] = useState<DashboardData | null>(null)
@@ -338,7 +346,36 @@ export default function AdminDashboardPage() {
   const [modalCharts, setModalCharts] = useState<ChartData[]>([])
   const [modalPage, setModalPage] = useState(1)
   const [modalLoadingMore, setModalLoadingMore] = useState(false)
+  const [modalPeriod, setModalPeriod] = useState('3mo')
   const pendingModal = useRef<string | null>(null)
+
+  async function fetchModalData(section: string, page: number, period: string, append = false) {
+    if (page === 1) setModalLoading(true)
+    else setModalLoadingMore(true)
+    const qs = new URLSearchParams({
+      section,
+      pageSize: String(PAGE_SIZE),
+      page: String(page),
+      ...(PERIOD_SECTIONS.includes(section) ? { period } : {}),
+    })
+    try {
+      const result = await apiFetch(`/api/admin/dashboard/detail?${qs}`)
+      if (pendingModal.current !== section) return
+      if (append) {
+        setModalItems((prev) => [...prev, ...(result.items ?? [])])
+      } else {
+        setModalItems(result.items ?? [])
+        setModalTotal(result.totalCount ?? 0)
+        setModalKpis(result.kpis ?? [])
+        setModalCharts(result.charts ?? [])
+      }
+    } catch {
+      if (!append) setModalItems([])
+    } finally {
+      if (page === 1 && pendingModal.current === section) setModalLoading(false)
+      else setModalLoadingMore(false)
+    }
+  }
 
   const DONOR_SECTIONS    = ['donors', 'churn-high', 'churn-medium', 'churn-low', 'okr-recent', 'okr-lapsed', 'donations']
   const RESIDENT_SECTIONS = ['residents', 'risk-high', 'risk-medium', 'risk-low', 'health', 'education', 'counseling', 'conferences']
@@ -372,6 +409,7 @@ export default function AdminDashboardPage() {
   }, [])
 
   async function openModal(section: string) {
+    const period = PERIOD_SECTIONS.includes(section) ? modalPeriod : '3mo'
     pendingModal.current = section
     setActiveModal(section)
     setModalItems([])
@@ -379,39 +417,25 @@ export default function AdminDashboardPage() {
     setModalKpis([])
     setModalCharts([])
     setModalPage(1)
-    setModalLoading(true)
-    try {
-      const result = await apiFetch(
-        `/api/admin/dashboard/detail?section=${encodeURIComponent(section)}&pageSize=${PAGE_SIZE}&page=1`
-      )
-      if (pendingModal.current !== section) return
-      setModalItems(result.items ?? [])
-      setModalTotal(result.totalCount ?? 0)
-      setModalKpis(result.kpis ?? [])
-      setModalCharts(result.charts ?? [])
-    } catch {
-      setModalItems([])
-    } finally {
-      if (pendingModal.current === section) setModalLoading(false)
-    }
+    await fetchModalData(section, 1, period)
   }
 
   async function loadMoreModal() {
     if (!activeModal || modalLoadingMore) return
     const nextPage = modalPage + 1
     setModalPage(nextPage)
-    setModalLoadingMore(true)
-    try {
-      const result = await apiFetch(
-        `/api/admin/dashboard/detail?section=${encodeURIComponent(activeModal)}&pageSize=${PAGE_SIZE}&page=${nextPage}`
-      )
-      if (pendingModal.current !== activeModal) return
-      setModalItems((prev) => [...prev, ...(result.items ?? [])])
-    } catch {
-      // silent
-    } finally {
-      setModalLoadingMore(false)
-    }
+    await fetchModalData(activeModal, nextPage, modalPeriod, true)
+  }
+
+  async function handlePeriodChange(newPeriod: string) {
+    if (!activeModal) return
+    setModalPeriod(newPeriod)
+    setModalItems([])
+    setModalTotal(0)
+    setModalKpis([])
+    setModalCharts([])
+    setModalPage(1)
+    await fetchModalData(activeModal, 1, newPeriod)
   }
 
   function closeModal() {
@@ -420,6 +444,7 @@ export default function AdminDashboardPage() {
     setModalItems([])
     setModalKpis([])
     setModalCharts([])
+    setModalPeriod('3mo')
   }
 
   if (loading) return <p className="text-slate-400 text-sm">Loading dashboard…</p>
@@ -814,6 +839,9 @@ export default function AdminDashboardPage() {
           loadingMore={modalLoadingMore}
           onRowClick={(row) => handleRowClick(activeModal, row)}
           isRowClickable={(row) => resolveRowClickable(activeModal, row)}
+          periodOptions={PERIOD_SECTIONS.includes(activeModal) ? PERIOD_OPTIONS : undefined}
+          period={modalPeriod}
+          onPeriodChange={handlePeriodChange}
         />
       )}
     </div>

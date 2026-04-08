@@ -20,12 +20,27 @@ public class AdminDashboardController : ControllerBase
     public async Task<IActionResult> GetDetail(
         [FromQuery] string section,
         [FromQuery] int page = 1,
-        [FromQuery] int pageSize = 100)
+        [FromQuery] int pageSize = 100,
+        [FromQuery] string period = "3mo")
     {
         if (pageSize < 1) pageSize = 1;
         if (pageSize > 500) pageSize = 500;
         if (page < 1) page = 1;
         int skip = (page - 1) * pageSize;
+
+        // Resolve the period window (used by OKR sections; ignored by others)
+        var periodDays = period switch {
+            "30d"  => 30,
+            "6mo"  => 180,
+            "12mo" => 365,
+            _      => 90,   // default "3mo"
+        };
+        var periodLabel = period switch {
+            "30d"  => "30 Days",
+            "6mo"  => "6 Months",
+            "12mo" => "12 Months",
+            _      => "3 Months",
+        };
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
         var thirtyDaysAgo  = today.AddDays(-30);
@@ -179,10 +194,16 @@ public class AdminDashboardController : ControllerBase
                     .Select(p => (double)p.ChurnProbability * 100)
                     .ToListAsync();
 
+                // Blue→indigo gradient: clearly distinct from red/amber/green risk-tier colors
+                var probColors = new[] {
+                    "#bfdbfe", "#93c5fd", "#60a5fa", "#3b82f6", "#2563eb",
+                    "#1d4ed8", "#4338ca", "#6d28d9", "#7c3aed", "#5b21b6"
+                };
                 var probSeries = Enumerable.Range(0, 10)
                     .Select(i => new {
                         name  = $"{i * 10}–{i * 10 + 9}%",
-                        value = probData.Count(p => p >= i * 10 && p < (i + 1) * 10)
+                        value = probData.Count(p => p >= i * 10 && p < (i + 1) * 10),
+                        color = probColors[i],
                     })
                     .Where(b => b.value > 0)
                     .ToArray();
@@ -212,10 +233,11 @@ public class AdminDashboardController : ControllerBase
                     new { label = "Inactive 60+ Days",            value = inactive60d.ToString("N0") },
                     new { label = "12-Month Revenue at Risk",     value = atRiskRevenue.HasValue ? $"₱{atRiskRevenue.Value:N0}" : "—" },
                 };
+                // Neither marked primary → both render side-by-side in grid
                 var charts = new object[]
                 {
-                    new { id = "prob-distrib", type = "bar",        title = "Churn Probability Distribution", series = probSeries,        primary = true },
-                    new { id = "risk-distrib", type = "stackedBar", title = "All Risk Tiers",                  series = riskDistribSeries, compact = true },
+                    new { id = "prob-distrib", type = "verticalBar", title = "Churn Probability Distribution", series = probSeries,        valueSuffix = "", showValueLabels = true },
+                    new { id = "risk-distrib", type = "stackedBar",  title = "All Risk Tiers",                  series = riskDistribSeries },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -302,17 +324,30 @@ public class AdminDashboardController : ControllerBase
                     })
                     .ToListAsync();
 
-                // Available capacity series — sorted ascending (0 spots = most urgent first)
+                // Normalize "Lighthouse" → "Safira" in displayed names
+                static string NormalizeName(string? raw) =>
+                    (raw ?? "Unknown").Replace("Lighthouse", "Safira", StringComparison.OrdinalIgnoreCase);
+
+                // Available capacity list — sorted ascending (0 spots = most urgent first)
                 var availabilitySeries = allItems
                     .Select(s => {
                         var empty = Math.Max(0, s.Capacity - s.Residents);
                         var color = empty == 0 ? "#dc2626" : empty <= 2 ? "#d97706" : "#16a34a";
-                        return new { name = s.Name ?? "Unknown", value = empty, color };
+                        return new { name = NormalizeName(s.Name), value = empty, color };
                     })
                     .OrderBy(x => x.value)
                     .ToArray();
 
-                var items = allItems.Skip(skip).Take(pageSize).ToList();
+                var items = allItems.Skip(skip).Take(pageSize)
+                    .Select(s => new {
+                        Name         = NormalizeName(s.Name),
+                        City         = s.City,
+                        Region       = s.Region,
+                        Residents    = s.Residents,
+                        Capacity     = s.Capacity,
+                        OccupancyPct = s.OccupancyPct,
+                    })
+                    .ToList();
 
                 var kpis = new object[]
                 {
@@ -324,7 +359,7 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "availability", type = "verticalBar", title = "Available Capacity by Safe House", series = availabilitySeries, primary = true, showValueLabels = true },
+                    new { id = "availability", type = "list", title = "Available Spots by Safe House", series = availabilitySeries, primary = true },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -472,8 +507,9 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "avg-scores",   type = "verticalBar", title = "Avg Health Scores (0–5, threshold 3.0)", series = avgScoresSeries,   valueSuffix = "/5", yDomain = new[] { 0, 5 }, threshold = 3.0, primary = true, showValueLabels = true },
-                    new { id = "by-safehouse", type = "verticalBar", title = "Avg Health by Safe House",                series = healthBySafehouse, valueSuffix = "/5", yDomain = new[] { 2, 5 }, threshold = 3.0, compact = true, sort = "asc" },
+                    // No primary=true → both render side-by-side
+                    new { id = "avg-scores",   type = "statList",    title = "Avg Health Scores",       series = avgScoresSeries,   valueSuffix = "/5" },
+                    new { id = "by-safehouse", type = "verticalBar", title = "Avg Health by Safe House", series = healthBySafehouse, valueSuffix = "/5", yDomain = new[] { 2, 5 }, threshold = 3.0, sort = "asc" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -599,8 +635,9 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "by-type", type = "bar",        title = "Sessions by Type",             series = byTypeSeries,   primary = true, sort = "desc" },
-                    new { id = "by-risk", type = "stackedBar", title = "Sessions by Resident Risk Tier",series = sessionsByRisk, compact = true },
+                    // No primary=true → side-by-side
+                    new { id = "by-type", type = "statList",   title = "Sessions by Type",              series = byTypeSeries  },
+                    new { id = "by-risk", type = "stackedBar", title = "Sessions by Resident Risk Tier", series = sessionsByRisk },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -657,8 +694,9 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "by-safehouse", type = "verticalBar", title = $"{level} Risk by Safe House", series = bySafehouse,       primary = true, sort = "desc", showValueLabels = true },
-                    new { id = "risk-distrib", type = "stackedBar",  title = "All Risk Levels",              series = riskDistribSeries, compact = true },
+                    // No primary → side-by-side grid
+                    new { id = "by-safehouse", type = "statList",   title = $"{level} Risk by Safe House", series = bySafehouse       },
+                    new { id = "risk-distrib", type = "stackedBar", title = "All Risk Levels",              series = riskDistribSeries },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -666,8 +704,9 @@ public class AdminDashboardController : ControllerBase
             // ── OKR sections ──────────────────────────────────────────────────
             case "okr-recent":
             {
+                var periodStart   = today.AddDays(-periodDays);
                 var activeDonors  = await _db.Supporters.CountAsync(s => s.Status == "Active");
-                var total         = await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= threeMonthsAgo));
+                var total         = await _db.Supporters.CountAsync(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= periodStart));
                 var lapsed        = activeDonors - total;
                 var pct           = activeDonors > 0 ? Math.Round(100.0 * total / activeDonors, 1) : 0.0;
                 var repeatIn12mo  = await _db.Supporters
@@ -677,33 +716,23 @@ public class AdminDashboardController : ControllerBase
                 // Retention split donut
                 var retentionSeries = new object[]
                 {
-                    new { name = "Retained (3mo)", value = total,  color = "#16a34a" },
-                    new { name = "Lapsed",          value = lapsed, color = "#dc2626" },
+                    new { name = $"Retained ({periodLabel})", value = total,  color = "#16a34a" },
+                    new { name = "Lapsed",                     value = lapsed, color = "#dc2626" },
                 };
 
-                // Active donors by country (top 8 by count)
-                var countrySeries = await _db.Supporters
-                    .Where(s => s.Status == "Active" && s.Country != null
-                             && s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
-                    .GroupBy(s => s.Country)
-                    .Select(g => new { name = g.Key!, value = g.Count() })
-                    .OrderByDescending(x => x.value)
-                    .Take(8)
-                    .ToListAsync();
-
-                // Gift frequency buckets (12mo) for retained donors
-                var giftCounts12mo = await _db.Supporters
-                    .Where(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
-                    .Select(s => s.Donations.Count(d => d.DonationDate >= twelveMonthsAgo))
+                // Gift frequency within selected period for retained donors
+                var giftCountsPeriod = await _db.Supporters
+                    .Where(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= periodStart))
+                    .Select(s => s.Donations.Count(d => d.DonationDate >= periodStart))
                     .ToListAsync();
                 var frequencySeries = new object[]
                 {
-                    new { name = "1 gift",    value = giftCounts12mo.Count(c => c == 1) },
-                    new { name = "2–3 gifts", value = giftCounts12mo.Count(c => c >= 2 && c <= 3) },
-                    new { name = "4+ gifts",  value = giftCounts12mo.Count(c => c >= 4) },
+                    new { name = "1 gift",    value = giftCountsPeriod.Count(c => c == 1) },
+                    new { name = "2–3 gifts", value = giftCountsPeriod.Count(c => c >= 2 && c <= 3) },
+                    new { name = "4+ gifts",  value = giftCountsPeriod.Count(c => c >= 4) },
                 };
 
-                // Monthly donor activity trend (last 12 months) for line chart
+                // Monthly donor activity trend (always 12 months for historical context)
                 var rawDonations12mo = await _db.Donations
                     .Where(d => d.DonationDate >= twelveMonthsAgo)
                     .Select(d => new { d.SupporterId, d.DonationDate.Year, d.DonationDate.Month })
@@ -717,11 +746,11 @@ public class AdminDashboardController : ControllerBase
                     return (object)new { name = new DateTime(monthDate.Year, monthDate.Month, 1).ToString("MMM ''yy"), value = count };
                 }).ToArray();
 
-                // Action list: retained donors sorted by 12-mo value desc (protect highest value)
+                // Action list: retained within period, sorted by period value desc
                 var items = await _db.Supporters
-                    .Where(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
+                    .Where(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= periodStart))
                     .OrderByDescending(s => s.Donations
-                        .Where(d => d.DonationDate >= twelveMonthsAgo && d.Amount != null)
+                        .Where(d => d.DonationDate >= periodStart && d.Amount != null)
                         .Sum(d => (decimal?)d.Amount) ?? 0m)
                     .Skip(skip).Take(pageSize)
                     .Select(s => new {
@@ -729,14 +758,11 @@ public class AdminDashboardController : ControllerBase
                         DisplayName      = s.DisplayName,
                         Country          = s.Country,
                         LastDonation     = s.Donations.Max(d => (DateOnly?)d.DonationDate),
-                        GiftCount12mo    = s.Donations.Count(d => d.DonationDate >= twelveMonthsAgo),
+                        GiftCount12mo    = s.Donations.Count(d => d.DonationDate >= periodStart),
                         TotalDonated12mo = s.Donations
-                            .Where(d => d.DonationDate >= twelveMonthsAgo && d.Amount != null)
+                            .Where(d => d.DonationDate >= periodStart && d.Amount != null)
                             .Sum(d => (decimal?)d.Amount) ?? 0m,
                         StatusLabel      = "Active",
-                        PriorityScore    = s.Donations
-                            .Where(d => d.DonationDate >= twelveMonthsAgo && d.Amount != null)
-                            .Sum(d => (decimal?)d.Amount) ?? 0m,
                     })
                     .ToListAsync();
 
@@ -749,24 +775,25 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "trend",       type = "line",  title = "Active Donors per Month (12mo)", series = trendSeries,       primary = true },
-                    new { id = "retention",   type = "donut", title = "Retention Split",                series = retentionSeries,   compact = true },
-                    new { id = "frequency",   type = "bar",   title = "Gift Frequency (12mo)",          series = frequencySeries,   compact = true },
+                    new { id = "trend",     type = "line",  title = "Active Donors per Month (12mo)", series = trendSeries,     primary = true },
+                    new { id = "retention", type = "donut", title = "Retention Split",                 series = retentionSeries, compact = true },
+                    new { id = "frequency", type = "bar",   title = $"Gift Frequency ({periodLabel})", series = frequencySeries, compact = true },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
 
             case "okr-lapsed":
             {
+                var periodStart  = today.AddDays(-periodDays);
                 var activeDonors = await _db.Supporters.CountAsync(s => s.Status == "Active");
                 var total        = await _db.Supporters
-                    .CountAsync(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= threeMonthsAgo));
+                    .CountAsync(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= periodStart));
                 var pct          = activeDonors > 0 ? Math.Round(100.0 * total / activeDonors, 1) : 0.0;
                 var retained     = activeDonors - total;
 
-                // At-risk revenue: what lapsed donors gave in last 12mo
+                // At-risk revenue: what lapsed donors gave in the selected period
                 var lapsedIds = await _db.Supporters
-                    .Where(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
+                    .Where(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= periodStart))
                     .Select(s => s.SupporterId)
                     .ToListAsync();
                 var atRiskRevenue = lapsedIds.Count > 0
@@ -779,14 +806,14 @@ public class AdminDashboardController : ControllerBase
                 // Active vs Lapsed donut
                 var retentionSeries = new object[]
                 {
-                    new { name = "Active (3mo)", value = retained, color = "#16a34a" },
-                    new { name = "Lapsed",        value = total,    color = "#dc2626" },
+                    new { name = $"Active ({periodLabel})", value = retained, color = "#16a34a" },
+                    new { name = "Lapsed",                   value = total,    color = "#dc2626" },
                 };
 
                 // Lapsed donors by country
                 var countrySeries = await _db.Supporters
                     .Where(s => s.Status == "Active" && s.Country != null
-                             && !s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
+                             && !s.Donations.Any(d => d.DonationDate >= periodStart))
                     .GroupBy(s => s.Country)
                     .Select(g => new { name = g.Key!, value = g.Count() })
                     .OrderByDescending(x => x.value)
@@ -795,7 +822,7 @@ public class AdminDashboardController : ControllerBase
 
                 // Action list: sorted by 12-mo value desc (highest revenue at risk first)
                 var items = await _db.Supporters
-                    .Where(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= threeMonthsAgo))
+                    .Where(s => s.Status == "Active" && !s.Donations.Any(d => d.DonationDate >= periodStart))
                     .OrderByDescending(s => s.Donations
                         .Where(d => d.DonationDate >= twelveMonthsAgo && d.Amount != null)
                         .Sum(d => (decimal?)d.Amount) ?? 0m)
@@ -810,9 +837,6 @@ public class AdminDashboardController : ControllerBase
                             .Where(d => d.DonationDate >= twelveMonthsAgo && d.Amount != null)
                             .Sum(d => (decimal?)d.Amount) ?? 0m,
                         StatusLabel      = "Lapsed",
-                        PriorityScore    = s.Donations
-                            .Where(d => d.DonationDate >= twelveMonthsAgo && d.Amount != null)
-                            .Sum(d => (decimal?)d.Amount) ?? 0m,
                     })
                     .ToListAsync();
 
@@ -838,9 +862,9 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "trend",      type = "line",  title = "Last Donation Activity — Lapsed Donors (12mo)", series = lapsedTrendSeries, primary = true },
-                    new { id = "retention",  type = "donut", title = "Active vs Lapsed",                               series = retentionSeries,   compact = true },
-                    new { id = "by-country", type = "bar",   title = "Lapsed Donors by Country",                      series = countrySeries,     compact = true },
+                    new { id = "trend",      type = "line",  title = $"Lapsed Donor Activity (12mo)",     series = lapsedTrendSeries, primary = true },
+                    new { id = "retention",  type = "donut", title = $"Active vs Lapsed ({periodLabel})", series = retentionSeries,   compact = true },
+                    new { id = "by-country", type = "bar",   title = "Lapsed Donors by Country",          series = countrySeries,     compact = true },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }

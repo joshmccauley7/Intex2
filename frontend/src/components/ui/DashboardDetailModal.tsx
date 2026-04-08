@@ -25,8 +25,8 @@ export interface ChartSeriesItem {
 
 export interface ChartData {
   id: string
-  /** 'pie' | 'donut' | 'bar' | 'line' | 'stackedBar' | 'verticalBar' */
-  type: 'pie' | 'donut' | 'bar' | 'line' | 'stackedBar' | 'verticalBar'
+  /** 'pie' | 'donut' | 'bar' | 'line' | 'stackedBar' | 'verticalBar' | 'list' | 'statList' */
+  type: 'pie' | 'donut' | 'bar' | 'line' | 'stackedBar' | 'verticalBar' | 'list' | 'statList'
   title: string
   series: ChartSeriesItem[]
   valuePrefix?: string
@@ -282,6 +282,79 @@ function StackedBarPanel({ chart }: { chart: ChartData }) {
   )
 }
 
+function ListPanel({ chart }: { chart: ChartData }) {
+  return (
+    <div className="flex flex-col gap-1.5">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 shrink-0">
+        {chart.title}
+      </p>
+      {chart.series.map((item, i) => {
+        const color = item.color ?? PALETTE[i % PALETTE.length]
+        const isFull = item.value === 0
+        return (
+          <div
+            key={i}
+            className="flex items-center justify-between px-4 py-2.5 rounded-lg bg-slate-50 border border-slate-100"
+            style={{ borderLeftWidth: 3, borderLeftColor: color }}
+          >
+            <span className="text-sm text-slate-700 font-medium">{item.name}</span>
+            {isFull ? (
+              <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-700">
+                FULL
+              </span>
+            ) : (
+              <div className="flex items-baseline gap-1">
+                <span className="text-xl font-bold tabular-nums" style={{ color }}>
+                  {item.value}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {chart.valueSuffix ?? 'spots open'}
+                </span>
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/** Compact stat list — stacks vertically so sort order is always visually obvious */
+function StatListPanel({ chart }: { chart: ChartData }) {
+  const fmt = (v: number) => {
+    const prefix = chart.valuePrefix ?? ''
+    const suffix = chart.valueSuffix ?? ''
+    const num = Number.isInteger(v)
+      ? v.toLocaleString()
+      : v.toLocaleString(undefined, { maximumFractionDigits: 2 })
+    return `${prefix}${num}${suffix}`
+  }
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
+        {chart.title}
+      </p>
+      <div className="flex flex-col gap-1.5">
+        {chart.series.map((item, i) => {
+          const color = item.color ?? PALETTE[i % PALETTE.length]
+          return (
+            <div
+              key={i}
+              className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm"
+            >
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
+                <span className="text-xs text-slate-500 truncate">{item.name}</span>
+              </div>
+              <span className="text-sm font-bold text-slate-800 tabular-nums shrink-0">{fmt(item.value)}</span>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function VerticalBarPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }) {
   const h = resolveHeight(chart, isPrimary)
 
@@ -367,6 +440,8 @@ function ChartPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean
   if (chart.type === 'verticalBar') return <VerticalBarPanel chart={chart} isPrimary={isPrimary} />
   if (chart.type === 'line')        return <LinePanel        chart={chart} isPrimary={isPrimary} />
   if (chart.type === 'stackedBar')  return <StackedBarPanel  chart={chart} />
+  if (chart.type === 'list')        return <ListPanel        chart={chart} />
+  if (chart.type === 'statList')    return <StatListPanel    chart={chart} />
   return null
 }
 
@@ -388,6 +463,9 @@ export interface DashboardDetailModalProps {
   onRowClick?: (row: Record<string, unknown>) => void
   /** Per-row guard — if provided, only rows returning true show pointer + click */
   isRowClickable?: (row: Record<string, unknown>) => boolean
+  periodOptions?: { label: string; value: string }[]
+  period?: string
+  onPeriodChange?: (value: string) => void
 }
 
 export function DashboardDetailModal({
@@ -405,6 +483,9 @@ export function DashboardDetailModal({
   loadingMore,
   onRowClick,
   isRowClickable,
+  periodOptions,
+  period,
+  onPeriodChange,
 }: DashboardDetailModalProps) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
@@ -460,12 +541,26 @@ export function DashboardDetailModal({
       >
         {/* ── Header ── */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 shrink-0">
-          <div>
-            <h2 className="text-lg font-bold text-[#0f172a]">{title}</h2>
-            {!loading && (
-              <p className="text-xs text-slate-400 mt-0.5">
-                {totalCount.toLocaleString()} total record{totalCount === 1 ? '' : 's'}
-              </p>
+          <div className="flex items-center gap-4">
+            <div>
+              <h2 className="text-lg font-bold text-[#0f172a]">{title}</h2>
+              {!loading && (
+                <p className="text-xs text-slate-400 mt-0.5">
+                  {totalCount.toLocaleString()} total record{totalCount === 1 ? '' : 's'}
+                </p>
+              )}
+            </div>
+            {periodOptions && periodOptions.length > 0 && (
+              <select
+                value={period}
+                onChange={(e) => onPeriodChange?.(e.target.value)}
+                disabled={loading}
+                className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-safira-blue/30 cursor-pointer disabled:opacity-50"
+              >
+                {periodOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>{opt.label}</option>
+                ))}
+              </select>
             )}
           </div>
           <div className="flex items-center gap-2">
