@@ -81,6 +81,8 @@ const COOPERATION_BADGE: Record<string, string> = {
   Uncooperative: 'bg-red-100 text-red-700',
 }
 
+const SOCIAL_WORKERS = Array.from({ length: 20 }, (_, i) => `SW-${String(i + 1).padStart(2, '0')}`)
+
 const PAGE_SIZE = 10
 
 const blankVisit = (): Partial<HomeVisitation> => ({
@@ -174,17 +176,22 @@ export default function HomeVisitationsPage() {
 
   const handleSaveVisit = async () => {
     if (!selectedResidentId) return
-    if (editVisit) {
-      await apiFetch(`/api/home-visitations/${editVisit.visitationId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(visitForm),
-      })
-    } else {
-      await apiFetch(`/api/residents/${selectedResidentId}/home-visitations`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(visitForm),
-      })
+    try {
+      const payload = { ...visitForm, visitDate: visitForm.visitDate || null }
+      if (editVisit) {
+        await apiFetch(`/api/home-visitations/${editVisit.visitationId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+      } else {
+        await apiFetch(`/api/residents/${selectedResidentId}/home-visitations`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+      }
+      setShowVisitForm(false)
+      fetchVisits(selectedResidentId)
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to save visitation.')
     }
-    setShowVisitForm(false)
-    fetchVisits(selectedResidentId)
   }
 
   const handleDeleteVisit = async (id: number) => {
@@ -199,17 +206,26 @@ export default function HomeVisitationsPage() {
 
   const handleSaveConf = async () => {
     if (!selectedResidentId) return
-    if (editConf) {
-      await apiFetch(`/api/case-conferences/${editConf.conferenceId}`, {
-        method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(confForm),
-      })
-    } else {
-      await apiFetch(`/api/residents/${selectedResidentId}/case-conferences`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(confForm),
-      })
+    try {
+      const payload = {
+        ...confForm,
+        conferenceDate: confForm.conferenceDate || null,
+        nextConferenceDate: confForm.nextConferenceDate || null,
+      }
+      if (editConf) {
+        await apiFetch(`/api/case-conferences/${editConf.conferenceId}`, {
+          method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+      } else {
+        await apiFetch(`/api/residents/${selectedResidentId}/case-conferences`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload),
+        })
+      }
+      setShowConfForm(false)
+      fetchConferences(selectedResidentId)
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to save conference.')
     }
-    setShowConfForm(false)
-    fetchConferences(selectedResidentId)
   }
 
   const handleDeleteConf = async (id: number) => {
@@ -254,7 +270,7 @@ export default function HomeVisitationsPage() {
                 onClick={() => handleSelectResident(r.residentId)}
                 className={`text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                   selectedResidentId === r.residentId
-                    ? 'bg-navy-DEFAULT text-white'
+                    ? 'bg-navy text-white'
                     : 'hover:bg-slate-100 text-slate-700'
                 }`}
               >
@@ -439,7 +455,10 @@ export default function HomeVisitationsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Social Worker</label>
-                  <input type="text" value={visitForm.socialWorker ?? ''} onChange={(e) => setVisitForm({ ...visitForm, socialWorker: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-safira-blue" />
+                  <select value={visitForm.socialWorker ?? ''} onChange={(e) => setVisitForm({ ...visitForm, socialWorker: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-safira-blue">
+                    <option value="">Select…</option>
+                    {SOCIAL_WORKERS.map((sw) => <option key={sw} value={sw}>{sw}</option>)}
+                  </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -512,7 +531,10 @@ export default function HomeVisitationsPage() {
                 </div>
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Social Worker</label>
-                  <input type="text" value={confForm.socialWorker ?? ''} onChange={(e) => setConfForm({ ...confForm, socialWorker: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-safira-blue" />
+                  <select value={confForm.socialWorker ?? ''} onChange={(e) => setConfForm({ ...confForm, socialWorker: e.target.value })} className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-safira-blue">
+                    <option value="">Select…</option>
+                    {SOCIAL_WORKERS.map((sw) => <option key={sw} value={sw}>{sw}</option>)}
+                  </select>
                 </div>
               </div>
               <div>

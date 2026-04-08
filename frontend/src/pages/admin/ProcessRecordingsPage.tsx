@@ -27,6 +27,8 @@ interface ProcessRecording {
   createdAt: string
 }
 
+const SOCIAL_WORKERS = Array.from({ length: 20 }, (_, i) => `SW-${String(i + 1).padStart(2, '0')}`)
+
 const PAGE_SIZE = 10
 
 const SESSION_TYPE_BADGE: Record<string, string> = {
@@ -110,7 +112,7 @@ export default function ProcessRecordingsPage() {
                 onClick={() => handleSelectResident(r.residentId)}
                 className={`w-full text-left px-3 py-2 rounded-lg text-sm transition-colors ${
                   selectedResidentId === r.residentId
-                    ? 'bg-safira-blue text-white'
+                    ? 'bg-navy text-white'
                     : 'text-slate-700 hover:bg-slate-100'
                 }`}
               >
@@ -146,7 +148,7 @@ export default function ProcessRecordingsPage() {
               </div>
               <button
                 onClick={() => { setEditRecording(null); setShowForm(true) }}
-                className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+                className="flex items-center gap-2 bg-navy hover:bg-navy-light text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
               >
                 <Plus size={16} />
                 Add Recording
@@ -415,7 +417,10 @@ function RecordingFormModal({ residentId, existing, onClose, onSaved }: Recordin
 
         <div className="grid grid-cols-2 gap-3">
           <FormField label="Social Worker">
-            <input className={inputClass} value={form.socialWorker} onChange={(e) => setForm({ ...form, socialWorker: e.target.value })} />
+            <select className={inputClass} value={form.socialWorker} onChange={(e) => setForm({ ...form, socialWorker: e.target.value })}>
+              <option value="">Select…</option>
+              {SOCIAL_WORKERS.map((sw) => <option key={sw} value={sw}>{sw}</option>)}
+            </select>
           </FormField>
           <FormField label="Duration (minutes)">
             <input className={inputClass} type="number" value={form.sessionDurationMinutes} onChange={(e) => setForm({ ...form, sessionDurationMinutes: e.target.value })} placeholder="e.g. 60" />
