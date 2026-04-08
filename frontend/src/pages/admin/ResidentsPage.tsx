@@ -699,7 +699,7 @@ function GoalChart({
         </div>
         {(() => {
           const enriched = data.map((d, i) => {
-            const entry: Record<string, number | null> & { date: string; value: number } = { date: d.date, value: d.value }
+            const entry: { date: string; value: number; [key: string]: string | number | null } = { date: d.date, value: d.value }
             data.forEach((_, j) => {
               if (j === 0) return
               entry[`seg_${j}`] = (i === j - 1 || i === j) ? d.value : null
@@ -1035,7 +1035,7 @@ function GoalBar({ current, target, max }: { current: number; target: number; ma
   )
 }
 
-function ProgressSnapshot({ resident, lifecycle }: { resident: ResidentDetail; lifecycle: LifecycleData }) {
+function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: ResidentDetail; lifecycle: LifecycleData }) {
   const [openChart, setOpenChart] = useState<string | null>(null)
 
   const latestHealth    = lifecycle.health.at(-1) ?? null
