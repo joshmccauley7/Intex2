@@ -99,8 +99,9 @@ export default function DonorsPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const [typeFilter, setTypeFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [filterInputValue, setFilterInputValue] = useState('')
+  const [filterField, setFilterField] = useState('type')
+  const [activeFilters, setActiveFilters] = useState<{ field: string; label: string; value: string }[]>([])
   const [currentPage, setCurrentPage] = useState(1)
 
   const [selectedSupporter, setSelectedSupporter] = useState<SupporterDetail | null>(null)
@@ -166,16 +167,79 @@ export default function DonorsPage() {
   const fetchSupporters = () => {
     setLoading(true)
     setCurrentPage(1)
-    const params = new URLSearchParams()
-    if (typeFilter) params.append('type', typeFilter)
-    if (statusFilter) params.append('status', statusFilter)
-    apiFetch(`/api/supporters?${params.toString()}`)
+    apiFetch('/api/supporters')
       .then(setSupporters)
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { fetchSupporters() }, [typeFilter, statusFilter])
+  useEffect(() => { fetchSupporters() }, [])
+
+  const FILTER_FIELDS = [
+    { value: 'name',      label: 'Name' },
+    { value: 'type',      label: 'Type' },
+    { value: 'status',    label: 'Status' },
+    { value: 'region',    label: 'Region' },
+    { value: 'churnRisk', label: 'Churn Risk' },
+    { value: 'donation',  label: 'Most Recent Donation' },
+  ]
+
+  const DONATION_SUGGESTIONS = [
+    'In the past week',
+    'In the past month',
+    'In the past year',
+    'In the past 5 years',
+  ]
+
+  const addFilter = () => {
+    const trimmed = filterInputValue.trim()
+    if (!trimmed) return
+    const label = FILTER_FIELDS.find((f) => f.value === filterField)?.label ?? filterField
+    setActiveFilters((prev) => [
+      ...prev.filter((f) => f.field !== filterField),
+      { field: filterField, label, value: trimmed },
+    ])
+    setFilterInputValue('')
+    setCurrentPage(1)
+  }
+
+  const removeFilter = (field: string) => {
+    setActiveFilters((prev) => prev.filter((f) => f.field !== field))
+    setCurrentPage(1)
+  }
+
+  const hasDonationFilter = activeFilters.some((f) => f.field === 'donation')
+
+  const filteredSupporters = supporters
+    .filter((s) => activeFilters.every((f) => {
+      switch (f.field) {
+        case 'name':      return s.displayName.toLowerCase().includes(f.value.toLowerCase())
+        case 'type':      return s.supporterType.toLowerCase().includes(f.value.toLowerCase())
+        case 'status':    return s.status.toLowerCase() === f.value.toLowerCase()
+        case 'region':    return (s.region ?? '').toLowerCase().includes(f.value.toLowerCase())
+        case 'churnRisk': return (s.churnRiskLevel ?? '').toLowerCase() === f.value.toLowerCase()
+        case 'donation': {
+          if (!s.mostRecentDonationDate) return false
+          const donationDate = new Date(s.mostRecentDonationDate)
+          const now = new Date()
+          const daysAgo = (days: number) => new Date(now.getTime() - days * 24 * 60 * 60 * 1000)
+          const val = f.value.toLowerCase()
+          if (val === 'in the past week')    return donationDate >= daysAgo(7)
+          if (val === 'in the past month')   return donationDate >= daysAgo(30)
+          if (val === 'in the past year')    return donationDate >= daysAgo(365)
+          if (val === 'in the past 5 years') return donationDate >= daysAgo(5 * 365)
+          // Custom: match against the raw date string (e.g. "2024", "2024-03")
+          return s.mostRecentDonationDate.includes(f.value)
+        }
+        default: return true
+      }
+    }))
+    .sort((a, b) => {
+      if (!hasDonationFilter) return 0
+      const da = a.mostRecentDonationDate ?? ''
+      const db = b.mostRecentDonationDate ?? ''
+      return db.localeCompare(da) // most recent first
+    })
 
   const openDetail = (id: number) => {
     setDetailLoading(true)
@@ -325,37 +389,68 @@ export default function DonorsPage() {
       {activeTab === 'donors' && <>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-6">
-        <select
-          value={typeFilter}
-          onChange={(e) => setTypeFilter(e.target.value)}
-          className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-safira-blue"
-        >
-          <option value="">All Types</option>
-          <option value="MonetaryDonor">Monetary Donor</option>
-          <option value="InKindDonor">In-Kind Donor</option>
-          <option value="Volunteer">Volunteer</option>
-          <option value="SocialMediaAdvocate">Social Media Advocate</option>
-          <option value="SkillsContributor">Skills Contributor</option>
-          <option value="PartnerOrganization">Partner Organization</option>
-        </select>
-        <select
-          value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-safira-blue"
-        >
-          <option value="">All Statuses</option>
-          <option value="Active">Active</option>
-          <option value="Inactive">Inactive</option>
-        </select>
+      <div className="mb-6">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            value={filterInputValue}
+            onChange={(e) => setFilterInputValue(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter') addFilter() }}
+            placeholder={filterField === 'donation' ? 'e.g. In the past month…' : 'Filter value...'}
+            list={filterField === 'donation' ? 'donation-suggestions' : undefined}
+            className="w-48 text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-safira-blue"
+          />
+          {filterField === 'donation' && (
+            <datalist id="donation-suggestions">
+              {DONATION_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
+            </datalist>
+          )}
+          <select
+            value={filterField}
+            onChange={(e) => setFilterField(e.target.value)}
+            className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-safira-blue"
+          >
+            {FILTER_FIELDS.map((f) => (
+              <option key={f.value} value={f.value}>{f.label}</option>
+            ))}
+          </select>
+          <button
+            onClick={addFilter}
+            className="flex items-center gap-1.5 text-sm font-semibold px-4 py-2 rounded-lg border border-slate-200 bg-white text-slate-700 hover:border-safira-blue hover:text-safira-blue transition-colors"
+          >
+            <Plus size={14} />
+            Add filter
+          </button>
+        </div>
+
+        {/* Active filter chips */}
+        {activeFilters.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-3">
+            {activeFilters.map((f) => (
+              <span
+                key={f.field}
+                className="inline-flex items-center gap-1.5 bg-safira-blue/10 text-safira-blue text-xs font-semibold px-3 py-1 rounded-full"
+              >
+                {f.label}: <span className="font-bold">{f.value}</span>
+                <button
+                  onClick={() => removeFilter(f.field)}
+                  className="ml-0.5 hover:text-safira-blue-dark transition-colors leading-none"
+                  aria-label={`Remove ${f.label} filter`}
+                >
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Table */}
       {loading && <p className="text-slate-500 text-sm">Loading...</p>}
       {error && <p className="text-red-500 text-sm">{error}</p>}
       {!loading && !error && (() => {
-        const totalPages = Math.ceil(supporters.length / PAGE_SIZE)
-        const paginated = supporters.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
+        const totalPages = Math.ceil(filteredSupporters.length / PAGE_SIZE)
+        const paginated = filteredSupporters.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
         return (
           <>
             <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -401,13 +496,15 @@ export default function DonorsPage() {
                       </td>
                     </tr>
                   ))}
-                  {supporters.length === 0 && (
-                    <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">No supporters found.</td></tr>
+                  {filteredSupporters.length === 0 && (
+                    <tr><td colSpan={8} className="px-4 py-8 text-center text-slate-400">
+                      {supporters.length === 0 ? 'No supporters found.' : 'No supporters match the current filters.'}
+                    </td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <Pagination current={currentPage} total={totalPages} onChange={setCurrentPage} count={supporters.length} pageSize={PAGE_SIZE} />
+            <Pagination current={currentPage} total={totalPages} onChange={setCurrentPage} count={filteredSupporters.length} pageSize={PAGE_SIZE} />
           </>
         )
       })()}
