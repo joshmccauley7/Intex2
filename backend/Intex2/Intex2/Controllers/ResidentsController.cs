@@ -50,18 +50,23 @@ public class ResidentsController : ControllerBase
 
         var residents = await query
             .OrderBy(r => r.InternalCode)
-            .Select(r => new
+            .GroupJoin(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, safehouses) => new { r, safehouse = safehouses.FirstOrDefault() })
+            .Select(x => new
             {
-                r.ResidentId,
-                r.InternalCode,
-                r.CaseControlNo,
-                r.CaseCategory,
-                r.CaseStatus,
-                r.SafehouseId,
-                r.AssignedSocialWorker,
-                r.PresentAge,
-                r.ReintegrationStatus,
-                r.DateOfAdmission
+                x.r.ResidentId,
+                x.r.InternalCode,
+                x.r.CaseControlNo,
+                x.r.CaseCategory,
+                x.r.CaseStatus,
+                x.r.SafehouseId,
+                SafehouseCity = x.safehouse != null ? x.safehouse.City : null,
+                SafehouseRegion = x.safehouse != null ? x.safehouse.Region : null,
+                x.r.AssignedSocialWorker,
+                x.r.PresentAge,
+                x.r.ReintegrationStatus,
+                x.r.ReintegrationType,
+                x.r.CurrentRiskLevel,
+                x.r.DateOfAdmission
             })
             .ToListAsync();
 
@@ -80,9 +85,13 @@ public class ResidentsController : ControllerBase
                 r.CaseCategory,
                 r.CaseStatus,
                 r.SafehouseId,
+                r.SafehouseCity,
+                r.SafehouseRegion,
                 r.AssignedSocialWorker,
                 r.PresentAge,
                 r.ReintegrationStatus,
+                r.ReintegrationType,
+                r.CurrentRiskLevel,
                 r.DateOfAdmission,
                 statusIndicators = new { health = si.Health, education = si.Education, counseling = si.Counseling, risk = si.Risk },
             };

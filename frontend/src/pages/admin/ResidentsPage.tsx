@@ -11,9 +11,13 @@ interface ResidentRow {
   caseCategory: string | null
   caseStatus: string | null
   safehouseId: number | null
+  safehouseCity: string | null
+  safehouseRegion: string | null
   assignedSocialWorker: string | null
   presentAge: string | null
   reintegrationStatus: string | null
+  reintegrationType: string | null
+  currentRiskLevel: string | null
   dateOfAdmission: string | null
 }
 
@@ -434,12 +438,13 @@ export default function ResidentsPage() {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Internal Code</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Safehouse</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-40">Safehouse</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Social Worker</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Age</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration Type</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration Status</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                   </tr>
                 </thead>
@@ -447,7 +452,6 @@ export default function ResidentsPage() {
                   {paginated.map((r) => (
                     <tr key={r.residentId} onClick={() => openDetail(r.residentId)} className="hover:bg-slate-50 transition-colors cursor-pointer">
                       <td className="px-4 py-3 font-medium text-[#0f172a]">{r.internalCode ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{r.caseCategory ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.caseStatus ?? ''] ?? 'bg-slate-100 text-slate-500'}`}>
                           {r.caseStatus ?? '—'}
@@ -456,7 +460,15 @@ export default function ResidentsPage() {
                       <td className="px-4 py-3 text-slate-600">{safehouseName(r.safehouseId)}</td>
                       <td className="px-4 py-3 text-slate-600">{r.assignedSocialWorker ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{r.presentAge ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{r.reintegrationStatus ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.caseCategory ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.reintegrationType && r.reintegrationType !== 'None' ? r.reintegrationType : '—'}</td>
+                      <td className="px-4 py-3">
+                        {r.reintegrationStatus ? (
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${REINTEGRATION_COLOR[r.reintegrationStatus] ?? 'bg-slate-100 text-slate-500'}`}>
+                            {r.reintegrationStatus}
+                          </span>
+                        ) : '—'}
+                      </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <button onClick={() => openDetail(r.residentId)} className="p-1.5 text-slate-400 hover:text-safira-blue transition-colors" title="View"><Eye size={15} /></button>
