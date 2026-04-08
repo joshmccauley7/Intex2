@@ -28,7 +28,7 @@ export default function SiteNav() {
     : 'bg-emerald-600 text-white';
 
   return (
-    <nav className="bg-white/95 dark:bg-slate-900/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:dark:bg-slate-900/90 text-slate-900 dark:text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-200 dark:border-slate-700/80 shadow-sm">
+    <nav className="bg-white/95 dark:bg-[#13264f]/95 backdrop-blur supports-[backdrop-filter]:bg-white/90 supports-[backdrop-filter]:dark:bg-[#13264f]/90 text-slate-900 dark:text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-200 dark:border-[#2a3d63] shadow-sm">
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2 font-bold text-xl shrink-0">
         <img src={navLogoImg} alt="Safira logo" style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: '4px' }} />

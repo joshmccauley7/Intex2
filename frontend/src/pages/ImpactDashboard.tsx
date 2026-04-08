@@ -470,9 +470,8 @@ export default function ImpactDashboard() {
           <div className="absolute inset-0" style={{ background: 'rgba(10, 20, 40, 0.52)' }} />
           <div className="relative mx-auto max-w-7xl">
             <div
-              className="max-w-3xl rounded-2xl px-8 py-8"
+              className="max-w-3xl rounded-2xl px-8 py-8 bg-white/85 dark:bg-slate-900/85"
               style={{
-                background: 'rgba(255,255,255,0.82)',
                 backdropFilter: 'blur(12px)',
                 WebkitBackdropFilter: 'blur(12px)',
                 boxShadow: '0 8px 40px rgba(0,0,0,0.18)',
@@ -484,7 +483,7 @@ export default function ImpactDashboard() {
               <h1 className="mt-2 text-4xl font-bold text-[#0f172a] dark:text-slate-100 md:text-5xl">
                 Proof That Support Changes Lives
               </h1>
-              <p className="mt-3 max-w-3xl text-slate-600 dark:text-slate-300">
+              <p className="mt-3 max-w-3xl text-slate-700 dark:text-slate-200">
               Every number here reflects real safety, stability, and long-term progress for girls in care.
               We track capacity, service delivery, and outcomes in one transparent view.
               </p>

@@ -18,7 +18,7 @@ export default function AdminLayout() {
     }`
 
   return (
-    <div className="flex flex-col min-h-screen font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+    <div className="admin-shell flex flex-col min-h-screen font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <SiteNav />
       <div className="flex flex-1">
       {/* Desktop sidebar */}
