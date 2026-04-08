@@ -95,15 +95,20 @@ function DonationFormWithGate() {
   const stripe = useStripe();
   const elements = useElements();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   const saved = useMemo(() => loadSavedForm(), []);
 
   const [fullName, setFullName] = useState(saved.fullName ?? '');
   const [email, setEmail] = useState(saved.email ?? '');
   const [phone, setPhone] = useState(saved.phone ?? '');
-  const [amount, setAmount] = useState(saved.amount ?? '50');
+  const [amount, setAmount] = useState(
+    searchParams.get('amount') ?? saved.amount ?? '50',
+  );
   const [message, setMessage] = useState(saved.message ?? '');
-  const [frequency, setFrequency] = useState<'one_time' | 'monthly'>(saved.frequency ?? 'one_time');
+  const [frequency, setFrequency] = useState<'one_time' | 'monthly'>(
+    searchParams.get('recurring') === 'true' ? 'monthly' : (saved.frequency ?? 'one_time'),
+  );
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -328,7 +333,7 @@ function DonationFormWithGate() {
           </div>
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Donation amount (USD)</label>
+          <label className="block text-sm font-medium mb-1">Donation amount (PHP ₱)</label>
           <input
             type="number"
             min="1"
@@ -383,8 +388,8 @@ function DonationFormWithGate() {
           {isSubmitting
             ? 'Processing...'
             : frequency === 'monthly'
-            ? `Start Monthly $${amountValue || 0}`
-            : `Donate $${amountValue || 0}`}
+            ? `Start Monthly ₱${amountValue || 0}`
+            : `Donate ₱${amountValue || 0}`}
         </button>
       </form>
     </div>

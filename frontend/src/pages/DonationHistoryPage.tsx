@@ -1,5 +1,5 @@
 import { Fragment, useEffect, useState } from 'react';
-import { Heart, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
+import { Heart, ChevronDown, ChevronUp, MapPin, RefreshCw } from 'lucide-react';
 import SiteNav from '../components/layout/SiteNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import { apiFetch } from '../api';
@@ -305,6 +305,47 @@ const DONATE_CTA_TITLE = 'Keep making a difference';
 const DONATE_CTA_BLURB =
   'Your support changes lives every day. Consider giving again to help even more girls find safety.';
 
+function avgMonetaryDonation(donations: Donation[]): number | null {
+  const monetary = donations.filter((d) => isMonetary(d.donationType) && (d.amount ?? 0) > 0);
+  if (monetary.length === 0) return null;
+  const sum = monetary.reduce((s, d) => s + (d.amount ?? 0), 0);
+  return Math.round(sum / monetary.length);
+}
+
+function RecurringNudge({ donations, currency }: { donations: Donation[]; currency: string | null }) {
+  const avg = avgMonetaryDonation(donations);
+  const suggested = avg ?? 25;
+  const donateUrl = `/donate?amount=${suggested}&recurring=true`;
+
+  return (
+    <div className="mb-10 rounded-2xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-6 flex flex-col sm:flex-row sm:items-center gap-5">
+      <div className="flex-shrink-0 w-11 h-11 rounded-full bg-safira-blue flex items-center justify-center">
+        <RefreshCw size={20} className="text-white" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="font-bold text-[#0f172a] dark:text-white text-base mb-1">
+          Make your generosity automatic
+        </p>
+        <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+          You've been giving one time at a time — which is amazing. Monthly donors unlock consistent
+          impact: girls receive ongoing care without gaps. Set up a recurring gift of{' '}
+          <span className="font-semibold text-safira-blue">
+            {formatAmount(suggested, currency ?? 'PHP')}/month
+          </span>{' '}
+          and your support never stops.
+        </p>
+      </div>
+      <a
+        href={donateUrl}
+        className="shrink-0 inline-flex items-center gap-2 bg-safira-blue hover:bg-blue-700 text-white font-semibold text-sm px-5 py-2.5 rounded-lg transition-colors whitespace-nowrap"
+      >
+        <RefreshCw size={14} />
+        Switch to Monthly
+      </a>
+    </div>
+  );
+}
+
 export default function DonationHistoryPage() {
   const [data, setData] = useState<MyDonationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
@@ -412,6 +453,70 @@ export default function DonationHistoryPage() {
                       </>
                     )}
                   </div>
+
+                  {/* Recurring pledge nudge — only for non-monthly donors */}
+                  {!isMonthlyDonor && (
+                    <RecurringNudge
+                      donations={data.donations}
+                      currency={summaryBuckets?.monetaryCurrency ?? null}
+                    />
+                  )}
+
+                  {/* Safehouse impact cards */}
+                  {safehouseImpact.length > 0 && (
+                    <div className="mb-10">
+                      <h2 className="text-lg font-bold text-[#0f172a] dark:text-white mb-4">Where Your Donations Went</h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {safehouseImpact.map((s) => (
+                          <div key={s.safehouseId} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
+                            {/* Photo */}
+                            <div className="h-44 overflow-hidden">
+                              <SafehouseCardPhoto safehouseId={s.safehouseId} city={s.city} />
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-4 flex flex-col flex-1">
+                              <div className="flex items-start gap-1 mb-1">
+                                <MapPin size={14} className="text-safira-blue mt-0.5 shrink-0" />
+                                <div>
+                                  <p className="text-sm font-bold text-[#0f172a] dark:text-white leading-tight">{s.city} Safehouse</p>
+                                </div>
+                              </div>
+
+                              {/* Program area pills */}
+                              <div className="mb-3">
+                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Used in the following areas:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {s.programAreas.map((area) => (
+                                    <span key={area} className={`text-xs font-semibold px-2 py-0.5 rounded-full ${areaColor(area)}`}>
+                                      {area}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Contribution totals */}
+                              <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                                {s.monetaryTotal > 0 && (
+                                  <p className="text-sm font-semibold text-safira-blue">
+                                    {formatAmount(s.monetaryTotal, s.currency)} contributed
+                                  </p>
+                                )}
+                                {s.impactLines
+                                  .filter((line) => !isCampaignImpactUnit(line.unit))
+                                  .map((line) => (
+                                    <p key={line.unit} className="text-sm font-semibold text-safira-blue">
+                                      {formatSafehouseImpactValue(line.value)}{' '}
+                                      {line.unit.toLowerCase().includes('item') ? 'items donated' : `${line.unit} devoted`}
+                                    </p>
+                                  ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Donation history — collapsible */}
                   <div className="mb-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
