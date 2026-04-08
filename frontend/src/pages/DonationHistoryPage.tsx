@@ -3,6 +3,28 @@ import { Heart, ChevronDown, ChevronUp, MapPin } from 'lucide-react';
 import SiteNav from '../components/layout/SiteNav';
 import SiteFooter from '../components/layout/SiteFooter';
 import { apiFetch } from '../api';
+import philSh1 from '../images/safehouses/Phil_lighthouse_1.jpg';
+import philSh2 from '../images/safehouses/Phil_lighthouse_2.jpg';
+import philSh3 from '../images/safehouses/Phil_lighthouse_3.jpg';
+import philSh4 from '../images/safehouses/Phil_lighthouse_4.jpg';
+import philSh5 from '../images/safehouses/Phil_lighthouse_5.jpg';
+import philSh6 from '../images/safehouses/Phil_lighthouse_6.jpg';
+import philSh7 from '../images/safehouses/Phil_lighthouse_7.jpg';
+import philSh8 from '../images/safehouses/Phil_lighthouse_8.jpg';
+import philSh9 from '../images/safehouses/Phil_lighthouse_9.jpg';
+
+/** Matches `safehouses.csv` safehouse_id → `Phil_lighthouse_{n}.jpg`. */
+const SAFEHOUSE_CARD_IMAGE_BY_ID: Record<number, string> = {
+  1: philSh1,
+  2: philSh2,
+  3: philSh3,
+  4: philSh4,
+  5: philSh5,
+  6: philSh6,
+  7: philSh7,
+  8: philSh8,
+  9: philSh9,
+};
 
 interface Donation {
   donationId: number;
@@ -48,7 +70,6 @@ interface SafehouseImpact {
   safehouseId: number;
   name: string;
   city: string;
-  region: string;
   programAreas: string[];
   monetaryTotal: number;
   currency: string | null;
@@ -66,10 +87,97 @@ function formatAmount(amount: number | null, currency: string | null) {
   return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(amount);
 }
 
+/** Per–safehouse card: show real hours/items (no round-up); top summary cards still use Math.ceil. */
+function formatSafehouseImpactValue(value: number) {
+  return new Intl.NumberFormat('en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 const MONETARY_TYPES = ['monetary', 'cash', 'financial'];
 
 function isMonetary(donationType: string) {
   return MONETARY_TYPES.includes(donationType.toLowerCase());
+}
+
+/** Social/advocacy rows use e.g. "campaigns" — we do not show those as impact on this page. */
+function isCampaignImpactUnit(unit: string | null | undefined): boolean {
+  return (unit ?? '').toLowerCase().includes('campaign');
+}
+
+/** Avoid substring false positives (e.g. "hr" inside unrelated words) — only hour-like units. */
+function isHourLikeImpactUnit(unit: string | null | undefined): boolean {
+  const u = (unit ?? '').toLowerCase().trim();
+  if (!u) return false;
+  if (u.includes('hour')) return true;
+  return u === 'hr' || u === 'hrs';
+}
+
+function positiveQuantity(n: number | null | undefined): number {
+  if (n == null || typeof n !== 'number' || Number.isNaN(n)) return 0;
+  return n > 0 ? n : 0;
+}
+
+/** Scalar for non-monetary impact (items, hours, …): prefer estimated_value, else amount for Time/Skills only. */
+function nonMonetaryImpactMagnitude(d: Donation): number {
+  const ev = positiveQuantity(d.estimatedValue);
+  if (ev > 0) return ev;
+  const type = (d.donationType ?? '').toLowerCase();
+  if (type === 'time' || type === 'skills') return positiveQuantity(d.amount);
+  return 0;
+}
+
+const AMOUNT_EPS = 0.02;
+
+/** Impact (hours, items, etc.) credited to one allocation row — avoids duplicating the full donation across every safehouse. */
+function impactAmountForAllocation(d: Donation, a: DonationAllocation): number {
+  if (isCampaignImpactUnit(d.impactUnit)) return 0;
+  const mag = nonMonetaryImpactMagnitude(d);
+  if (mag <= 0) return 0;
+  const type = (d.donationType ?? '').toLowerCase();
+  const timeOrSkills = type === 'time' || type === 'skills';
+  const unitOk =
+    (d.impactUnit && !isCampaignImpactUnit(d.impactUnit)) ||
+    (timeOrSkills && (isHourLikeImpactUnit(d.impactUnit) || !(d.impactUnit ?? '').trim()));
+  if (!unitOk) return 0;
+  const rowsWithLocation = d.allocations.filter((x) => x.safehouseId && x.safehouseCity);
+  const n = Math.max(1, rowsWithLocation.length);
+  // Scale amountAllocated proportionally to estimatedValue so safehouse totals match the summary card.
+  const sumAlloc = rowsWithLocation.reduce((s, x) => s + (x.amountAllocated ?? 0), 0);
+  if (sumAlloc > AMOUNT_EPS) {
+    const rowAlloc = a.amountAllocated ?? 0;
+    if (rowAlloc <= AMOUNT_EPS) return mag / n;
+    return rowAlloc * (mag / sumAlloc);
+  }
+  return mag / n;
+}
+
+/**
+ * Per-allocation share of a monetary donation for safehouse cards.
+ * If rows duplicate the full gift (sum of amountAllocated >> donation amount), scale down proportionally.
+ * If amountAllocated is missing, split donation total across location rows.
+ */
+function monetaryAmountForAllocation(d: Donation, a: DonationAllocation): number {
+  if (!isMonetary(d.donationType)) return 0;
+  const total = d.amount ?? 0;
+  if (total <= 0) return 0;
+
+  const rowsWithLocation = d.allocations.filter((x) => x.safehouseId && x.safehouseCity);
+  const n = Math.max(1, rowsWithLocation.length);
+  const sumAlloc = rowsWithLocation.reduce((s, x) => s + (x.amountAllocated ?? 0), 0);
+
+  if (sumAlloc <= AMOUNT_EPS) {
+    return total / n;
+  }
+
+  if (sumAlloc > total + AMOUNT_EPS) {
+    const row = a.amountAllocated ?? 0;
+    if (row <= AMOUNT_EPS) return total / n;
+    return row * (total / sumAlloc);
+  }
+
+  return a.amountAllocated ?? 0;
 }
 
 function buildSafehouseImpact(donations: Donation[]): SafehouseImpact[] {
@@ -83,7 +191,6 @@ function buildSafehouseImpact(donations: Donation[]): SafehouseImpact[] {
           safehouseId: a.safehouseId,
           name: a.safehouseName ?? `Safehouse #${a.safehouseId}`,
           city: a.safehouseCity,
-          region: a.safehouseRegion ?? '',
           programAreas: [],
           monetaryTotal: 0,
           currency: d.currencyCode ?? null,
@@ -95,12 +202,23 @@ function buildSafehouseImpact(donations: Donation[]): SafehouseImpact[] {
       if (!entry.programAreas.includes(area)) entry.programAreas.push(area);
 
       if (isMonetary(d.donationType)) {
-        entry.monetaryTotal += a.amountAllocated ?? 0;
+        entry.monetaryTotal += monetaryAmountForAllocation(d, a);
         if (!entry.currency) entry.currency = d.currencyCode ?? null;
-      } else if (d.impactUnit && d.estimatedValue) {
-        const existing = entry.impactLines.find((l) => l.unit === d.impactUnit);
-        if (existing) existing.value += d.estimatedValue;
-        else entry.impactLines.push({ unit: d.impactUnit, value: d.estimatedValue });
+      } else {
+        const add = impactAmountForAllocation(d, a);
+        if (add <= 0) continue;
+        const type = (d.donationType ?? '').toLowerCase();
+        const raw = (d.impactUnit ?? '').trim();
+        const lineUnit =
+          raw && !isCampaignImpactUnit(raw)
+            ? raw
+            : type === 'time' || type === 'skills'
+              ? 'hours'
+              : null;
+        if (!lineUnit) continue;
+        const existing = entry.impactLines.find((l) => l.unit === lineUnit);
+        if (existing) existing.value += add;
+        else entry.impactLines.push({ unit: lineUnit, value: add });
       }
     }
   }
@@ -108,32 +226,64 @@ function buildSafehouseImpact(donations: Donation[]): SafehouseImpact[] {
   return Array.from(map.values());
 }
 
-function buildDonationTypeSummary(donations: Donation[]) {
-  const map = new Map<string, { donationType: string; totalAmount: number; currency: string | null; totalImpactValue: number; impactUnit: string | null }>();
-  for (const d of donations) {
-    const type = d.donationType ?? 'Other';
-    if (!map.has(type)) map.set(type, { donationType: type, totalAmount: 0, currency: d.currencyCode ?? null, totalImpactValue: 0, impactUnit: d.impactUnit ?? null });
-    const entry = map.get(type)!;
-    if (isMonetary(type)) {
-      entry.totalAmount += d.amount ?? 0;
-      if (!entry.currency) entry.currency = d.currencyCode ?? null;
-    } else {
-      entry.totalImpactValue += d.estimatedValue ?? 0;
-      if (!entry.impactUnit) entry.impactUnit = d.impactUnit ?? null;
-    }
-  }
-  return Array.from(map.values()).sort((a, b) => b.totalAmount - a.totalAmount);
+function isInKindDonationType(type: string) {
+  const t = type.toLowerCase();
+  return t === 'inkind' || t.includes('in-kind') || t === 'in kind';
 }
 
-function CityPhoto({ city, className = '' }: { city: string; className?: string }) {
-  const [src, setSrc] = useState<string>(`https://picsum.photos/seed/${encodeURIComponent(city)}/600/400`);
-  useEffect(() => {
-    fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(city)}`)
-      .then((r) => r.json())
-      .then((data) => { if (data?.thumbnail?.source) setSrc(data.thumbnail.source); })
-      .catch(() => {});
-  }, [city]);
-  return <img src={src} alt={city} className={`w-full h-full object-cover object-center ${className}`} />;
+/**
+ * Hours for the "Time" summary card: explicit Time gifts plus other types that record hours
+ * (e.g. Skills in Lighthouse data), but not monetary / in-kind rows.
+ */
+function contributesTimeHours(d: Donation): boolean {
+  const type = (d.donationType ?? '').toLowerCase();
+  if (isMonetary(d.donationType ?? '') || isInKindDonationType(d.donationType ?? '')) return false;
+  if (isCampaignImpactUnit(d.impactUnit)) return false;
+  if (isHourLikeImpactUnit(d.impactUnit)) return true;
+  if (type === 'time') return true;
+  if (type === 'skills' && nonMonetaryImpactMagnitude(d) > 0) return true;
+  return false;
+}
+
+/** Top summary strip: only Total + Monetary + In-kind + Time (no extra cards per SocialMedia, etc.). */
+function buildDonationSummaryBuckets(donations: Donation[]) {
+  let monetaryTotal = 0;
+  let monetaryCurrency: string | null = null;
+  let inKindItems = 0;
+  let timeHours = 0;
+
+  for (const d of donations) {
+    const type = d.donationType ?? '';
+    if (isMonetary(type)) {
+      monetaryTotal += d.amount ?? 0;
+      if (!monetaryCurrency) monetaryCurrency = d.currencyCode ?? null;
+    } else if (isInKindDonationType(type)) {
+      inKindItems += d.estimatedValue ?? 0;
+    } else if (contributesTimeHours(d)) {
+      timeHours += nonMonetaryImpactMagnitude(d);
+    }
+  }
+
+  return { monetaryTotal, monetaryCurrency, inKindItems, timeHours };
+}
+
+function SafehouseCardPhoto({
+  safehouseId,
+  city,
+  className = '',
+}: {
+  safehouseId: number;
+  city: string;
+  className?: string;
+}) {
+  const src = SAFEHOUSE_CARD_IMAGE_BY_ID[safehouseId] ?? philSh1;
+  return (
+    <img
+      src={src}
+      alt={`${city} safehouse`}
+      className={`w-full h-full object-cover object-center ${className}`}
+    />
+  );
 }
 
 const AREA_COLORS: Record<string, string> = {
@@ -144,11 +294,17 @@ const AREA_COLORS: Record<string, string> = {
   maintenance: 'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300',
   shelter: 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300',
   food: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+  operations: 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900/40 dark:text-indigo-300',
+  transport: 'bg-fuchsia-100 text-fuchsia-800 dark:bg-fuchsia-900/40 dark:text-fuchsia-300',
 };
 
 function areaColor(area: string) {
   return AREA_COLORS[area.toLowerCase()] ?? 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300';
 }
+
+const DONATE_CTA_TITLE = 'Keep making a difference';
+const DONATE_CTA_BLURB =
+  'Your support changes lives every day. Consider giving again to help even more girls find safety.';
 
 export default function DonationHistoryPage() {
   const [data, setData] = useState<MyDonationsResponse | null>(null);
@@ -165,7 +321,7 @@ export default function DonationHistoryPage() {
   }, []);
 
   const safehouseImpact = data ? buildSafehouseImpact(data.donations) : [];
-  const typeSummary = data ? buildDonationTypeSummary(data.donations) : [];
+  const summaryBuckets = data ? buildDonationSummaryBuckets(data.donations) : null;
   const isMonthlyDonor = data?.donations.some((d) => d.isRecurring) ?? false;
 
   return (
@@ -226,32 +382,36 @@ export default function DonationHistoryPage() {
                   </div>
 
                   {/* Impact summary cards */}
-                  <div className="flex gap-4 mb-10 overflow-x-auto pb-1">
-                    <div className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-3 shrink-0">
-                      <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">Total donations</p>
-                      <p className="text-base font-bold text-[#0f172a] dark:text-white">{data.donations.length}</p>
+                  <div className="flex gap-5 mb-10 overflow-x-auto pb-2 snap-x snap-mandatory">
+                    <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
+                      <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">Total donations</p>
+                      <p className="text-2xl font-bold text-[#0f172a] dark:text-white tabular-nums">{data.donations.length}</p>
                     </div>
-                    {typeSummary.map((s) => (
-                      <div key={s.donationType} className="bg-white dark:bg-slate-900 rounded-lg border border-slate-200 dark:border-slate-700 px-4 py-3 shrink-0">
-                        <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">{s.donationType}</p>
-                        {isMonetary(s.donationType) ? (
-                          <p className="text-base font-bold">
-                            <span className="text-safira-blue">{formatAmount(s.totalAmount, s.currency)}</span>
+                    {summaryBuckets && (
+                      <>
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">Monetary</p>
+                          <p className="text-xl font-bold leading-snug">
+                            <span className="text-safira-blue">{formatAmount(summaryBuckets.monetaryTotal, summaryBuckets.monetaryCurrency)}</span>
                             <span className="text-[#0f172a] dark:text-white"> donated</span>
                           </p>
-                        ) : s.donationType.toLowerCase().includes('in-kind') || s.donationType.toLowerCase().includes('inkind') ? (
-                          <p className="text-base font-bold">
-                            <span className="text-safira-blue">{Math.ceil(s.totalImpactValue).toLocaleString()}</span>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">In-kind</p>
+                          <p className="text-xl font-bold leading-snug">
+                            <span className="text-safira-blue">{Math.ceil(summaryBuckets.inKindItems).toLocaleString()}</span>
                             <span className="text-[#0f172a] dark:text-white"> items donated</span>
                           </p>
-                        ) : (
-                          <p className="text-base font-bold">
-                            <span className="text-safira-blue">{Math.ceil(s.totalImpactValue).toLocaleString()}</span>
-                            <span className="text-[#0f172a] dark:text-white"> {s.impactUnit ?? 'units'} devoted</span>
+                        </div>
+                        <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
+                          <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">Time</p>
+                          <p className="text-xl font-bold leading-snug">
+                            <span className="text-safira-blue">{Math.ceil(summaryBuckets.timeHours).toLocaleString()}</span>
+                            <span className="text-[#0f172a] dark:text-white"> hours devoted</span>
                           </p>
-                        )}
-                      </div>
-                    ))}
+                        </div>
+                      </>
+                    )}
                   </div>
 
                   {/* Safehouse impact cards */}
@@ -263,7 +423,7 @@ export default function DonationHistoryPage() {
                           <div key={s.safehouseId} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
                             {/* Photo */}
                             <div className="h-44 overflow-hidden">
-                              <CityPhoto city={s.city} />
+                              <SafehouseCardPhoto safehouseId={s.safehouseId} city={s.city} />
                             </div>
 
                             {/* Content */}
@@ -271,19 +431,20 @@ export default function DonationHistoryPage() {
                               <div className="flex items-start gap-1 mb-1">
                                 <MapPin size={14} className="text-safira-blue mt-0.5 shrink-0" />
                                 <div>
-                                  <p className="text-sm font-bold text-[#0f172a] dark:text-white leading-tight">{s.city}</p>
-                                  <p className="text-xs text-slate-500 dark:text-slate-400">{s.region}</p>
+                                  <p className="text-sm font-bold text-[#0f172a] dark:text-white leading-tight">{s.city} Safehouse</p>
                                 </div>
                               </div>
 
-
                               {/* Program area pills */}
-                              <div className="flex flex-wrap gap-1.5 mb-3">
-                                {s.programAreas.map((area) => (
-                                  <span key={area} className={`text-xs font-semibold px-2 py-0.5 rounded-full ${areaColor(area)}`}>
-                                    {area}
-                                  </span>
-                                ))}
+                              <div className="mb-3">
+                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Used in the following areas:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {s.programAreas.map((area) => (
+                                    <span key={area} className={`text-xs font-semibold px-2 py-0.5 rounded-full ${areaColor(area)}`}>
+                                      {area}
+                                    </span>
+                                  ))}
+                                </div>
                               </div>
 
                               {/* Contribution totals */}
@@ -293,11 +454,14 @@ export default function DonationHistoryPage() {
                                     {formatAmount(s.monetaryTotal, s.currency)} contributed
                                   </p>
                                 )}
-                                {s.impactLines.map((line) => (
-                                  <p key={line.unit} className="text-sm font-semibold text-safira-blue">
-                                    {Math.ceil(line.value).toLocaleString()} {line.unit.toLowerCase().includes('item') ? 'items donated' : `${line.unit} devoted`}
-                                  </p>
-                                ))}
+                                {s.impactLines
+                                  .filter((line) => !isCampaignImpactUnit(line.unit))
+                                  .map((line) => (
+                                    <p key={line.unit} className="text-sm font-semibold text-safira-blue">
+                                      {formatSafehouseImpactValue(line.value)}{' '}
+                                      {line.unit.toLowerCase().includes('item') ? 'items donated' : `${line.unit} devoted`}
+                                    </p>
+                                  ))}
                               </div>
                             </div>
                           </div>
@@ -346,6 +510,7 @@ export default function DonationHistoryPage() {
                                 {isExpanded && (
                                   <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
                                     <td colSpan={4} className="px-6 py-3">
+                                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Used in the following areas:</p>
                                       <div className="space-y-2">
                                         {d.allocations.map((a) => (
                                           <div key={a.allocationId} className="flex items-center gap-2 flex-wrap">
@@ -354,14 +519,16 @@ export default function DonationHistoryPage() {
                                             </span>
                                             {a.safehouseCity && (
                                               <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                                                {a.safehouseCity}, {a.safehouseRegion}
+                                                {a.safehouseCity} Safehouse
                                               </span>
                                             )}
-                                            <span className="text-xs font-semibold text-safira-blue">
-                                              {!isMonetary(d.donationType) && d.impactUnit
-                                                ? `${a.amountAllocated != null ? a.amountAllocated.toFixed(1) : '—'} ${d.impactUnit}`
-                                                : formatAmount(a.amountAllocated, d.currencyCode)}
-                                            </span>
+                                            {!isMonetary(d.donationType) && d.impactUnit && isCampaignImpactUnit(d.impactUnit) ? null : (
+                                              <span className="text-xs font-semibold text-safira-blue">
+                                                {!isMonetary(d.donationType) && d.impactUnit
+                                                  ? `${a.amountAllocated != null ? a.amountAllocated.toFixed(1) : '—'} ${d.impactUnit}`
+                                                  : formatAmount(a.amountAllocated, d.currencyCode)}
+                                              </span>
+                                            )}
                                           </div>
                                         ))}
                                       </div>
@@ -378,8 +545,8 @@ export default function DonationHistoryPage() {
 
                   {/* CTA */}
                   <div className="mt-8 bg-safira-blue rounded-2xl p-6 text-center text-white">
-                    <p className="text-lg font-bold mb-1">Keep making a difference</p>
-                    <p className="text-sm text-blue-100 mb-4">Your support changes lives every day. Consider giving again to help even more girls find safety.</p>
+                    <p className="text-lg font-bold mb-1">{DONATE_CTA_TITLE}</p>
+                    <p className="text-sm text-blue-100 mb-4">{DONATE_CTA_BLURB}</p>
                     <a
                       href="/donate"
                       className="inline-block bg-white text-safira-blue font-semibold text-sm px-6 py-2.5 rounded-lg hover:bg-blue-50 transition-colors"
