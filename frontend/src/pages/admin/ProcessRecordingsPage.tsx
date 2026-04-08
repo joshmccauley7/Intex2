@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api'
-import { Plus, Pencil, Trash2, FileText } from 'lucide-react'
+import { Plus, Pencil, Trash2, FileText, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
 
 interface ResidentOption {
   residentId: number
@@ -50,6 +50,7 @@ export default function ProcessRecordingsPage() {
   const [showForm, setShowForm] = useState(false)
   const [editRecording, setEditRecording] = useState<ProcessRecording | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+  const [expandedId, setExpandedId] = useState<number | null>(null)
 
   useEffect(() => {
     apiFetch('/api/residents')
@@ -158,86 +159,129 @@ export default function ProcessRecordingsPage() {
             {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
             {loadingRecordings && <p className="text-slate-500 text-sm">Loading...</p>}
 
-            {!loadingRecordings && recordings.length === 0 && (
-              <div className="bg-white rounded-xl border border-slate-200 p-10 text-center text-slate-400 text-sm">
-                No process recordings yet for this resident.
-              </div>
-            )}
-
-            {/* Recording cards */}
+            {/* Recording rows */}
             {(() => {
               const totalPages = Math.ceil(recordings.length / PAGE_SIZE)
               const paginated = recordings.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE)
               return (
               <>
-            <div className="space-y-4">
-              {paginated.map((rec) => (
-                <div key={rec.recordingId} className="bg-white rounded-xl border border-slate-200 p-5">
-                  {/* Card header */}
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <div>
-                        <p className="font-semibold text-[#0f172a]">{rec.sessionDate ?? '—'}</p>
-                        <p className="text-sm text-slate-500">{rec.socialWorker ?? '—'}</p>
-                      </div>
-                      {rec.sessionType && (
-                        <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${SESSION_TYPE_BADGE[rec.sessionType] ?? 'bg-slate-100 text-slate-500'}`}>
-                          {rec.sessionType}
-                        </span>
-                      )}
-                      {rec.sessionDurationMinutes != null && (
-                        <span className="text-xs text-slate-400">{rec.sessionDurationMinutes} min</span>
-                      )}
-                      <div className="flex gap-2">
-                        {rec.progressNoted && <span className="text-xs bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Progress Noted</span>}
-                        {rec.concernsFlagged && <span className="text-xs bg-red-100 text-red-700 px-2 py-0.5 rounded-full">Concerns Flagged</span>}
-                        {rec.referralMade && <span className="text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">Referral Made</span>}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2 shrink-0">
-                      <button onClick={() => { setEditRecording(rec); setShowForm(true) }} className="p-1.5 text-slate-400 hover:text-safira-blue transition-colors" title="Edit"><Pencil size={15} /></button>
-                      <button onClick={() => setDeleteConfirmId(rec.recordingId)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors" title="Delete"><Trash2 size={15} /></button>
-                    </div>
-                  </div>
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              {/* Table header */}
+              <div className="grid grid-cols-[1fr_110px_90px_90px_90px_90px_72px_24px] items-center gap-4 px-4 py-2 border-b border-slate-100 bg-slate-50">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Date · Worker</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Type</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Duration</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Progress</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Concern</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Referral</span>
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Actions</span>
+                <span />
+              </div>
 
-                  {/* Card body */}
-                  <div className="space-y-3 text-sm">
-                    {(rec.emotionalStateObserved || rec.emotionalStateEnd) && (
+              {paginated.map((rec, idx) => {
+                const isExpanded = expandedId === rec.recordingId
+                return (
+                  <div key={rec.recordingId} className={idx > 0 ? 'border-t border-slate-100' : ''}>
+                    {/* Row */}
+                    <div
+                      className="grid grid-cols-[1fr_110px_90px_90px_90px_90px_72px_24px] items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                      onClick={() => setExpandedId(isExpanded ? null : rec.recordingId)}
+                    >
                       <div>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Emotional State</p>
-                        <p className="text-slate-700">
-                          {rec.emotionalStateObserved ?? '—'}
-                          {rec.emotionalStateEnd && <span className="text-slate-400"> → {rec.emotionalStateEnd}</span>}
-                        </p>
+                        <p className="font-medium text-sm text-[#0f172a]">{rec.sessionDate ?? '—'}</p>
+                        <p className="text-xs text-slate-400">{rec.socialWorker ?? '—'}</p>
                       </div>
-                    )}
-                    {rec.sessionNarrative && (
+
                       <div>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Session Narrative</p>
-                        <p className="text-slate-700 whitespace-pre-wrap">{rec.sessionNarrative}</p>
+                        {rec.sessionType ? (
+                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${SESSION_TYPE_BADGE[rec.sessionType] ?? 'bg-slate-100 text-slate-500'}`}>
+                            {rec.sessionType}
+                          </span>
+                        ) : <span className="text-xs text-slate-300">—</span>}
                       </div>
-                    )}
-                    {rec.interventionsApplied && (
+
                       <div>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Interventions Applied</p>
-                        <p className="text-slate-700 whitespace-pre-wrap">{rec.interventionsApplied}</p>
+                        <span className="text-xs text-slate-500">
+                          {rec.sessionDurationMinutes != null ? `${rec.sessionDurationMinutes} min` : '—'}
+                        </span>
                       </div>
-                    )}
-                    {rec.followUpActions && (
-                      <div>
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Follow-Up Actions</p>
-                        <p className="text-slate-700 whitespace-pre-wrap">{rec.followUpActions}</p>
+
+                      <div className="flex justify-center">
+                        {rec.progressNoted
+                          ? <CheckCircle2 size={18} className="text-green-500" />
+                          : <span className="text-slate-300 text-sm">—</span>}
                       </div>
-                    )}
-                    {rec.notesRestricted && (
-                      <div className="border-t border-slate-100 pt-3">
-                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Notes (Restricted)</p>
-                        <p className="text-slate-700 whitespace-pre-wrap">{rec.notesRestricted}</p>
+
+                      <div className="flex justify-center">
+                        {rec.concernsFlagged
+                          ? <CheckCircle2 size={18} className="text-red-400" />
+                          : <span className="text-slate-300 text-sm">—</span>}
+                      </div>
+
+                      <div className="flex justify-center">
+                        {rec.referralMade
+                          ? <CheckCircle2 size={18} className="text-yellow-500" />
+                          : <span className="text-slate-300 text-sm">—</span>}
+                      </div>
+
+                      <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                        <button onClick={() => { setEditRecording(rec); setShowForm(true) }} className="p-1.5 text-slate-400 hover:text-safira-blue transition-colors" title="Edit"><Pencil size={14} /></button>
+                        <button onClick={() => setDeleteConfirmId(rec.recordingId)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors" title="Delete"><Trash2 size={14} /></button>
+                      </div>
+
+                      <div className="text-slate-400">
+                        {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                      </div>
+                    </div>
+
+                    {/* Expanded details */}
+                    {isExpanded && (
+                      <div className="px-4 pb-4 pt-1 space-y-3 text-sm border-t border-slate-100 bg-slate-50/50">
+                        {(rec.emotionalStateObserved || rec.emotionalStateEnd) && (
+                          <div>
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Emotional State</p>
+                            <p className="text-slate-700">
+                              {rec.emotionalStateObserved ?? '—'}
+                              {rec.emotionalStateEnd && <span className="text-slate-400"> → {rec.emotionalStateEnd}</span>}
+                            </p>
+                          </div>
+                        )}
+                        {rec.sessionNarrative && (
+                          <div>
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Session Narrative</p>
+                            <p className="text-slate-700 whitespace-pre-wrap">{rec.sessionNarrative}</p>
+                          </div>
+                        )}
+                        {rec.interventionsApplied && (
+                          <div>
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Interventions Applied</p>
+                            <p className="text-slate-700 whitespace-pre-wrap">{rec.interventionsApplied}</p>
+                          </div>
+                        )}
+                        {rec.followUpActions && (
+                          <div>
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Follow-Up Actions</p>
+                            <p className="text-slate-700 whitespace-pre-wrap">{rec.followUpActions}</p>
+                          </div>
+                        )}
+                        {rec.notesRestricted && (
+                          <div className="border-t border-slate-100 pt-3">
+                            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Notes (Restricted)</p>
+                            <p className="text-slate-700 whitespace-pre-wrap">{rec.notesRestricted}</p>
+                          </div>
+                        )}
+                        {!rec.emotionalStateObserved && !rec.emotionalStateEnd && !rec.sessionNarrative && !rec.interventionsApplied && !rec.followUpActions && !rec.notesRestricted && (
+                          <p className="text-slate-400 text-xs italic">No additional details recorded.</p>
+                        )}
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
+                )
+              })}
+
+              {paginated.length === 0 && (
+                <div className="p-10 text-center text-slate-400 text-sm">No process recordings yet for this resident.</div>
+              )}
             </div>
             <Pagination current={currentPage} total={totalPages} onChange={setCurrentPage} count={recordings.length} pageSize={PAGE_SIZE} />
               </>
