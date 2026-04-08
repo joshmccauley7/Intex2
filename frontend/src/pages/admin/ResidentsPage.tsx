@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { apiFetch } from '../../api'
-import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users, ChevronDown, X } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users, ChevronDown, X, Info, Home } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 interface ResidentRow {
@@ -504,11 +504,6 @@ export default function ResidentsPage() {
                   {selectedResident.caseStatus}
                 </span>
               )}
-              {selectedResident.currentRiskLevel && (
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${RISK_COLOR[selectedResident.currentRiskLevel] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                  {selectedResident.currentRiskLevel} Risk
-                </span>
-              )}
             </div>
           </div>
 
@@ -764,25 +759,49 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   const recentHealth = lifecycle.health.slice(-DOTS)
   const recentEducation = lifecycle.education.slice(-DOTS)
 
-  const cooperativeCount = recentVisits.filter(v => v.familyCooperationLevel === 'Cooperative').length
+  const cooperativeCount = recentVisits.filter(v => v.familyCooperationLevel === 'Cooperative' || v.familyCooperationLevel === 'Highly Cooperative').length
   const progressCount = recentSessions.filter(s => s.progressNoted).length
   const psychCount = recentHealth.filter(h => h.psychologicalCheckupDone).length
   const goodAttendanceCount = recentEducation.filter(e => (e.attendanceRate ?? 0) >= 0.8).length
 
 
   // ── Dot row helper ──────────────────────────────────────────────────────────
-  function DotRow({ label, count, total, totalLabel, dots }: {
-    label: string; count: number; total: number; totalLabel: string; dots: React.ReactNode[]
+  function DotRow({ label, count, total, totalLabel, dots, info, dates }: {
+    label: string; count: number; total: number; totalLabel: string; dots: React.ReactNode[]; info?: string; dates?: (string | null)[]
   }) {
+    const fmtMmYy = (d: string | null) => {
+      if (!d) return ''
+      const dt = new Date(d)
+      return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getFullYear()).slice(-2)}`
+    }
+
     return (
       <div>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
+        <div className="flex items-center gap-1 mb-0.5">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
+          {info && (
+            <div className="relative group">
+              <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
+              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
+                {info}
+                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+              </div>
+            </div>
+          )}
+        </div>
         <p className="text-xs text-slate-500 mb-2">
           <span className="font-semibold text-[#0f172a]">{count}/{dots.length}</span> recent
           <span className="text-slate-300 mx-1">·</span>
           <span className="font-semibold text-[#0f172a]">{total}</span> {totalLabel}
         </p>
-        <div className="flex gap-1.5">{dots}</div>
+        <div className="inline-flex border border-slate-100 rounded-lg overflow-hidden">
+          {dots.map((dot, i) => (
+            <div key={i} className={`flex flex-col items-center gap-0.5 px-2 py-1 ${i > 0 ? 'border-l border-slate-100' : ''}`}>
+              <div className="scale-75">{dot}</div>
+              <span className="text-[9px] text-slate-400 leading-none">{dates?.[i] ? fmtMmYy(dates[i]!) : '—'}</span>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
@@ -802,19 +821,24 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   function renderIndicators() {
     if (reType === 'Family Reunification') {
       return (
-        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+        <div className="pt-3 border-t border-slate-100">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators For Family Reunification</p>
+        <div className="grid grid-cols-2 gap-4">
           {recentVisits.length > 0 && (
             <DotRow
               label="Family Cooperation"
+              info="How cooperative the family has been during recent home visits. Dark green = highly cooperative, green = cooperative, yellow = neutral, red = uncooperative."
               count={cooperativeCount}
               total={totalVisits}
               totalLabel="total visits"
+              dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
               dots={[
                 ...recentVisits.map((v, i) => (
                   <div key={i} title={v.familyCooperationLevel ?? 'Unknown'}
                     className={`w-4 h-4 rounded-full ${
-                      v.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-500' :
-                      v.familyCooperationLevel === 'Non-Cooperative' ? 'bg-red-400' : 'bg-yellow-400'
+                      v.familyCooperationLevel === 'Highly Cooperative' ? 'bg-emerald-600' :
+                      v.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-400' :
+                      v.familyCooperationLevel === 'Uncooperative' ? 'bg-red-400' : 'bg-yellow-400'
                     }`} />
                 )),
                 ...Array.from({ length: DOTS - recentVisits.length }).map((_, i) => (
@@ -826,9 +850,11 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
+              info="Whether progress was noted by the social worker at the end of each recent counseling session. Green = progress noted."
               count={progressCount}
               total={totalSessions}
               totalLabel="total sessions"
+              dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
                 ...recentSessions.map((s, i) => (
                   <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
@@ -841,18 +867,23 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             />
           )}
         </div>
+        </div>
       )
     }
 
     if (reType === 'Foster Care') {
       return (
-        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+        <div className="pt-3 border-t border-slate-100">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators For Foster Care</p>
+        <div className="grid grid-cols-2 gap-4">
           {recentHealth.length > 0 && (
             <DotRow
               label="Psych Checkups"
+              info="Whether a psychological checkup was completed at each recent health record. Green = completed."
               count={psychCount}
               total={recentHealth.length}
               totalLabel="recent records"
+              dates={[...recentHealth.map(h => h.date), ...Array(Math.max(0, DOTS - recentHealth.length)).fill(null)]}
               dots={[
                 ...recentHealth.map((h, i) => (
                   <div key={i} title={h.psychologicalCheckupDone ? 'Done' : 'Not done'}
@@ -867,9 +898,11 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
+              info="Whether progress was noted by the social worker at the end of each recent counseling session. Green = progress noted."
               count={progressCount}
               total={totalSessions}
               totalLabel="total sessions"
+              dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
                 ...recentSessions.map((s, i) => (
                   <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
@@ -882,27 +915,99 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             />
           )}
         </div>
+        </div>
       )
     }
 
     if (reType === 'Adoption (Domestic)' || reType === 'Adoption (Inter-Country)') {
+      const allDates = [...lifecycle.visitations.map(v => v.date), ...lifecycle.sessions.map(s => s.date)].filter(Boolean).sort()
+      const anchor = allDates.at(-1) ? new Date(allDates.at(-1)!) : new Date()
+      const recentStart = new Date(anchor.getFullYear(), anchor.getMonth() - 2, 1).toISOString().split('T')[0]
+      const priorStart  = new Date(anchor.getFullYear(), anchor.getMonth() - 5, 1).toISOString().split('T')[0]
+
+      const visitsRecent = lifecycle.visitations.filter(v => v.date >= recentStart).length
+      const visitsPrior  = lifecycle.visitations.filter(v => v.date >= priorStart && v.date < recentStart).length
+      const sessionsRecent = lifecycle.sessions.filter(s => s.date >= recentStart).length
+      const sessionsPrior  = lifecycle.sessions.filter(s => s.date >= priorStart && s.date < recentStart).length
+
+      const monthTrend = (current: number, prev: number) => {
+        if (prev === 0 && current === 0) return <span className="text-xs text-slate-400">No activity in the last 12 months</span>
+        if (prev === 0) return <span className="text-xs text-emerald-600">↑ {current} recent (no prior activity)</span>
+        const pct = Math.round(((current - prev) / prev) * 100)
+        if (pct > 0) return <span className="text-xs text-emerald-600">↑ {pct}% over the last 3 months</span>
+        if (pct < 0) return <span className="text-xs text-red-500">↓ {Math.abs(pct)}% over the last 3 months</span>
+        return <span className="text-xs text-slate-400">→ No change over the last 3 months</span>
+      }
+
       return (
-        <div className="grid grid-cols-2 gap-6 pt-3 border-t border-slate-100">
-          <StatBlock label="Home Visits" value={totalVisits} sub="total conducted" />
-          <StatBlock label="Counseling Sessions" value={totalSessions} sub="total attended" />
+        <div className="pt-3 border-t border-slate-100">
+          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators For {reType}</p>
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Home Visits</p>
+                <div className="relative group">
+                  <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
+                    Total home visits conducted. The trend compares the most recent 3 months to the 3 months prior.
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-[#0f172a]">{totalVisits}</p>
+              <p className="text-xs text-slate-400 mb-1">total conducted</p>
+              {monthTrend(visitsRecent, visitsPrior)}
+            </div>
+            <div>
+              <div className="flex items-center gap-1 mb-1">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Counseling Sessions</p>
+                <div className="relative group">
+                  <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
+                    Total counseling sessions attended. The trend compares the most recent 3 months to the 3 months prior.
+                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                  </div>
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-[#0f172a]">{totalSessions}</p>
+              <p className="text-xs text-slate-400 mb-1">total attended</p>
+              {monthTrend(sessionsRecent, sessionsPrior)}
+            </div>
+          </div>
         </div>
       )
     }
 
     if (reType === 'Independent Living') {
+      const ilAllDates = [...lifecycle.sessions.map(s => s.date), ...lifecycle.visitations.map(v => v.date)].filter(Boolean).sort()
+      const ilAnchor = ilAllDates.at(-1) ? new Date(ilAllDates.at(-1)!) : new Date()
+      const ilRecentStart = new Date(ilAnchor.getFullYear(), ilAnchor.getMonth() - 2, 1).toISOString().split('T')[0]
+      const ilPriorStart  = new Date(ilAnchor.getFullYear(), ilAnchor.getMonth() - 5, 1).toISOString().split('T')[0]
+
+      const sessionsRecent = lifecycle.sessions.filter(s => s.date >= ilRecentStart).length
+      const sessionsPrior  = lifecycle.sessions.filter(s => s.date >= ilPriorStart && s.date < ilRecentStart).length
+
+      const ilTrend = () => {
+        if (sessionsPrior === 0 && sessionsRecent === 0) return <span className="text-xs text-slate-400">No session activity</span>
+        if (sessionsPrior === 0) return <span className="text-xs text-emerald-600">↑ {sessionsRecent} recent (no prior activity)</span>
+        const pct = Math.round(((sessionsRecent - sessionsPrior) / sessionsPrior) * 100)
+        if (pct > 0) return <span className="text-xs text-emerald-600">↑ {pct}% over the last 3 months</span>
+        if (pct < 0) return <span className="text-xs text-red-500">↓ {Math.abs(pct)}% over the last 3 months</span>
+        return <span className="text-xs text-slate-400">→ No change over the last 3 months</span>
+      }
+
       return (
-        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+        <div className="pt-3 border-t border-slate-100">
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators For Independent Living</p>
+        <div className="grid grid-cols-2 gap-4">
           {recentEducation.length > 0 && (
             <DotRow
               label="Attendance"
+              info="School attendance rate from recent education records. Green ≥80%, yellow ≥60%, red <60%."
               count={goodAttendanceCount}
               total={recentEducation.length}
               totalLabel="recent records"
+              dates={[...recentEducation.map(e => e.date), ...Array(Math.max(0, DOTS - recentEducation.length)).fill(null)]}
               dots={[
                 ...recentEducation.map((e, i) => {
                   const rate = e.attendanceRate ?? 0
@@ -918,29 +1023,44 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             />
           )}
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Session Engagement</p>
-            <p className="text-2xl font-bold text-[#0f172a]">{totalSessions}</p>
-            <p className="text-xs text-slate-400">sessions · {totalVisits} home visits</p>
+            <div className="flex items-center gap-1 mb-1">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Social Worker Contact</p>
+              <div className="relative group">
+                <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
+                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
+                  Total counseling sessions attended and home visits conducted — key markers of ongoing support engagement for independent living preparation.
+                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
+                </div>
+              </div>
+            </div>
+            <p className="text-2xl font-bold text-[#0f172a]">{totalSessions + totalVisits}</p>
+            <p className="text-xs text-slate-400 mb-1">{totalSessions} sessions · {totalVisits} home visits</p>
+            {ilTrend()}
           </div>
+        </div>
         </div>
       )
     }
 
     // Fallback — generic
     return (recentVisits.length > 0 || recentSessions.length > 0) ? (
-      <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+      <div className="pt-3 border-t border-slate-100">
+      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators</p>
+      <div className="grid grid-cols-2 gap-4">
         {recentVisits.length > 0 && (
           <DotRow
             label="Family Cooperation"
+            info="How cooperative the family has been during recent home visits. Dark green = highly cooperative, green = cooperative, yellow = neutral, red = uncooperative."
             count={cooperativeCount}
             total={totalVisits}
             totalLabel="total visits"
+            dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
             dots={[
               ...recentVisits.map((v, i) => (
                 <div key={i} title={v.familyCooperationLevel ?? 'Unknown'}
                   className={`w-4 h-4 rounded-full ${
                     v.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-500' :
-                    v.familyCooperationLevel === 'Non-Cooperative' ? 'bg-red-400' : 'bg-yellow-400'
+                    v.familyCooperationLevel === 'Uncooperative' ? 'bg-red-400' : 'bg-yellow-400'
                   }`} />
               )),
               ...Array.from({ length: DOTS - recentVisits.length }).map((_, i) => (
@@ -952,9 +1072,11 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         {recentSessions.length > 0 && (
           <DotRow
             label="Counseling Progress"
+            info="Whether progress was noted by the social worker at the end of each recent counseling session. Green = progress noted."
             count={progressCount}
             total={totalSessions}
             totalLabel="total sessions"
+            dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
             dots={[
               ...recentSessions.map((s, i) => (
                 <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
@@ -966,6 +1088,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             ]}
           />
         )}
+      </div>
       </div>
     ) : null
   }
@@ -1188,7 +1311,7 @@ function RiskJourney({ initial, current }: { initial: string | null; current: st
       <div className="rounded-xl border border-slate-200 overflow-hidden">
         <div className="flex">
           {/* At admission */}
-          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-slate-50 border-r border-slate-200">
+          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-white border-r border-slate-200">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">At Admission</p>
             <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[initial ?? ''] ?? 'bg-slate-300'}`} />
             <p className={`text-lg font-bold ${RISK_COLOR[initial ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{initial ?? '—'}</p>
@@ -1200,7 +1323,7 @@ function RiskJourney({ initial, current }: { initial: string | null; current: st
           </div>
 
           {/* Current */}
-          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-slate-50 border-l border-slate-200">
+          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-white border-l border-slate-200">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Current</p>
             <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[current ?? ''] ?? 'bg-slate-300'}`} />
             <p className={`text-lg font-bold ${RISK_COLOR[current ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{current ?? '—'}</p>
@@ -1276,7 +1399,7 @@ function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
   const TYPE_META = {
     health: { label: 'Health Check', color: 'bg-emerald-500', light: 'bg-emerald-50 border-emerald-100', icon: <Heart size={12} className="text-emerald-600" /> },
     session: { label: 'Counseling Session', color: 'bg-purple-500', light: 'bg-purple-50 border-purple-100', icon: <Users size={12} className="text-purple-600" /> },
-    visitation: { label: 'Home Visit', color: 'bg-blue-500', light: 'bg-blue-50 border-blue-100', icon: <AlertTriangle size={12} className="text-blue-600" /> },
+    visitation: { label: 'Home Visit', color: 'bg-blue-500', light: 'bg-blue-50 border-blue-100', icon: <Home size={12} className="text-blue-600" /> },
     education: { label: 'Education Record', color: 'bg-yellow-500', light: 'bg-yellow-50 border-yellow-100', icon: <GraduationCap size={12} className="text-yellow-600" /> },
   }
 
@@ -1291,6 +1414,9 @@ function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
         {events.map((ev, i) => {
           const meta = TYPE_META[ev.type]
           const open = expanded.has(i)
+          const hasConcern =
+            (ev.type === 'session' && ev.concernsFlagged) ||
+            (ev.type === 'visitation' && ev.safetyConcernsNoted)
 
           return (
             <div key={i}>
@@ -1304,6 +1430,12 @@ function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
                   <span className="text-sm font-medium text-slate-700">{meta.label}</span>
                 </div>
                 <div className="flex items-center gap-3">
+                  {hasConcern && (
+                    <span className="flex items-center gap-1 text-xs font-medium text-orange-500">
+                      <AlertTriangle size={13} />
+                      Concern Flagged
+                    </span>
+                  )}
                   <span className="text-xs text-slate-400">{fmtShortDate(ev.date)}</span>
                   <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
                 </div>
@@ -1394,7 +1526,8 @@ function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
                           <p className="text-slate-400 mb-0.5">Family Cooperation</p>
                           <span className={`inline-block px-2 py-0.5 rounded font-medium ${
                             ev.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-100 text-emerald-700' :
-                            ev.familyCooperationLevel === 'Non-Cooperative' ? 'bg-red-100 text-red-600' :
+                            ev.familyCooperationLevel === 'Highly Cooperative' ? 'bg-emerald-100 text-emerald-700' :
+                            ev.familyCooperationLevel === 'Uncooperative' ? 'bg-red-100 text-red-600' :
                             'bg-slate-100 text-slate-500'
                           }`}>{ev.familyCooperationLevel ?? '—'}</span>
                         </div>
