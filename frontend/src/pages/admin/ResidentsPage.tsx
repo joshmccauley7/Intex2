@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api'
-import { Plus, Eye, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users } from 'lucide-react'
+import ResidentStatusStrip, { type ResidentStatusIndicators, type StatusLight } from '../../components/admin/ResidentStatusStrip'
 
 interface ResidentRow {
   residentId: number
@@ -11,9 +12,9 @@ interface ResidentRow {
   safehouseId: number | null
   assignedSocialWorker: string | null
   presentAge: string | null
-  currentRiskLevel: string | null
   reintegrationStatus: string | null
   dateOfAdmission: string | null
+  statusIndicators?: ResidentStatusIndicators
 }
 
 interface ResidentDetail {
@@ -65,6 +66,61 @@ interface ResidentDetail {
   dateEnrolled: string | null
   dateClosed: string | null
   notesRestricted: string | null
+}
+
+interface HealthEvent {
+  type: 'health'
+  date: string
+  generalHealthScore: number | null
+  nutritionScore: number | null
+  sleepQualityScore: number | null
+  energyLevelScore: number | null
+  medicalCheckupDone: boolean | null
+  dentalCheckupDone: boolean | null
+  psychologicalCheckupDone: boolean | null
+}
+
+interface SessionEvent {
+  type: 'session'
+  date: string
+  sessionType: string | null
+  socialWorker: string | null
+  sessionDurationMinutes: number | null
+  emotionalStateObserved: string | null
+  emotionalStateEnd: string | null
+  progressNoted: boolean | null
+  concernsFlagged: boolean | null
+  interventionsApplied: string | null
+}
+
+interface VisitationEvent {
+  type: 'visitation'
+  date: string
+  visitType: string | null
+  locationVisited: string | null
+  familyCooperationLevel: string | null
+  safetyConcernsNoted: boolean | null
+  visitOutcome: string | null
+}
+
+interface EducationEvent {
+  type: 'education'
+  date: string
+  enrollmentStatus: string | null
+  attendanceRate: number | null
+  progressPercent: number | null
+  completionStatus: string | null
+}
+
+type LifecycleEvent = HealthEvent | SessionEvent | VisitationEvent | EducationEvent
+
+interface LifecycleData {
+  riskJourney: { initial: string | null; current: string | null }
+  statusIndicators: ResidentStatusIndicators
+  health: HealthEvent[]
+  sessions: SessionEvent[]
+  visitations: VisitationEvent[]
+  education: EducationEvent[]
 }
 
 const SAFEHOUSES = [1,2,3,4,5,6,7,8,9].map(i => ({ id: i, name: `Lighthouse Safehouse ${i}` }))
@@ -140,14 +196,19 @@ const STATUS_BADGE: Record<string, string> = {
   Transferred: 'bg-blue-100 text-blue-700',
 }
 
-const RISK_BADGE: Record<string, string> = {
-  Critical: 'bg-red-100 text-red-700',
-  High: 'bg-orange-100 text-orange-700',
-  Medium: 'bg-yellow-100 text-yellow-700',
-  Low: 'bg-green-100 text-green-700',
-}
-
 const PAGE_SIZE = 20
+
+function normalizeStatusIndicators(raw: unknown): ResidentStatusIndicators {
+  const o = raw as Record<string, string> | null | undefined
+  const s = (v: string | undefined): StatusLight =>
+    v === 'green' || v === 'yellow' || v === 'red' ? v : 'yellow'
+  return {
+    health: s(o?.health),
+    education: s(o?.education),
+    counseling: s(o?.counseling),
+    risk: s(o?.risk),
+  }
+}
 
 function formatAgeFromDates(startDateRaw: string | null | undefined, endDateRaw: string | null | undefined) {
   if (!startDateRaw || !endDateRaw) return ''
@@ -231,6 +292,7 @@ export default function ResidentsPage() {
   const [currentPage, setCurrentPage] = useState(1)
 
   const [selectedResident, setSelectedResident] = useState<ResidentDetail | null>(null)
+  const [lifecycle, setLifecycle] = useState<LifecycleData | null>(null)
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [editResident, setEditResident] = useState<ResidentDetail | null>(null)
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
@@ -245,7 +307,14 @@ export default function ResidentsPage() {
     if (riskFilter) params.append('riskLevel', riskFilter)
     if (search) params.append('search', search)
     apiFetch(`/api/residents?${params.toString()}`)
-      .then(setResidents)
+      .then((rows: ResidentRow[]) =>
+        setResidents(
+          rows.map((r) => ({
+            ...r,
+            statusIndicators: normalizeStatusIndicators(r.statusIndicators),
+          }))
+        )
+      )
       .catch((e) => setError(e.message))
       .finally(() => setLoading(false))
   }
@@ -253,8 +322,19 @@ export default function ResidentsPage() {
   useEffect(() => { fetchResidents() }, [statusFilter, safehouseFilter, categoryFilter, riskFilter, search])
 
   const openDetail = (id: number) => {
-    apiFetch(`/api/residents/${id}`)
-      .then(setSelectedResident)
+    setLifecycle(null)
+    Promise.all([
+      apiFetch(`/api/residents/${id}`),
+      apiFetch(`/api/residents/${id}/lifecycle`),
+    ])
+      .then(([detail, lc]) => {
+        setSelectedResident(detail)
+        const raw = lc as LifecycleData & { statusIndicators?: unknown }
+        setLifecycle({
+          ...raw,
+          statusIndicators: normalizeStatusIndicators(raw.statusIndicators),
+        })
+      })
       .catch((e) => setError(e.message))
   }
 
@@ -330,12 +410,12 @@ export default function ResidentsPage() {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Internal Code</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-0 whitespace-nowrap">Indicators</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Safehouse</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Social Worker</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Age</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Risk Level</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                   </tr>
@@ -344,6 +424,9 @@ export default function ResidentsPage() {
                   {paginated.map((r) => (
                     <tr key={r.residentId} onClick={() => openDetail(r.residentId)} className="hover:bg-slate-50 transition-colors cursor-pointer">
                       <td className="px-4 py-3 font-medium text-[#0f172a]">{r.internalCode ?? '—'}</td>
+                      <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                        <ResidentStatusStrip levels={r.statusIndicators ?? normalizeStatusIndicators(undefined)} variant="compact" />
+                      </td>
                       <td className="px-4 py-3 text-slate-600">{r.caseCategory ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.caseStatus ?? ''] ?? 'bg-slate-100 text-slate-500'}`}>
@@ -353,13 +436,6 @@ export default function ResidentsPage() {
                       <td className="px-4 py-3 text-slate-600">{safehouseName(r.safehouseId)}</td>
                       <td className="px-4 py-3 text-slate-600">{r.assignedSocialWorker ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{r.presentAge ?? '—'}</td>
-                      <td className="px-4 py-3">
-                        {r.currentRiskLevel ? (
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${RISK_BADGE[r.currentRiskLevel] ?? 'bg-slate-100 text-slate-500'}`}>
-                            {r.currentRiskLevel}
-                          </span>
-                        ) : '—'}
-                      </td>
                       <td className="px-4 py-3 text-slate-600">{r.reintegrationStatus ?? '—'}</td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
@@ -395,7 +471,7 @@ export default function ResidentsPage() {
 
       {/* Detail modal */}
       {selectedResident && !editResident && (
-        <Modal onClose={() => setSelectedResident(null)} wide>
+        <Modal onClose={() => { setSelectedResident(null); setLifecycle(null) }} wide>
           <div className="flex items-start justify-between mb-4">
             <div>
               <h2 className="text-xl font-bold text-[#0f172a]">{selectedResident.internalCode ?? 'Resident'}</h2>
@@ -407,6 +483,13 @@ export default function ResidentsPage() {
               </span>
             )}
           </div>
+
+          {lifecycle && (
+            <div className="mb-6 pb-4 border-b border-slate-200">
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Health · Education · Counseling · Risk</p>
+              <ResidentStatusStrip variant="labeled" levels={lifecycle.statusIndicators} className="justify-start" />
+            </div>
+          )}
 
           <SectionHeading>Demographics</SectionHeading>
           <div className="grid grid-cols-2 gap-x-8 gap-y-2 text-sm mb-4">
@@ -499,9 +582,19 @@ export default function ResidentsPage() {
             </>
           )}
 
+          {lifecycle && (
+            <>
+              <RiskJourney
+                initial={lifecycle.riskJourney.initial}
+                current={lifecycle.riskJourney.current}
+              />
+              <ResidentTimeline lifecycle={lifecycle} />
+            </>
+          )}
+
           <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
             <button onClick={() => setEditResident(selectedResident)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Edit</button>
-            <button onClick={() => setSelectedResident(null)} className="px-4 py-2 text-sm font-medium text-white bg-safira-blue hover:bg-safira-blue-dark rounded-lg transition-colors">Close</button>
+            <button onClick={() => { setSelectedResident(null); setLifecycle(null) }} className="px-4 py-2 text-sm font-medium text-white bg-safira-blue hover:bg-safira-blue-dark rounded-lg transition-colors">Close</button>
           </div>
         </Modal>
       )}
@@ -514,6 +607,214 @@ export default function ResidentsPage() {
           onSaved={() => { setShowCreateModal(false); setEditResident(null); setSelectedResident(null); fetchResidents() }}
         />
       )}
+    </div>
+  )
+}
+
+// ── Risk Journey ─────────────────────────────────────────────────────────────
+
+const RISK_RANK: Record<string, number> = { Critical: 4, High: 3, Medium: 2, Low: 1 }
+const RISK_COLOR: Record<string, string> = {
+  Critical: 'bg-red-100 text-red-700 border-red-200',
+  High: 'bg-orange-100 text-orange-700 border-orange-200',
+  Medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
+  Low: 'bg-green-100 text-green-700 border-green-200',
+}
+
+function RiskJourney({ initial, current }: { initial: string | null; current: string | null }) {
+  if (!initial && !current) return null
+  const improved =
+    initial && current ? RISK_RANK[current] < RISK_RANK[initial] : false
+  const worsened =
+    initial && current ? RISK_RANK[current] > RISK_RANK[initial] : false
+
+  return (
+    <div className="mt-6 mb-2">
+      <SectionHeading>Risk Journey</SectionHeading>
+      <div className="flex items-center gap-3">
+        <div className={`px-3 py-1.5 rounded-lg border text-sm font-semibold ${RISK_COLOR[initial ?? ''] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+          {initial ?? '—'}
+          <span className="block text-xs font-normal opacity-70">at admission</span>
+        </div>
+        <ArrowRight
+          size={18}
+          className={improved ? 'text-green-500' : worsened ? 'text-red-400' : 'text-slate-300'}
+        />
+        <div className={`px-3 py-1.5 rounded-lg border text-sm font-semibold ${RISK_COLOR[current ?? ''] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
+          {current ?? '—'}
+          <span className="block text-xs font-normal opacity-70">current</span>
+        </div>
+        {improved && <span className="text-xs text-green-600 font-medium ml-1">Improving</span>}
+        {worsened && <span className="text-xs text-red-500 font-medium ml-1">Escalated</span>}
+        {!improved && !worsened && initial && current && (
+          <span className="text-xs text-slate-400 font-medium ml-1">Unchanged</span>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Resident Timeline ─────────────────────────────────────────────────────────
+
+function fmtShortDate(d: string | null) {
+  if (!d) return ''
+  const dt = new Date(d)
+  return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+function scoreBar(value: number | null) {
+  if (value == null) return null
+  const pct = Math.round((value / 5) * 100)
+  return (
+    <div className="flex items-center gap-1.5">
+      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+        <div className="h-full bg-safira-blue rounded-full" style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs text-slate-500 w-6 text-right">{value.toFixed(1)}</span>
+    </div>
+  )
+}
+
+function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
+  const events: LifecycleEvent[] = [
+    ...lifecycle.health,
+    ...lifecycle.sessions,
+    ...lifecycle.visitations,
+    ...lifecycle.education,
+  ].sort((a, b) => (a.date ?? '').localeCompare(b.date ?? ''))
+
+  if (events.length === 0) return null
+
+  const TYPE_META = {
+    health: { label: 'Health Check', color: 'bg-emerald-500', light: 'bg-emerald-50 border-emerald-100', icon: <Heart size={12} className="text-emerald-600" /> },
+    session: { label: 'Counseling Session', color: 'bg-purple-500', light: 'bg-purple-50 border-purple-100', icon: <Users size={12} className="text-purple-600" /> },
+    visitation: { label: 'Home Visit', color: 'bg-blue-500', light: 'bg-blue-50 border-blue-100', icon: <AlertTriangle size={12} className="text-blue-600" /> },
+    education: { label: 'Education Record', color: 'bg-yellow-500', light: 'bg-yellow-50 border-yellow-100', icon: <GraduationCap size={12} className="text-yellow-600" /> },
+  }
+
+  return (
+    <div className="mt-6">
+      <SectionHeading>Case Timeline</SectionHeading>
+      <div className="relative pl-6">
+        {/* Vertical guide line */}
+        <div className="absolute left-2 top-0 bottom-0 w-px bg-slate-200" />
+
+        <div className="space-y-3">
+          {events.map((ev, i) => {
+            const meta = TYPE_META[ev.type]
+            return (
+              <div key={i} className="relative">
+                {/* Dot */}
+                <div className={`absolute -left-4 top-3 w-2.5 h-2.5 rounded-full border-2 border-white ring-1 ring-slate-200 ${meta.color}`} />
+
+                <div className={`rounded-lg border p-3 ${meta.light}`}>
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center gap-1.5">
+                      {meta.icon}
+                      <span className="text-xs font-semibold text-slate-700">{meta.label}</span>
+                    </div>
+                    <span className="text-xs text-slate-400">{fmtShortDate(ev.date)}</span>
+                  </div>
+
+                  {ev.type === 'health' && (
+                    <div className="space-y-1">
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+                        <div><span className="text-xs text-slate-400">Health</span>{scoreBar(ev.generalHealthScore)}</div>
+                        <div><span className="text-xs text-slate-400">Nutrition</span>{scoreBar(ev.nutritionScore)}</div>
+                        <div><span className="text-xs text-slate-400">Sleep</span>{scoreBar(ev.sleepQualityScore)}</div>
+                        <div><span className="text-xs text-slate-400">Energy</span>{scoreBar(ev.energyLevelScore)}</div>
+                      </div>
+                      <div className="flex gap-2 mt-1 flex-wrap">
+                        {[
+                          [ev.medicalCheckupDone, 'Medical'],
+                          [ev.dentalCheckupDone, 'Dental'],
+                          [ev.psychologicalCheckupDone, 'Psych'],
+                        ].map(([done, label]) => (
+                          <span
+                            key={label as string}
+                            className={`text-xs px-1.5 py-0.5 rounded font-medium ${done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}
+                          >
+                            {done ? '✓' : '✗'} {label}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {ev.type === 'session' && (
+                    <div className="text-xs text-slate-600 space-y-0.5">
+                      <div className="flex gap-3 flex-wrap">
+                        {ev.sessionType && <span className="font-medium">{ev.sessionType}</span>}
+                        {ev.socialWorker && <span className="text-slate-400">{ev.socialWorker}</span>}
+                        {ev.sessionDurationMinutes && <span className="text-slate-400">{ev.sessionDurationMinutes} min</span>}
+                      </div>
+                      {ev.emotionalStateObserved && ev.emotionalStateEnd && (
+                        <div className="flex items-center gap-1">
+                          <span className="text-slate-500">{ev.emotionalStateObserved}</span>
+                          <ArrowRight size={10} className="text-slate-300" />
+                          <span className="text-slate-700 font-medium">{ev.emotionalStateEnd}</span>
+                        </div>
+                      )}
+                      <div className="flex gap-2 flex-wrap">
+                        {ev.progressNoted && <span className="text-emerald-600 font-medium">✓ Progress noted</span>}
+                        {ev.concernsFlagged && <span className="text-orange-500 font-medium">⚠ Concerns flagged</span>}
+                        {ev.interventionsApplied && <span className="text-slate-400">{ev.interventionsApplied}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {ev.type === 'visitation' && (
+                    <div className="text-xs text-slate-600 space-y-0.5">
+                      <div className="flex gap-3 flex-wrap">
+                        {ev.visitType && <span className="font-medium">{ev.visitType}</span>}
+                        {ev.locationVisited && <span className="text-slate-400">{ev.locationVisited}</span>}
+                      </div>
+                      <div className="flex gap-2 flex-wrap">
+                        {ev.familyCooperationLevel && (
+                          <span className={`px-1.5 py-0.5 rounded font-medium ${
+                            ev.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-100 text-emerald-700' :
+                            ev.familyCooperationLevel === 'Non-Cooperative' ? 'bg-red-100 text-red-600' :
+                            'bg-slate-100 text-slate-500'
+                          }`}>{ev.familyCooperationLevel}</span>
+                        )}
+                        {ev.safetyConcernsNoted && <span className="text-orange-500 font-medium">⚠ Safety concerns</span>}
+                        {ev.visitOutcome && <span className="text-slate-400">{ev.visitOutcome}</span>}
+                      </div>
+                    </div>
+                  )}
+
+                  {ev.type === 'education' && (
+                    <div className="text-xs text-slate-600 space-y-0.5">
+                      <div className="flex gap-3 flex-wrap">
+                        {ev.enrollmentStatus && <span className={`font-medium ${ev.enrollmentStatus === 'Enrolled' ? 'text-emerald-600' : 'text-slate-500'}`}>{ev.enrollmentStatus}</span>}
+                        {ev.completionStatus && <span className="text-slate-400">{ev.completionStatus}</span>}
+                      </div>
+                      {ev.attendanceRate != null && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 w-20">Attendance</span>
+                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${Math.round(ev.attendanceRate * 100)}%` }} />
+                          </div>
+                          <span className="text-slate-500 w-8 text-right">{Math.round(ev.attendanceRate * 100)}%</span>
+                        </div>
+                      )}
+                      {ev.progressPercent != null && (
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-slate-400 w-20">Progress</span>
+                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                            <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${Math.round(ev.progressPercent)}%` }} />
+                          </div>
+                          <span className="text-slate-500 w-8 text-right">{Math.round(ev.progressPercent)}%</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
     </div>
   )
 }

@@ -81,18 +81,17 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function formatAmount(amount: number | null, currency: string | null) {
+/** Whole currency units for all contribution amounts on this page. */
+function formatRoundedCurrency(amount: number | null, currency: string | null) {
   if (amount == null) return '—';
+  const rounded = Math.round(amount);
   const code = (currency ?? 'USD').toUpperCase();
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(amount);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(rounded);
 }
 
-/** Per–safehouse card: show real hours/items (no round-up); top summary cards still use Math.ceil. */
-function formatSafehouseImpactValue(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value);
+/** Whole numbers for hours, items, and other non-currency impact lines. */
+function formatRoundedCount(value: number) {
+  return Math.round(value).toLocaleString('en-US');
 }
 
 const MONETARY_TYPES = ['monetary', 'cash', 'financial'];
@@ -392,25 +391,98 @@ export default function DonationHistoryPage() {
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
                           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">Monetary</p>
                           <p className="text-xl font-bold leading-snug">
-                            <span className="text-safira-blue">{formatAmount(summaryBuckets.monetaryTotal, summaryBuckets.monetaryCurrency)}</span>
+                            <span className="text-safira-blue">{formatRoundedCurrency(summaryBuckets.monetaryTotal, summaryBuckets.monetaryCurrency)}</span>
                             <span className="text-[#0f172a] dark:text-white"> donated</span>
                           </p>
                         </div>
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
                           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">In-kind</p>
                           <p className="text-xl font-bold leading-snug">
-                            <span className="text-safira-blue">{Math.ceil(summaryBuckets.inKindItems).toLocaleString()}</span>
+                            <span className="text-safira-blue">{formatRoundedCount(summaryBuckets.inKindItems)}</span>
                             <span className="text-[#0f172a] dark:text-white"> items donated</span>
                           </p>
                         </div>
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
                           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">Time</p>
                           <p className="text-xl font-bold leading-snug">
-                            <span className="text-safira-blue">{Math.ceil(summaryBuckets.timeHours).toLocaleString()}</span>
+                            <span className="text-safira-blue">{formatRoundedCount(summaryBuckets.timeHours)}</span>
                             <span className="text-[#0f172a] dark:text-white"> hours devoted</span>
                           </p>
                         </div>
                       </>
+                    )}
+                  </div>
+
+                  {/* Donation history — collapsible */}
+                  <div className="mb-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                    <button
+                      onClick={() => setHistoryOpen((o) => !o)}
+                      className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-[#0f172a] dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
+                    >
+                      Donation History
+                      {historyOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
+                    </button>
+
+                    {historyOpen && (
+                      <table className="w-full text-sm border-t border-slate-200 dark:border-slate-700">
+                        <thead>
+                          <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Date</th>
+                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Type</th>
+                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Amount</th>
+                            <th className="px-4 py-3" />
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {data.donations.map((d) => {
+                            const isExpanded = expandedId === d.donationId;
+                            const hasAllocations = d.allocations.length > 0;
+                            return (
+                              <Fragment key={d.donationId}>
+                                <tr
+                                  onClick={() => hasAllocations && setExpandedId(isExpanded ? null : d.donationId)}
+                                  className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${hasAllocations ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''} ${isExpanded ? 'bg-slate-50 dark:bg-slate-800/50' : ''}`}
+                                >
+                                  <td className="px-4 py-3 text-[#0f172a] dark:text-white font-medium whitespace-nowrap">{formatDate(d.donationDate)}</td>
+                                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{d.donationType}</td>
+                                  <td className="px-4 py-3 font-semibold text-safira-blue">{formatRoundedCurrency(d.amount, d.currencyCode)}</td>
+                                  <td className="px-4 py-3 text-right text-slate-400 dark:text-slate-500">
+                                    {hasAllocations && (isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
+                                  </td>
+                                </tr>
+                                {isExpanded && (
+                                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
+                                    <td colSpan={4} className="px-6 py-3">
+                                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Used in the following areas:</p>
+                                      <div className="space-y-2">
+                                        {d.allocations.map((a) => (
+                                          <div key={a.allocationId} className="flex items-center gap-2 flex-wrap">
+                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${areaColor(a.programArea ?? '')}`}>
+                                              {a.programArea ?? 'General'}
+                                            </span>
+                                            {a.safehouseCity && (
+                                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
+                                                {a.safehouseCity} Safehouse
+                                              </span>
+                                            )}
+                                            {!isMonetary(d.donationType) && d.impactUnit && isCampaignImpactUnit(d.impactUnit) ? null : (
+                                              <span className="text-xs font-semibold text-safira-blue">
+                                                {!isMonetary(d.donationType) && d.impactUnit
+                                                  ? `${a.amountAllocated != null ? formatRoundedCount(a.amountAllocated) : '—'} ${d.impactUnit}`
+                                                  : formatRoundedCurrency(a.amountAllocated, d.currencyCode)}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ))}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                )}
+                              </Fragment>
+                            );
+                          })}
+                        </tbody>
+                      </table>
                     )}
                   </div>
 
@@ -449,16 +521,16 @@ export default function DonationHistoryPage() {
 
                               {/* Contribution totals */}
                               <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
-                                {s.monetaryTotal > 0 && (
+                                {Math.round(s.monetaryTotal) > 0 && (
                                   <p className="text-sm font-semibold text-safira-blue">
-                                    {formatAmount(s.monetaryTotal, s.currency)} contributed
+                                    {formatRoundedCurrency(s.monetaryTotal, s.currency)} contributed
                                   </p>
                                 )}
                                 {s.impactLines
                                   .filter((line) => !isCampaignImpactUnit(line.unit))
                                   .map((line) => (
                                     <p key={line.unit} className="text-sm font-semibold text-safira-blue">
-                                      {formatSafehouseImpactValue(line.value)}{' '}
+                                      {formatRoundedCount(line.value)}{' '}
                                       {line.unit.toLowerCase().includes('item') ? 'items donated' : `${line.unit} devoted`}
                                     </p>
                                   ))}
@@ -469,79 +541,6 @@ export default function DonationHistoryPage() {
                       </div>
                     </div>
                   )}
-
-                  {/* Donation history — collapsible */}
-                  <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
-                    <button
-                      onClick={() => setHistoryOpen((o) => !o)}
-                      className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-[#0f172a] dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
-                    >
-                      Donation History
-                      {historyOpen ? <ChevronUp size={16} className="text-slate-400" /> : <ChevronDown size={16} className="text-slate-400" />}
-                    </button>
-
-                    {historyOpen && (
-                      <table className="w-full text-sm border-t border-slate-200 dark:border-slate-700">
-                        <thead>
-                          <tr className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Date</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Type</th>
-                            <th className="text-left px-4 py-3 font-semibold text-slate-600 dark:text-slate-300">Amount</th>
-                            <th className="px-4 py-3" />
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {data.donations.map((d) => {
-                            const isExpanded = expandedId === d.donationId;
-                            const hasAllocations = d.allocations.length > 0;
-                            return (
-                              <Fragment key={d.donationId}>
-                                <tr
-                                  onClick={() => hasAllocations && setExpandedId(isExpanded ? null : d.donationId)}
-                                  className={`border-b border-slate-100 dark:border-slate-800 transition-colors ${hasAllocations ? 'cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50' : ''} ${isExpanded ? 'bg-slate-50 dark:bg-slate-800/50' : ''}`}
-                                >
-                                  <td className="px-4 py-3 text-[#0f172a] dark:text-white font-medium whitespace-nowrap">{formatDate(d.donationDate)}</td>
-                                  <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{d.donationType}</td>
-                                  <td className="px-4 py-3 font-semibold text-safira-blue">{formatAmount(d.amount, d.currencyCode)}</td>
-                                  <td className="px-4 py-3 text-right text-slate-400 dark:text-slate-500">
-                                    {hasAllocations && (isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
-                                  </td>
-                                </tr>
-                                {isExpanded && (
-                                  <tr className="border-b border-slate-100 dark:border-slate-800 bg-slate-50 dark:bg-slate-800/30">
-                                    <td colSpan={4} className="px-6 py-3">
-                                      <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-2">Used in the following areas:</p>
-                                      <div className="space-y-2">
-                                        {d.allocations.map((a) => (
-                                          <div key={a.allocationId} className="flex items-center gap-2 flex-wrap">
-                                            <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${areaColor(a.programArea ?? '')}`}>
-                                              {a.programArea ?? 'General'}
-                                            </span>
-                                            {a.safehouseCity && (
-                                              <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300">
-                                                {a.safehouseCity} Safehouse
-                                              </span>
-                                            )}
-                                            {!isMonetary(d.donationType) && d.impactUnit && isCampaignImpactUnit(d.impactUnit) ? null : (
-                                              <span className="text-xs font-semibold text-safira-blue">
-                                                {!isMonetary(d.donationType) && d.impactUnit
-                                                  ? `${a.amountAllocated != null ? a.amountAllocated.toFixed(1) : '—'} ${d.impactUnit}`
-                                                  : formatAmount(a.amountAllocated, d.currencyCode)}
-                                              </span>
-                                            )}
-                                          </div>
-                                        ))}
-                                      </div>
-                                    </td>
-                                  </tr>
-                                )}
-                              </Fragment>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
 
                   {/* CTA */}
                   <div className="mt-8 bg-safira-blue rounded-2xl p-6 text-center text-white">
