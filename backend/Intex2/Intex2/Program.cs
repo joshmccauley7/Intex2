@@ -50,6 +50,8 @@ else
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
+builder.Services.AddScoped<ResidentStatusCalculator>();
+
 // ─── Identity database (PostgreSQL — same server as app DB) ──────────────────
 builder.Services.AddDbContext<AuthIdentityDbContext>(options =>
     options.UseNpgsql(connectionString));
