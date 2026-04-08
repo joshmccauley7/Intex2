@@ -6,7 +6,7 @@ import {
   ResponsiveContainer, Legend, LineChart, Line, CartesianGrid, ReferenceLine,
   LabelList,
 } from 'recharts'
-import { X, Download, Printer, Search, TrendingUp, TrendingDown, Minus } from 'lucide-react'
+import { X, Download, Printer, Search, TrendingUp, TrendingDown, Minus, Filter } from 'lucide-react'
 
 // ── Shared types ──────────────────────────────────────────────────────────────
 
@@ -47,6 +47,9 @@ export interface ChartData {
   sort?: 'asc' | 'desc' | 'none'
   /** Marks primary chart — rendered taller and full-width */
   primary?: boolean
+  /** Item field name used for chart-click → table filter. When set, clicking any element in
+   *  this chart filters the table to rows where item[filterKey] === clicked series name. */
+  filterKey?: string
 }
 
 export interface ColumnDef {
@@ -80,8 +83,13 @@ const phpShort = new Intl.NumberFormat('en-PH', {
 
 // ── Chart panels ──────────────────────────────────────────────────────────────
 
-function PiePanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }) {
+function PiePanel({ chart, isPrimary, onSliceClick, activeValue }: {
+  chart: ChartData; isPrimary: boolean
+  onSliceClick?: (name: string) => void
+  activeValue?: string
+}) {
   const h = resolveHeight(chart, isPrimary)
+  const isFiltering = activeValue != null
   return (
     <div className="flex flex-col">
       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1 shrink-0">
@@ -98,9 +106,15 @@ function PiePanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }
             dataKey="value"
             nameKey="name"
             paddingAngle={chart.type === 'donut' ? 2 : 0}
+            cursor={onSliceClick ? 'pointer' : undefined}
           >
             {chart.series.map((entry, i) => (
-              <Cell key={i} fill={entry.color ?? PALETTE[i % PALETTE.length]} />
+              <Cell
+                key={i}
+                fill={entry.color ?? PALETTE[i % PALETTE.length]}
+                opacity={isFiltering && entry.name !== activeValue ? 0.3 : 1}
+                onClick={onSliceClick ? () => onSliceClick(entry.name) : undefined}
+              />
             ))}
           </Pie>
           <Tooltip
@@ -116,7 +130,11 @@ function PiePanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }
   )
 }
 
-function BarPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }) {
+function BarPanel({ chart, isPrimary, onSliceClick, activeValue }: {
+  chart: ChartData; isPrimary: boolean
+  onSliceClick?: (name: string) => void
+  activeValue?: string
+}) {
   const h = resolveHeight(chart, isPrimary)
 
   // Optionally sort series
@@ -141,6 +159,8 @@ function BarPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }
   const domain: [number | 'auto', number | 'auto'] = chart.xDomain
     ? [chart.xDomain[0], chart.xDomain[1]]
     : [0, 'auto']
+
+  const isFiltering = activeValue != null
 
   return (
     <div className="flex flex-col">
@@ -174,9 +194,19 @@ function BarPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }
           {chart.xDomain && (
             <ReferenceLine x={chart.xDomain[1]} stroke="#e2e8f0" strokeDasharray="3 3" />
           )}
-          <Bar dataKey="value" radius={[0, 3, 3, 0]}>
+          <Bar
+            dataKey="value"
+            radius={[0, 3, 3, 0]}
+            cursor={onSliceClick ? 'pointer' : undefined}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onClick={onSliceClick ? (data: any) => onSliceClick(data.name) : undefined}
+          >
             {series.map((entry, i) => (
-              <Cell key={i} fill={entry.color ?? PALETTE[i % PALETTE.length]} />
+              <Cell
+                key={i}
+                fill={entry.color ?? PALETTE[i % PALETTE.length]}
+                fillOpacity={isFiltering && entry.name !== activeValue ? 0.3 : 1}
+              />
             ))}
           </Bar>
         </BarChart>
@@ -230,9 +260,15 @@ function LinePanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean 
   )
 }
 
-function StackedBarPanel({ chart }: { chart: ChartData }) {
+function StackedBarPanel({ chart, onSliceClick, activeValue }: {
+  chart: ChartData
+  onSliceClick?: (name: string) => void
+  activeValue?: string
+}) {
   const total = chart.series.reduce((s, x) => s + x.value, 0)
   if (total === 0) return null
+
+  const isFiltering = activeValue != null
 
   return (
     <div className="flex flex-col gap-2">
@@ -244,12 +280,14 @@ function StackedBarPanel({ chart }: { chart: ChartData }) {
         {chart.series.map((seg, i) => {
           const pct = (seg.value / total) * 100
           if (pct === 0) return null
+          const isActive = seg.name === activeValue
           return (
             <div
               key={i}
               style={{ width: `${pct}%`, backgroundColor: seg.color ?? PALETTE[i % PALETTE.length] }}
-              className="relative group flex items-center justify-center"
+              className={`relative flex items-center justify-center transition-opacity ${onSliceClick ? 'cursor-pointer' : ''} ${isFiltering && !isActive ? 'opacity-30' : ''} ${isActive ? 'ring-2 ring-inset ring-white/60' : ''}`}
               title={`${seg.name}: ${seg.value.toLocaleString()} (${pct.toFixed(1)}%)`}
+              onClick={onSliceClick ? () => onSliceClick(seg.name) : undefined}
             >
               {pct > 10 && (
                 <span className="text-white text-xs font-semibold drop-shadow-sm pointer-events-none">
@@ -264,13 +302,18 @@ function StackedBarPanel({ chart }: { chart: ChartData }) {
       <div className="flex flex-wrap gap-x-4 gap-y-1">
         {chart.series.map((seg, i) => {
           const pct = total > 0 ? ((seg.value / total) * 100).toFixed(1) : '0'
+          const isActive = seg.name === activeValue
           return (
-            <div key={i} className="flex items-center gap-1.5">
+            <div
+              key={i}
+              className={`flex items-center gap-1.5 transition-opacity ${onSliceClick ? 'cursor-pointer' : ''} ${isFiltering && !isActive ? 'opacity-40' : ''}`}
+              onClick={onSliceClick ? () => onSliceClick(seg.name) : undefined}
+            >
               <div
                 className="w-2.5 h-2.5 rounded-sm shrink-0"
                 style={{ backgroundColor: seg.color ?? PALETTE[i % PALETTE.length] }}
               />
-              <span className="text-xs text-slate-600">
+              <span className={`text-xs ${isActive ? 'text-slate-800 font-semibold' : 'text-slate-600'}`}>
                 {seg.name}: <span className="font-semibold">{seg.value.toLocaleString()}</span>
                 <span className="text-slate-400 ml-1">({pct}%)</span>
               </span>
@@ -320,7 +363,11 @@ function ListPanel({ chart }: { chart: ChartData }) {
 }
 
 /** Compact stat list — stacks vertically so sort order is always visually obvious */
-function StatListPanel({ chart }: { chart: ChartData }) {
+function StatListPanel({ chart, onSliceClick, activeValue }: {
+  chart: ChartData
+  onSliceClick?: (name: string) => void
+  activeValue?: string
+}) {
   const fmt = (v: number) => {
     const prefix = chart.valuePrefix ?? ''
     const suffix = chart.valueSuffix ?? ''
@@ -329,6 +376,7 @@ function StatListPanel({ chart }: { chart: ChartData }) {
       : v.toLocaleString(undefined, { maximumFractionDigits: 2 })
     return `${prefix}${num}${suffix}`
   }
+  const isFiltering = activeValue != null
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide">
@@ -337,10 +385,12 @@ function StatListPanel({ chart }: { chart: ChartData }) {
       <div className="flex flex-col gap-1.5">
         {chart.series.map((item, i) => {
           const color = item.color ?? PALETTE[i % PALETTE.length]
+          const isActive = item.name === activeValue
           return (
             <div
               key={i}
-              className="flex items-center justify-between gap-3 bg-white border border-slate-200 rounded-lg px-3 py-2 shadow-sm"
+              onClick={onSliceClick ? () => onSliceClick(item.name) : undefined}
+              className={`flex items-center justify-between gap-3 rounded-lg px-3 py-2 shadow-sm border transition-all ${onSliceClick ? 'cursor-pointer' : ''} ${isFiltering && !isActive ? 'opacity-40 bg-white border-slate-200' : isActive ? 'bg-blue-50 border-blue-300' : 'bg-white border-slate-200'}`}
             >
               <div className="flex items-center gap-2 min-w-0">
                 <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: color }} />
@@ -355,7 +405,11 @@ function StatListPanel({ chart }: { chart: ChartData }) {
   )
 }
 
-function VerticalBarPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }) {
+function VerticalBarPanel({ chart, isPrimary, onSliceClick, activeValue }: {
+  chart: ChartData; isPrimary: boolean
+  onSliceClick?: (name: string) => void
+  activeValue?: string
+}) {
   const h = resolveHeight(chart, isPrimary)
 
   const series = chart.sort && chart.sort !== 'none'
@@ -377,6 +431,8 @@ function VerticalBarPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: b
   // Rotate x-axis labels when there are many categories
   const rotateLabels = series.length > 4
   const bottomMargin = rotateLabels ? 55 : 24
+
+  const isFiltering = activeValue != null
 
   return (
     <div className="flex flex-col">
@@ -414,9 +470,19 @@ function VerticalBarPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: b
               '',
             ]}
           />
-          <Bar dataKey="value" radius={[3, 3, 0, 0]}>
+          <Bar
+            dataKey="value"
+            radius={[3, 3, 0, 0]}
+            cursor={onSliceClick ? 'pointer' : undefined}
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            onClick={onSliceClick ? (data: any) => onSliceClick(data.name) : undefined}
+          >
             {series.map((entry, i) => (
-              <Cell key={i} fill={entry.color ?? PALETTE[i % PALETTE.length]} />
+              <Cell
+                key={i}
+                fill={entry.color ?? PALETTE[i % PALETTE.length]}
+                fillOpacity={isFiltering && entry.name !== activeValue ? 0.3 : 1}
+              />
             ))}
             {chart.showValueLabels && (
               <LabelList
@@ -433,15 +499,36 @@ function VerticalBarPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: b
   )
 }
 
-function ChartPanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean }) {
+function ChartPanel({
+  chart, isPrimary, onChartClick, activeFilterKey, activeFilterValue,
+}: {
+  chart: ChartData; isPrimary: boolean
+  onChartClick?: (filterKey: string, value: string) => void
+  activeFilterKey?: string
+  activeFilterValue?: string
+}) {
   if (!chart.series.length) return null
-  if (chart.type === 'pie' || chart.type === 'donut') return <PiePanel chart={chart} isPrimary={isPrimary} />
-  if (chart.type === 'bar')         return <BarPanel         chart={chart} isPrimary={isPrimary} />
-  if (chart.type === 'verticalBar') return <VerticalBarPanel chart={chart} isPrimary={isPrimary} />
-  if (chart.type === 'line')        return <LinePanel        chart={chart} isPrimary={isPrimary} />
-  if (chart.type === 'stackedBar')  return <StackedBarPanel  chart={chart} />
-  if (chart.type === 'list')        return <ListPanel        chart={chart} />
-  if (chart.type === 'statList')    return <StatListPanel    chart={chart} />
+
+  // Only wire up click / highlight if this chart has a filterKey
+  const onSliceClick = chart.filterKey && onChartClick
+    ? (name: string) => onChartClick(chart.filterKey!, name)
+    : undefined
+  const activeValue = activeFilterKey === chart.filterKey ? activeFilterValue : undefined
+
+  if (chart.type === 'pie' || chart.type === 'donut')
+    return <PiePanel         chart={chart} isPrimary={isPrimary} onSliceClick={onSliceClick} activeValue={activeValue} />
+  if (chart.type === 'bar')
+    return <BarPanel         chart={chart} isPrimary={isPrimary} onSliceClick={onSliceClick} activeValue={activeValue} />
+  if (chart.type === 'verticalBar')
+    return <VerticalBarPanel chart={chart} isPrimary={isPrimary} onSliceClick={onSliceClick} activeValue={activeValue} />
+  if (chart.type === 'line')
+    return <LinePanel        chart={chart} isPrimary={isPrimary} />
+  if (chart.type === 'stackedBar')
+    return <StackedBarPanel  chart={chart} onSliceClick={onSliceClick} activeValue={activeValue} />
+  if (chart.type === 'list')
+    return <ListPanel        chart={chart} />
+  if (chart.type === 'statList')
+    return <StatListPanel    chart={chart} onSliceClick={onSliceClick} activeValue={activeValue} />
   return null
 }
 
@@ -492,6 +579,7 @@ export function DashboardDetailModal({
 }: DashboardDetailModalProps) {
   const navigate = useNavigate()
   const [search, setSearch] = useState('')
+  const [chartFilter, setChartFilter] = useState<{ key: string; value: string } | null>(null)
 
   const validCharts = charts.filter((c) => c.series.length > 0)
 
@@ -503,14 +591,30 @@ export function DashboardDetailModal({
     ? validCharts.filter((c) => !c.primary).slice(0, 2)
     : validCharts.slice(0, 3)
 
-  const filtered = search
-    ? items.filter((row) =>
-        columns.some((col) => {
-          const val = row[col.key]
-          return val != null && String(val).toLowerCase().includes(search.toLowerCase())
-        })
-      )
-    : items
+  // Compose text search + chart filter
+  let filtered = items
+  if (search) {
+    filtered = filtered.filter((row) =>
+      columns.some((col) => {
+        const val = row[col.key]
+        return val != null && String(val).toLowerCase().includes(search.toLowerCase())
+      })
+    )
+  }
+  if (chartFilter) {
+    filtered = filtered.filter((row) => {
+      const val = row[chartFilter.key]
+      return val != null && String(val).toLowerCase() === chartFilter.value.toLowerCase()
+    })
+  }
+
+  function handleChartClick(filterKey: string, seriesName: string) {
+    setChartFilter((prev) =>
+      prev?.key === filterKey && prev?.value === seriesName
+        ? null   // click same segment → deselect
+        : { key: filterKey, value: seriesName }
+    )
+  }
 
   function exportCsv() {
     const header = columns.map((c) => `"${c.label}"`).join(',')
@@ -533,13 +637,36 @@ export function DashboardDetailModal({
     URL.revokeObjectURL(url)
   }
 
+  function handlePrint() {
+    const STYLE_ID = '__modal-print-css'
+    if (!document.getElementById(STYLE_ID)) {
+      const style = document.createElement('style')
+      style.id = STYLE_ID
+      style.textContent = `
+        @media print {
+          #root { display: none !important; }
+          .modal-print-overlay { position: static !important; background: transparent !important; padding: 0 !important; display: block !important; }
+          .modal-print-backdrop { display: none !important; }
+          .modal-print-card { box-shadow: none !important; border-radius: 0 !important; height: auto !important; max-height: none !important; overflow: visible !important; width: 100% !important; max-width: 100% !important; }
+          .modal-print-scroll { overflow: visible !important; height: auto !important; max-height: none !important; }
+          .modal-no-print { display: none !important; }
+        }
+      `
+      document.head.appendChild(style)
+    }
+    window.print()
+    window.addEventListener('afterprint', () => {
+      document.getElementById(STYLE_ID)?.remove()
+    }, { once: true })
+  }
+
   return createPortal(
-    <div className="fixed inset-0 z-50 flex items-start justify-center pt-6 px-4 pb-6">
+    <div className="modal-print-overlay fixed inset-0 z-50 flex items-start justify-center pt-6 px-4 pb-6">
       {/* Backdrop — clicking it does nothing; only X closes */}
-      <div className="absolute inset-0 bg-black/50" />
+      <div className="modal-print-backdrop absolute inset-0 bg-black/50" />
 
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200"
+        className="modal-print-card relative bg-white rounded-2xl shadow-2xl w-full max-w-6xl h-[90vh] flex flex-col animate-in fade-in slide-in-from-bottom-4 duration-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* ── Header ── */}
@@ -556,7 +683,7 @@ export function DashboardDetailModal({
             {periodOptions && periodOptions.length > 0 && (
               <select
                 value={period}
-                onChange={(e) => onPeriodChange?.(e.target.value)}
+                onChange={(e) => { setChartFilter(null); onPeriodChange?.(e.target.value) }}
                 disabled={loading}
                 className="text-sm border border-slate-200 rounded-lg px-3 py-1.5 text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-safira-blue/30 cursor-pointer disabled:opacity-50"
               >
@@ -566,7 +693,7 @@ export function DashboardDetailModal({
               </select>
             )}
           </div>
-          <div className="flex items-center gap-2">
+          <div className="modal-no-print flex items-center gap-2">
             <button
               onClick={exportCsv}
               disabled={loading || filtered.length === 0}
@@ -576,7 +703,7 @@ export function DashboardDetailModal({
               Export CSV
             </button>
             <button
-              onClick={() => window.print()}
+              onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 bg-slate-100 hover:bg-slate-200 rounded-lg transition-colors"
             >
               <Printer size={13} />
@@ -625,43 +752,62 @@ export function DashboardDetailModal({
           </div>
         )}
 
-        {/* ── Charts ── */}
-        {!loading && validCharts.length > 0 && (
-          <div className="px-6 pt-4 pb-2 border-b border-slate-100 shrink-0 flex flex-col gap-4">
-            {/* Primary chart — full width (only when explicitly marked) */}
-            {primaryChart && (
-              <ChartPanel key={`${primaryChart.id}-${period ?? 'all'}`} chart={primaryChart} isPrimary={true} />
-            )}
-            {/* Grid charts — side by side (2-col) or single column */}
-            {gridCharts.length > 0 && (
-              <div className={`grid gap-6 ${gridCharts.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
-                {gridCharts.map((chart) => (
-                  <ChartPanel key={`${chart.id}-${period ?? 'all'}`} chart={chart} isPrimary={false} />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {/* ── Charts + Search + Table (single shared scroll area) ── */}
+        <div className="modal-print-scroll overflow-y-auto flex-1 min-h-0">
 
-        {/* ── Search bar ── */}
-        <div className="px-6 py-3 border-b border-slate-100 shrink-0">
-          <div className="relative max-w-sm">
-            <Search
-              size={14}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
-            />
-            <input
-              type="text"
-              placeholder="Search within loaded records…"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-safira-blue/30 bg-white"
-            />
-          </div>
-        </div>
+          {/* Charts */}
+          {!loading && validCharts.length > 0 && (
+            <div className="px-6 pt-4 pb-4 border-b border-slate-100 flex flex-col gap-4">
+              {/* Primary chart — full width (only when explicitly marked) */}
+              {primaryChart && (
+                <ChartPanel key={`${primaryChart.id}-${period ?? 'all'}`} chart={primaryChart} isPrimary={true} onChartClick={handleChartClick} activeFilterKey={chartFilter?.key} activeFilterValue={chartFilter?.value} />
+              )}
+              {/* Grid charts — side by side (2-col) or single column */}
+              {gridCharts.length > 0 && (
+                <div className={`grid gap-6 ${gridCharts.length === 1 ? 'grid-cols-1' : 'grid-cols-2'}`}>
+                  {gridCharts.map((chart) => (
+                    <ChartPanel key={`${chart.id}-${period ?? 'all'}`} chart={chart} isPrimary={false} onChartClick={handleChartClick} activeFilterKey={chartFilter?.key} activeFilterValue={chartFilter?.value} />
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
 
-        {/* ── Table ── */}
-        <div className="overflow-y-auto flex-1">
+          {/* Search bar — right above the table */}
+          <div className="modal-no-print px-6 py-3 border-b border-slate-100 bg-white">
+            <div className="relative max-w-sm">
+              <Search
+                size={14}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none"
+              />
+              <input
+                type="text"
+                placeholder="Search within loaded records…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-safira-blue/30 bg-white"
+              />
+            </div>
+          </div>
+
+          {/* Active chart filter chip */}
+          {chartFilter && (
+            <div className="modal-no-print px-6 py-2 bg-blue-50 border-b border-blue-100 flex items-center gap-2">
+              <Filter size={12} className="text-blue-500 shrink-0" />
+              <span className="text-xs text-blue-700">
+                Chart filter: <strong>{chartFilter.value}</strong>
+              </span>
+              <button
+                onClick={() => setChartFilter(null)}
+                className="ml-1 text-blue-400 hover:text-blue-600 transition-colors"
+                title="Clear chart filter"
+              >
+                <X size={12} />
+              </button>
+            </div>
+          )}
+
+          {/* Table */}
           {loading ? (
             <p className="text-sm text-slate-400 px-6 py-10 text-center">Loading…</p>
           ) : filtered.length === 0 ? (
@@ -684,7 +830,6 @@ export function DashboardDetailModal({
               </thead>
               <tbody className="divide-y divide-slate-50">
                 {filtered.map((row, i) => {
-                  // Row is only clickable if the per-row guard approves (or no guard + handler exists)
                   const clickable = onRowClick != null &&
                     (isRowClickable ? isRowClickable(row) : true)
                   return (
@@ -711,7 +856,7 @@ export function DashboardDetailModal({
         </div>
 
         {/* ── Footer ── */}
-        <div className="px-6 py-3 border-t border-slate-100 shrink-0 flex items-center justify-between">
+        <div className="modal-no-print px-6 py-3 border-t border-slate-100 shrink-0 flex items-center justify-between">
           <span className="text-xs text-slate-400">
             {search
               ? `${filtered.length} match${filtered.length === 1 ? '' : 'es'} within ${items.length.toLocaleString()} loaded`

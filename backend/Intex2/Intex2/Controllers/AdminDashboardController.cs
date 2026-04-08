@@ -147,9 +147,86 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "country",       type = "bar",   title = $"Giving by Country ({periodLabel}, PHP)", series = countrySeries,       valuePrefix = "₱", primary = true, sort = "desc" },
+                    new { id = "country",       type = "bar",   title = $"Giving by Country ({periodLabel}, PHP)", series = countrySeries,       valuePrefix = "₱", primary = true, sort = "desc", filterKey = "country" },
                     new { id = "concentration", type = "donut", title = $"Donor Concentration ({periodLabel})",    series = concentrationSeries, compact = true },
                     new { id = "cadence",       type = "bar",   title = $"Gift Frequency ({periodLabel})",          series = cadenceSeries,       compact = true },
+                };
+                return Ok(new { kpis, charts, items, totalCount = total });
+            }
+
+            // ── Churn all tiers combined ──────────────────────────────────────
+            case "churn-all":
+            {
+                var total       = await _db.DonorChurnPredictions.CountAsync();
+                var avgChurnRaw = await _db.DonorChurnPredictions
+                    .AverageAsync(p => (double?)p.ChurnProbability);
+                var avgChurnPct = avgChurnRaw.HasValue ? Math.Round(avgChurnRaw.Value * 100, 1) : 0.0;
+
+                var highCount = await _db.DonorChurnPredictions.CountAsync(p => p.RiskLevel == "High");
+                var medCount  = await _db.DonorChurnPredictions.CountAsync(p => p.RiskLevel == "Medium");
+                var lowCount  = await _db.DonorChurnPredictions.CountAsync(p => p.RiskLevel == "Low");
+
+                var riskDistribSeries = new[]
+                {
+                    new { name = "High",   value = highCount, color = "#dc2626" },
+                    new { name = "Medium", value = medCount,  color = "#d97706" },
+                    new { name = "Low",    value = lowCount,  color = "#16a34a" },
+                };
+
+                var probData = await _db.DonorChurnPredictions
+                    .Select(p => (double)p.ChurnProbability * 100)
+                    .ToListAsync();
+                var probColors = new[] {
+                    "#bfdbfe", "#93c5fd", "#60a5fa", "#3b82f6", "#2563eb",
+                    "#1d4ed8", "#4338ca", "#6d28d9", "#7c3aed", "#5b21b6"
+                };
+                var probSeries = Enumerable.Range(0, 10)
+                    .Select(i => new {
+                        name  = $"{i * 10}–{i * 10 + 9}%",
+                        value = probData.Count(p => p >= i * 10 && p < (i + 1) * 10),
+                        color = probColors[i],
+                    })
+                    .Where(b => b.value > 0)
+                    .ToArray();
+
+                var rawItemsChurnAll = await _db.DonorChurnPredictions
+                    .OrderBy(p => p.RiskLevel == "High" ? 0 : p.RiskLevel == "Medium" ? 1 : 2)
+                    .ThenByDescending(p => p.ChurnProbability)
+                    .Skip(skip).Take(pageSize)
+                    .Join(_db.Supporters, p => p.SupporterId, s => s.SupporterId,
+                        (p, s) => new {
+                            SupporterId      = s.SupporterId,
+                            s.DisplayName,
+                            RiskLevel        = p.RiskLevel,
+                            ChurnProbability = Math.Round((double)p.ChurnProbability * 100, 1),
+                            LastDonation     = s.Donations.Max(d => (DateOnly?)d.DonationDate),
+                            ValueInPeriod    = s.Donations
+                                .Where(d => d.Amount != null)
+                                .Sum(d => (decimal?)d.Amount) ?? 0m,
+                        })
+                    .ToListAsync();
+
+                var items = rawItemsChurnAll.Select(x => {
+                    var bucketIdx   = x.ChurnProbability >= 100 ? 9 : (int)(x.ChurnProbability / 10);
+                    var bucketStart = bucketIdx * 10;
+                    return new {
+                        x.SupporterId, x.DisplayName, x.RiskLevel, x.ChurnProbability,
+                        x.LastDonation, x.ValueInPeriod,
+                        ChurnBucket = $"{bucketStart}\u2013{bucketStart + 9}%",
+                    };
+                }).ToList<object>();
+
+                var kpis = new object[]
+                {
+                    new { label = "High Risk Donors",      value = highCount.ToString("N0") },
+                    new { label = "Medium Risk Donors",    value = medCount.ToString("N0")  },
+                    new { label = "Low Risk Donors",       value = lowCount.ToString("N0")  },
+                    new { label = "Avg Churn Probability", value = $"{avgChurnPct}%"        },
+                };
+                var charts = new object[]
+                {
+                    new { id = "prob-distrib", type = "verticalBar", title = "Churn Probability Distribution", series = probSeries,        valueSuffix = "", showValueLabels = true, filterKey = "churnBucket" },
+                    new { id = "risk-distrib", type = "stackedBar",  title = "Risk Tier Breakdown",             series = riskDistribSeries, filterKey = "riskLevel" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -218,7 +295,7 @@ public class AdminDashboardController : ControllerBase
                     .ToArray();
 
                 // Action list: sorted by churn probability desc (priority outreach queue)
-                var items = await _db.DonorChurnPredictions
+                var rawItemsChurn = await _db.DonorChurnPredictions
                     .Where(p => p.RiskLevel == level)
                     .OrderByDescending(p => p.ChurnProbability)
                     .Skip(skip).Take(pageSize)
@@ -235,6 +312,16 @@ public class AdminDashboardController : ControllerBase
                         })
                     .ToListAsync();
 
+                var items = rawItemsChurn.Select(x => {
+                    var bucketIdx   = x.ChurnProbability >= 100 ? 9 : (int)(x.ChurnProbability / 10);
+                    var bucketStart = bucketIdx * 10;
+                    return new {
+                        x.SupporterId, x.DisplayName, x.RiskLevel, x.ChurnProbability,
+                        x.LastDonation, x.ValueInPeriod,
+                        ChurnBucket = $"{bucketStart}\u2013{bucketStart + 9}%",
+                    };
+                }).ToList<object>();
+
                 var kpis = new object[]
                 {
                     new { label = $"{level} Risk Donors",                     value = total.ToString("N0") },
@@ -245,7 +332,7 @@ public class AdminDashboardController : ControllerBase
                 // Neither marked primary → both render side-by-side in grid
                 var charts = new object[]
                 {
-                    new { id = "prob-distrib", type = "verticalBar", title = "Churn Probability Distribution", series = probSeries,        valueSuffix = "", showValueLabels = true },
+                    new { id = "prob-distrib", type = "verticalBar", title = "Churn Probability Distribution", series = probSeries,        valueSuffix = "", showValueLabels = true, filterKey = "churnBucket" },
                     new { id = "risk-distrib", type = "stackedBar",  title = "All Risk Tiers",                  series = riskDistribSeries },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
@@ -302,8 +389,8 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "by-safehouse", type = "verticalBar", title = "Residents by Safe House", series = bySafehouse, primary = true, sort = "desc", showValueLabels = true },
-                    new { id = "risk-distrib", type = "stackedBar",  title = "Risk Distribution",        series = riskSeries,  compact = true },
+                    new { id = "by-safehouse", type = "verticalBar", title = "Residents by Safe House", series = bySafehouse, primary = true, sort = "desc", showValueLabels = true, filterKey = "safehouse" },
+                    new { id = "risk-distrib", type = "stackedBar",  title = "Risk Distribution",        series = riskSeries,  compact = true, filterKey = "currentRiskLevel" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -405,7 +492,7 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "by-type", type = "bar", title = $"Donations by Type ({periodLabel})", series = byTypeSeries, primary = true, sort = "desc" },
+                    new { id = "by-type", type = "bar", title = $"Donations by Type ({periodLabel})", series = byTypeSeries, primary = true, sort = "desc", filterKey = "donationType" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -439,7 +526,7 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "by-type", type = "bar", title = $"Upcoming by Type (next {periodLabel})", series = byTypeSeries, primary = true, sort = "desc" },
+                    new { id = "by-type", type = "bar", title = $"Upcoming by Type (next {periodLabel})", series = byTypeSeries, primary = true, sort = "desc", filterKey = "conferenceType" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -564,7 +651,7 @@ public class AdminDashboardController : ControllerBase
                 var atRiskRate = enrolled > 0 ? Math.Round(100.0 * atRisk / enrolled, 1) : 0.0;
 
                 // Action list: sorted by lowest attendance first, within period
-                var items = await _db.EducationRecords
+                var rawItemsEdu = await _db.EducationRecords
                     .Where(e => e.RecordDate != null && e.RecordDate >= periodStart)
                     .OrderBy(e => e.AttendanceRate ?? 1m)
                     .ThenByDescending(e => e.RecordDate)
@@ -580,6 +667,12 @@ public class AdminDashboardController : ControllerBase
                         })
                     .ToListAsync();
 
+                var items = rawItemsEdu.Select(e => new {
+                    e.ResidentId, e.ResidentCode, e.RecordDate, e.EnrollmentStatus,
+                    e.AttendancePct, e.Progress,
+                    AttendanceBucket = e.AttendancePct != null && e.AttendancePct < 70.0 ? "At Risk (<70%)" : "On Track",
+                }).ToList<object>();
+
                 var kpis = new object[]
                 {
                     new { label = $"Records ({periodLabel})", value = total.ToString("N0") },
@@ -591,8 +684,8 @@ public class AdminDashboardController : ControllerBase
                 };
                 var charts = new object[]
                 {
-                    new { id = "enrollment",   type = "donut",      title = "Enrollment Status Mix", series = enrollmentSeries },
-                    new { id = "at-risk-prop", type = "stackedBar", title = "At-Risk vs On Track",   series = atRiskSeries },
+                    new { id = "enrollment",   type = "donut",      title = "Enrollment Status Mix", series = enrollmentSeries, filterKey = "enrollmentStatus" },
+                    new { id = "at-risk-prop", type = "stackedBar", title = "At-Risk vs On Track",   series = atRiskSeries,     filterKey = "attendanceBucket" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -655,8 +748,55 @@ public class AdminDashboardController : ControllerBase
                 var charts = new object[]
                 {
                     // No primary=true → side-by-side
-                    new { id = "by-type", type = "statList",   title = "Sessions by Type",              series = byTypeSeries  },
+                    new { id = "by-type", type = "statList",   title = "Sessions by Type",              series = byTypeSeries,  filterKey = "sessionType" },
                     new { id = "by-risk", type = "stackedBar", title = "Sessions by Resident Risk Tier", series = sessionsByRisk },
+                };
+                return Ok(new { kpis, charts, items, totalCount = total });
+            }
+
+            // ── Active Resident Risk all tiers combined ───────────────────────
+            case "risk-all":
+            {
+                var total     = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
+                var highCount = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "High");
+                var medCount  = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "Medium");
+                var lowCount  = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "Low");
+
+                var riskDistribSeries = new[]
+                {
+                    new { name = "High",   value = highCount, color = "#dc2626" },
+                    new { name = "Medium", value = medCount,  color = "#d97706" },
+                    new { name = "Low",    value = lowCount,  color = "#16a34a" },
+                };
+
+                var bySafehouse = await _db.Residents
+                    .Where(r => r.CaseStatus == "Active")
+                    .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, s) => s.Name)
+                    .GroupBy(name => name)
+                    .Select(g => new { name = g.Key ?? "Unknown", value = g.Count() })
+                    .OrderByDescending(x => x.value)
+                    .ToListAsync();
+
+                var items = await _db.Residents
+                    .Where(r => r.CaseStatus == "Active")
+                    .OrderBy(r => r.CurrentRiskLevel == "High" ? 0 : r.CurrentRiskLevel == "Medium" ? 1 : 2)
+                    .ThenBy(r => r.InternalCode)
+                    .Skip(skip).Take(pageSize)
+                    .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId,
+                        (r, s) => new { ResidentId = r.ResidentId, r.InternalCode, Safehouse = s.Name, RiskLevel = r.CurrentRiskLevel, r.CaseStatus })
+                    .ToListAsync();
+
+                var kpis = new object[]
+                {
+                    new { label = "Active Residents", value = total.ToString("N0")     },
+                    new { label = "High Risk",        value = highCount.ToString("N0") },
+                    new { label = "Medium Risk",      value = medCount.ToString("N0")  },
+                    new { label = "Low Risk",         value = lowCount.ToString("N0")  },
+                };
+                var charts = new object[]
+                {
+                    new { id = "risk-distrib",  type = "stackedBar", title = "Risk Tier Breakdown",     series = riskDistribSeries, filterKey = "riskLevel"   },
+                    new { id = "by-safehouse",  type = "statList",   title = "Residents by Safe House",  series = bySafehouse,       filterKey = "safehouse"   },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -715,7 +855,7 @@ public class AdminDashboardController : ControllerBase
                 var charts = new object[]
                 {
                     // No primary → side-by-side grid
-                    new { id = "by-safehouse", type = "statList",   title = $"{level} Risk by Safe House", series = bySafehouse       },
+                    new { id = "by-safehouse", type = "statList",   title = $"{level} Risk by Safe House", series = bySafehouse,       filterKey = "safehouse" },
                     new { id = "risk-distrib", type = "stackedBar", title = "All Risk Levels",              series = riskDistribSeries },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
