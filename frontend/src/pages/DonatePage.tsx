@@ -121,7 +121,8 @@ function DonationFormWithGate() {
   // Pre-fill from logged-in session + supporter profile
   useEffect(() => {
     if (!session.isAuthenticated || !session.userName) return;
-    setEmail(session.userName);
+    // Prefill from account, but still allow correction (e.g., admin username not an email).
+    if (!saved.email) setEmail(session.userName);
     apiFetch('/api/donations/my-profile')
       .then((profile: { displayName: string | null; phone: string | null }) => {
         if (profile.displayName && !saved.fullName) setFullName(profile.displayName);
@@ -165,7 +166,7 @@ function DonationFormWithGate() {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            amountUsd: amountValue,
+            amountPhp: amountValue,
             fullName: fullName.trim(),
             email: email.trim(),
             phone: phone.trim(),
@@ -185,7 +186,7 @@ function DonationFormWithGate() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          amountUsd: amountValue,
+          amountPhp: amountValue,
           fullName: fullName.trim(),
           email: email.trim(),
           phone: phone.trim(),
@@ -218,7 +219,7 @@ function DonationFormWithGate() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           paymentIntentId: result.paymentIntent.id,
-          amountUsd: amountValue,
+          amountPhp: amountValue,
           isRecurring: false,
           fullName: fullName.trim(),
           email: email.trim(),
@@ -283,11 +284,10 @@ function DonationFormWithGate() {
           <input
             type="email"
             value={email}
-            onChange={(e) => { if (!isAuthenticated) setEmail(e.target.value); }}
-            readOnly={isAuthenticated}
+            onChange={(e) => setEmail(e.target.value)}
             className={`w-full rounded-lg border border-slate-300 dark:border-slate-700 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue ${
               isAuthenticated
-                ? 'bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-400 cursor-not-allowed'
+                ? 'bg-slate-50 dark:bg-slate-800'
                 : 'bg-white dark:bg-slate-800'
             }`}
             placeholder="you@example.com"

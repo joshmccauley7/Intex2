@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using System.Net.Mail;
 using Stripe;
 using Stripe.Checkout;
 
@@ -37,7 +38,8 @@ public class DonationsController : ControllerBase
     [HttpPost("create-payment-intent")]
     public async Task<IActionResult> CreatePaymentIntent([FromBody] CreatePaymentIntentRequest req)
     {
-        if (req.AmountUsd <= 0)
+        var amountPhp = ResolveAmountPhp(req.AmountPhp, req.AmountUsd);
+        if (amountPhp <= 0)
             return BadRequest(new { message = "Amount must be greater than zero." });
 
         var stripeSecret = Environment.GetEnvironmentVariable("STRIPE_SECRET_KEY");
@@ -46,7 +48,8 @@ public class DonationsController : ControllerBase
 
         StripeConfiguration.ApiKey = stripeSecret;
 
-        var amountCents = (long)Math.Round(req.AmountUsd * 100, MidpointRounding.AwayFromZero);
+        var normalizedEmail = NormalizeEmail(req.Email);
+        var amountCents = (long)Math.Round(amountPhp * 100, MidpointRounding.AwayFromZero);
         var service = new PaymentIntentService();
         var options = new PaymentIntentCreateOptions
         {
@@ -56,12 +59,12 @@ public class DonationsController : ControllerBase
             {
                 Enabled = true
             },
-            ReceiptEmail = req.Email,
+            ReceiptEmail = normalizedEmail,
             Description = "Safira donation",
             Metadata = new Dictionary<string, string>
             {
                 ["donor_name"] = req.FullName ?? "",
-                ["donor_email"] = req.Email ?? "",
+                ["donor_email"] = normalizedEmail ?? "",
                 ["donor_phone"] = req.Phone ?? "",
                 ["message"] = req.Message ?? ""
             }
@@ -78,7 +81,8 @@ public class DonationsController : ControllerBase
     [HttpPost("create-recurring-session")]
     public async Task<IActionResult> CreateRecurringSession([FromBody] CreateRecurringSessionRequest req)
     {
-        if (req.AmountUsd <= 0)
+        var amountPhp = ResolveAmountPhp(req.AmountPhp, req.AmountUsd);
+        if (amountPhp <= 0)
             return BadRequest(new { message = "Amount must be greater than zero." });
         if (string.IsNullOrWhiteSpace(req.SuccessUrl) || string.IsNullOrWhiteSpace(req.CancelUrl))
             return BadRequest(new { message = "Success and cancel URLs are required." });
@@ -89,13 +93,14 @@ public class DonationsController : ControllerBase
 
         StripeConfiguration.ApiKey = stripeSecret;
 
-        var amountCents = (long)Math.Round(req.AmountUsd * 100, MidpointRounding.AwayFromZero);
+        var normalizedEmail = NormalizeEmail(req.Email);
+        var amountCents = (long)Math.Round(amountPhp * 100, MidpointRounding.AwayFromZero);
         var options = new SessionCreateOptions
         {
             Mode = "subscription",
             SuccessUrl = req.SuccessUrl,
             CancelUrl = req.CancelUrl,
-            CustomerEmail = req.Email,
+            CustomerEmail = normalizedEmail,
             LineItems = new List<SessionLineItemOptions>
             {
                 new SessionLineItemOptions
@@ -119,10 +124,10 @@ public class DonationsController : ControllerBase
             Metadata = new Dictionary<string, string>
             {
                 ["donor_name"] = req.FullName ?? "",
-                ["donor_email"] = req.Email ?? "",
+                ["donor_email"] = normalizedEmail ?? "",
                 ["donor_phone"] = req.Phone ?? "",
                 ["message"] = req.Message ?? "",
-                ["amount_usd"] = req.AmountUsd.ToString(System.Globalization.CultureInfo.InvariantCulture),
+                ["amount_php"] = amountPhp.ToString(System.Globalization.CultureInfo.InvariantCulture),
                 ["is_recurring"] = "true"
             }
         };
@@ -149,7 +154,8 @@ public class DonationsController : ControllerBase
         if (!string.Equals(intent.Status, "succeeded", StringComparison.OrdinalIgnoreCase))
             return BadRequest(new { message = "Payment has not completed successfully." });
 
-        var expectedCents = (long)Math.Round(req.AmountUsd * 100, MidpointRounding.AwayFromZero);
+        var amountPhp = ResolveAmountPhp(req.AmountPhp, req.AmountUsd);
+        var expectedCents = (long)Math.Round(amountPhp * 100, MidpointRounding.AwayFromZero);
         if (intent.AmountReceived < expectedCents)
             return BadRequest(new { message = "Payment amount mismatch." });
 
@@ -167,7 +173,7 @@ public class DonationsController : ControllerBase
         var supporter = await GetOrCreateSupporterAsync(req.FullName, req.Email, effectivePhone);
         var donation = await CreateDonationAsync(
             supporter.SupporterId,
-            req.AmountUsd,
+            amountPhp,
             req.IsRecurring,
             $"Stripe PI: {req.PaymentIntentId}. {req.Message ?? ""}".Trim()
         );
@@ -199,8 +205,8 @@ public class DonationsController : ControllerBase
         if (existing != null)
             return Ok(new { message = "Donation already recorded.", donationId = existing.DonationId });
 
-        var metaAmount = session.Metadata != null && session.Metadata.TryGetValue("amount_usd", out var v) ? v : null;
-        var amountUsd = decimal.TryParse(metaAmount, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
+        var metaAmount = session.Metadata != null && session.Metadata.TryGetValue("amount_php", out var v) ? v : null;
+        var amountPhp = decimal.TryParse(metaAmount, System.Globalization.NumberStyles.Any, System.Globalization.CultureInfo.InvariantCulture, out var parsed)
             ? parsed
             : ((session.AmountTotal ?? 0) / 100m);
         var fullName = session.Metadata != null && session.Metadata.TryGetValue("donor_name", out var dn) ? dn : null;
@@ -211,7 +217,7 @@ public class DonationsController : ControllerBase
         var supporter = await GetOrCreateSupporterAsync(fullName, email, phone);
         var donation = await CreateDonationAsync(
             supporter.SupporterId,
-            amountUsd,
+            amountPhp,
             true,
             $"Stripe Checkout Session: {req.SessionId}. {message ?? ""}".Trim()
         );
@@ -219,9 +225,26 @@ public class DonationsController : ControllerBase
         return Ok(new { message = "Recurring donation recorded.", donationId = donation.DonationId });
     }
 
+    private static string? NormalizeEmail(string? emailRaw)
+    {
+        if (string.IsNullOrWhiteSpace(emailRaw)) return null;
+        var trimmed = emailRaw.Trim();
+        try
+        {
+            return new MailAddress(trimmed).Address.ToLowerInvariant();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    private static decimal ResolveAmountPhp(decimal? amountPhp, decimal? amountUsd)
+        => amountPhp ?? amountUsd ?? 0;
+
     private async Task<Supporter> GetOrCreateSupporterAsync(string? fullNameRaw, string? emailRaw, string? phoneRaw)
     {
-        var email = emailRaw?.Trim();
+        var email = NormalizeEmail(emailRaw);
         var fullName = string.IsNullOrWhiteSpace(fullNameRaw) ? "Anonymous Donor" : fullNameRaw.Trim();
         var phone = phoneRaw?.Trim();
 
@@ -256,7 +279,7 @@ public class DonationsController : ControllerBase
         return supporter;
     }
 
-    private async Task<Donation> CreateDonationAsync(int supporterId, decimal amountUsd, bool isRecurring, string notes)
+    private async Task<Donation> CreateDonationAsync(int supporterId, decimal amountPhp, bool isRecurring, string notes)
     {
         var donation = new Donation
         {
@@ -266,7 +289,7 @@ public class DonationsController : ControllerBase
             IsRecurring = isRecurring,
             ChannelSource = "Stripe",
             CurrencyCode = "PHP",
-            Amount = amountUsd,
+            Amount = amountPhp,
             Notes = notes
         };
         _db.Donations.Add(donation);
@@ -277,7 +300,8 @@ public class DonationsController : ControllerBase
 
 public sealed class CreatePaymentIntentRequest
 {
-    public decimal AmountUsd { get; set; }
+    public decimal? AmountPhp { get; set; }
+    public decimal? AmountUsd { get; set; } // legacy fallback
     public string? FullName { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }
@@ -287,7 +311,8 @@ public sealed class CreatePaymentIntentRequest
 public sealed class RecordDonationRequest
 {
     public string PaymentIntentId { get; set; } = "";
-    public decimal AmountUsd { get; set; }
+    public decimal? AmountPhp { get; set; }
+    public decimal? AmountUsd { get; set; } // legacy fallback
     public bool IsRecurring { get; set; }
     public string? FullName { get; set; }
     public string? Email { get; set; }
@@ -297,7 +322,8 @@ public sealed class RecordDonationRequest
 
 public sealed class CreateRecurringSessionRequest
 {
-    public decimal AmountUsd { get; set; }
+    public decimal? AmountPhp { get; set; }
+    public decimal? AmountUsd { get; set; } // legacy fallback
     public string? FullName { get; set; }
     public string? Email { get; set; }
     public string? Phone { get; set; }

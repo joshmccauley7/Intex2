@@ -376,30 +376,56 @@ export default function ResidentsPage() {
 
       {/* Filters */}
       <div className="flex gap-3 mb-6 flex-wrap">
+        <label htmlFor="resident-search-filter" className="sr-only">Search residents by internal code</label>
         <input
+          id="resident-search-filter"
           placeholder="Search by code..."
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           className={filterClass}
         />
-        <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className={filterClass}>
+        <label htmlFor="resident-status-filter" className="sr-only">Filter by resident status</label>
+        <select
+          id="resident-status-filter"
+          value={statusFilter}
+          onChange={(e) => setStatusFilter(e.target.value)}
+          className={filterClass}
+        >
           <option value="">All Statuses</option>
           <option value="Active">Active</option>
           <option value="Closed">Closed</option>
           <option value="Transferred">Transferred</option>
         </select>
-        <select value={safehouseFilter} onChange={(e) => setSafehouseFilter(e.target.value)} className={filterClass}>
+        <label htmlFor="resident-safehouse-filter" className="sr-only">Filter by safehouse</label>
+        <select
+          id="resident-safehouse-filter"
+          value={safehouseFilter}
+          onChange={(e) => setSafehouseFilter(e.target.value)}
+          className={filterClass}
+        >
           <option value="">All Safehouses</option>
           {SAFEHOUSES.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
         </select>
-        <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)} className={filterClass}>
+        <label htmlFor="resident-category-filter" className="sr-only">Filter by case category</label>
+        <select
+          id="resident-category-filter"
+          value={categoryFilter}
+          onChange={(e) => setCategoryFilter(e.target.value)}
+          className={filterClass}
+        >
           <option value="">All Categories</option>
           <option value="Abandoned">Abandoned</option>
           <option value="Foundling">Foundling</option>
           <option value="Neglected">Neglected</option>
           <option value="Surrendered">Surrendered</option>
         </select>
-        <select value={riskFilter} onChange={(e) => setRiskFilter(e.target.value)} className={filterClass}>
+        <label htmlFor="resident-risk-filter" className="sr-only">Filter by risk level</label>
+        <select
+          id="resident-risk-filter"
+          value={riskFilter}
+          onChange={(e) => setRiskFilter(e.target.value)}
+          className={filterClass}
+        >
           <option value="">All Risk Levels</option>
           <option value="Critical">Critical</option>
           <option value="High">High</option>
