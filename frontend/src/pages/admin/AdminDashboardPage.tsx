@@ -511,23 +511,23 @@ export default function AdminDashboardPage() {
             predictable support better than total donor count alone.
           </p>
         </div>
-
-        <StatCard
-          icon={<AlertTriangle size={20} className="text-red-500" />}
-          label="High Churn Risk"
-          value={data.highChurnCount}
-          sub="donors at risk of lapsing"
-          highlight
-          onClick={() => openModal('churn-high')}
-          action={
-            <button
-              className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-left"
-              onClick={() => navigate('/admin/donors?tab=outreach')}
-            >
-              Go to Outreach Queue →
-            </button>
-          }
-        />
+        {data.donorOkrPercent != null ? (
+          <>
+            <div className="text-3xl font-bold tabular-nums text-[#0f172a]">
+              {data.donorOkrPercent.toLocaleString('en-US', { maximumFractionDigits: 1 })}
+              <span className="text-xl font-bold text-slate-600">%</span>
+            </div>
+            <p className="text-xs text-slate-400 mt-1">
+              Primary OKR — {data.donorOkrRecentCount} of {data.activeDonors} active donor
+              {data.activeDonors === 1 ? '' : 's'} with a donation in the last 3 months
+            </p>
+          </>
+        ) : (
+          <>
+            <div className="text-3xl font-bold text-slate-400">—</div>
+            <p className="text-xs text-slate-400 mt-1">No active donors to measure yet.</p>
+          </>
+        )}
       </div>
 
       {/* ── Stat cards ── */}

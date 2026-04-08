@@ -5,13 +5,34 @@ import { useCookieConsent } from '../../hooks/useCookieConsent';
 interface SiteFooterProps {
   variant?: 'dark' | 'light';
   className?: string;
+  homeLang?: 'en' | 'pt' | 'fil';
 }
+
+const footerCopy = {
+  en: {
+    allRightsReserved: 'All rights reserved.',
+    privacyPolicy: 'Privacy Policy',
+    cookieSettings: 'Cookie settings',
+  },
+  pt: {
+    allRightsReserved: 'Todos os direitos reservados.',
+    privacyPolicy: 'Politica de privacidade',
+    cookieSettings: 'Configuracoes de cookies',
+  },
+  fil: {
+    allRightsReserved: 'Lahat ng karapatan ay nakalaan.',
+    privacyPolicy: 'Patakaran sa privacy',
+    cookieSettings: 'Cookie settings',
+  },
+} as const;
 
 export default function SiteFooter({
   variant = 'dark',
   className = '',
+  homeLang = 'en',
 }: SiteFooterProps) {
   const { openCookieSettings } = useCookieConsent();
+  const copy = footerCopy[homeLang];
 
   const isDark = variant === 'dark';
 
@@ -24,8 +45,7 @@ export default function SiteFooter({
       } ${className}`}
     >
       <p className="mb-3">
-        &copy; {new Date().getFullYear()} {siteConfig.SITE_NAME}. All rights
-        reserved.
+        &copy; {new Date().getFullYear()} {siteConfig.SITE_NAME}. {copy.allRightsReserved}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2">
         <Link
@@ -36,7 +56,7 @@ export default function SiteFooter({
               : 'hover:text-safira-blue dark:hover:text-blue-400 transition-colors underline-offset-2 hover:underline'
           }
         >
-          Privacy Policy
+          {copy.privacyPolicy}
         </Link>
         <span
           className={
@@ -55,7 +75,7 @@ export default function SiteFooter({
               : 'hover:text-safira-blue dark:hover:text-blue-400 transition-colors underline-offset-2 hover:underline bg-transparent border-0 cursor-pointer text-inherit text-sm p-0 font-[inherit]'
           }
         >
-          Cookie settings
+          {copy.cookieSettings}
         </button>
       </div>
     </footer>
