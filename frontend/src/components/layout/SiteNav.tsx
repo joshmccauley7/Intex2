@@ -19,8 +19,8 @@ export default function SiteNav() {
 
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     isActive
-      ? 'text-white hover:text-blue-400 transition-colors'
-      : 'text-slate-300 hover:text-white transition-colors';
+      ? 'text-safira-blue dark:text-white transition-colors'
+      : 'text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors';
 
   const roleLabel = isAdmin ? 'Admin' : isDonor ? 'Donor' : null;
   const roleBadgeClass = isAdmin
@@ -28,7 +28,7 @@ export default function SiteNav() {
     : 'bg-emerald-600 text-white';
 
   return (
-    <nav className="bg-[#0f172a] dark:bg-slate-950 text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-800/80">
+    <nav className="bg-white dark:bg-slate-950 text-slate-900 dark:text-white px-6 py-4 flex items-center justify-between sticky top-0 z-50 border-b border-slate-200 dark:border-slate-800/80">
       {/* Logo */}
       <Link to="/" className="flex items-center gap-2 font-bold text-xl shrink-0">
         <img src={navLogoImg} alt="Safira logo" style={{ width: 22, height: 22, objectFit: 'cover', borderRadius: '4px' }} />
@@ -56,7 +56,7 @@ export default function SiteNav() {
             window.open(`https://translate.google.com/translate?sl=en&u=${url}`, '_blank');
           }}
           title="Translate this page"
-          className="flex items-center text-slate-300 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+          className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
         >
           <Globe size={16} />
         </button>
@@ -65,7 +65,7 @@ export default function SiteNav() {
           <>
             <Link
               to="/profile"
-              className="flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
+              className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               {session.userName}
               {roleLabel && (
@@ -77,7 +77,7 @@ export default function SiteNav() {
             <button
               onClick={() => setLogoutConfirmOpen(true)}
               title="Sign out"
-              className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+              className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
             >
               <LogOut size={16} />
             </button>
@@ -100,7 +100,7 @@ export default function SiteNav() {
             window.open(`https://translate.google.com/translate?sl=en&u=${url}`, '_blank');
           }}
           title="Translate this page"
-          className="flex items-center text-slate-300 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+          className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
         >
           <Globe size={16} />
         </button>
@@ -108,7 +108,7 @@ export default function SiteNav() {
         <button
           type="button"
           onClick={() => setMobileMenuOpen((open) => !open)}
-          className="flex items-center text-slate-300 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+          className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
           aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
           aria-expanded={mobileMenuOpen}
           aria-controls="mobile-site-nav-menu"
@@ -121,7 +121,7 @@ export default function SiteNav() {
       {mobileMenuOpen && (
         <div
           id="mobile-site-nav-menu"
-          className="md:hidden absolute left-0 right-0 top-full border-b border-slate-800 bg-[#0f172a] dark:bg-slate-950 px-4 py-4 shadow-xl"
+          className="md:hidden absolute left-0 right-0 top-full border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 px-4 py-4 shadow-xl"
         >
           <div className="flex flex-col gap-1 text-sm font-medium">
             <NavLink to="/" end className={linkClass} onClick={() => setMobileMenuOpen(false)}>Home</NavLink>
@@ -139,13 +139,13 @@ export default function SiteNav() {
             )}
           </div>
 
-          <div className="mt-4 pt-3 border-t border-slate-800">
+          <div className="mt-4 pt-3 border-t border-slate-200 dark:border-slate-800">
             {session.isAuthenticated ? (
               <div className="flex items-center justify-between gap-3">
                 <Link
                   to="/profile"
                   onClick={() => setMobileMenuOpen(false)}
-                  className="flex items-center gap-2 text-sm font-medium text-slate-300 hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-800"
+                  className="flex items-center gap-2 text-sm font-medium text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   {session.userName}
                   {roleLabel && (
@@ -160,7 +160,7 @@ export default function SiteNav() {
                     setLogoutConfirmOpen(true);
                   }}
                   title="Sign out"
-                  className="flex items-center gap-1 text-sm text-slate-400 hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-800"
+                  className="flex items-center gap-1 text-sm text-slate-500 hover:text-slate-900 dark:text-slate-400 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
                 >
                   <LogOut size={16} />
                 </button>
