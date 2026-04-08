@@ -8,10 +8,12 @@ using Microsoft.EntityFrameworkCore;
 public class ResidentsController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly ResidentStatusCalculator _statusCalculator;
 
-    public ResidentsController(AppDbContext db)
+    public ResidentsController(AppDbContext db, ResidentStatusCalculator statusCalculator)
     {
         _db = db;
+        _statusCalculator = statusCalculator;
     }
 
     // GET /api/residents?status=Active&safehouseId=1&category=Neglected&socialWorker=Jane&riskLevel=High&search=code
@@ -58,13 +60,33 @@ public class ResidentsController : ControllerBase
                 r.SafehouseId,
                 r.AssignedSocialWorker,
                 r.PresentAge,
-                r.CurrentRiskLevel,
                 r.ReintegrationStatus,
                 r.DateOfAdmission
             })
             .ToListAsync();
 
-        return Ok(residents);
+        var ids = residents.Select(r => r.ResidentId).ToList();
+        var statusMap = await _statusCalculator.ComputeBatchAsync(ids);
+
+        return Ok(residents.Select(r =>
+        {
+            var si = statusMap.GetValueOrDefault(r.ResidentId)
+                ?? new ResidentStatusIndicatorsDto("yellow", "yellow", "yellow", "yellow");
+            return new
+            {
+                r.ResidentId,
+                r.InternalCode,
+                r.CaseControlNo,
+                r.CaseCategory,
+                r.CaseStatus,
+                r.SafehouseId,
+                r.AssignedSocialWorker,
+                r.PresentAge,
+                r.ReintegrationStatus,
+                r.DateOfAdmission,
+                statusIndicators = new { health = si.Health, education = si.Education, counseling = si.Counseling, risk = si.Risk },
+            };
+        }));
     }
 
     // GET /api/residents/:id
@@ -151,6 +173,96 @@ public class ResidentsController : ControllerBase
 
         await _db.SaveChangesAsync();
         return Ok(resident);
+    }
+
+    // GET /api/residents/:id/lifecycle
+    [HttpGet("{id}/lifecycle")]
+    public async Task<IActionResult> GetLifecycle(int id)
+    {
+        var resident = await _db.Residents
+            .AsNoTracking()
+            .Where(r => r.ResidentId == id)
+            .Select(r => new { r.InitialRiskLevel, r.CurrentRiskLevel })
+            .FirstOrDefaultAsync();
+
+        if (resident == null) return NotFound();
+
+        var statusMap = await _statusCalculator.ComputeBatchAsync(new[] { id });
+        var si = statusMap.GetValueOrDefault(id)
+            ?? new ResidentStatusIndicatorsDto("yellow", "yellow", "yellow", "yellow");
+
+        var health = await _db.HealthWellbeingRecords
+            .AsNoTracking()
+            .Where(r => r.ResidentId == id)
+            .OrderBy(r => r.RecordDate)
+            .Select(r => new {
+                type = "health",
+                date = r.RecordDate,
+                r.GeneralHealthScore,
+                r.NutritionScore,
+                r.SleepQualityScore,
+                r.EnergyLevelScore,
+                r.MedicalCheckupDone,
+                r.DentalCheckupDone,
+                r.PsychologicalCheckupDone
+            })
+            .ToListAsync();
+
+        var sessions = await _db.ProcessRecordings
+            .AsNoTracking()
+            .Where(r => r.ResidentId == id)
+            .OrderBy(r => r.SessionDate)
+            .Select(r => new {
+                type = "session",
+                date = r.SessionDate,
+                r.SessionType,
+                r.SocialWorker,
+                r.SessionDurationMinutes,
+                r.EmotionalStateObserved,
+                r.EmotionalStateEnd,
+                r.ProgressNoted,
+                r.ConcernsFlagged,
+                r.InterventionsApplied
+            })
+            .ToListAsync();
+
+        var visitations = await _db.HomeVisitations
+            .AsNoTracking()
+            .Where(r => r.ResidentId == id)
+            .OrderBy(r => r.VisitDate)
+            .Select(r => new {
+                type = "visitation",
+                date = r.VisitDate,
+                r.VisitType,
+                r.LocationVisited,
+                r.FamilyCooperationLevel,
+                r.SafetyConcernsNoted,
+                r.VisitOutcome
+            })
+            .ToListAsync();
+
+        var education = await _db.EducationRecords
+            .AsNoTracking()
+            .Where(r => r.ResidentId == id)
+            .OrderBy(r => r.RecordDate)
+            .Select(r => new {
+                type = "education",
+                date = r.RecordDate,
+                r.EnrollmentStatus,
+                r.AttendanceRate,
+                r.ProgressPercent,
+                r.CompletionStatus
+            })
+            .ToListAsync();
+
+        return Ok(new {
+            riskJourney = new { initial = resident.InitialRiskLevel, current = resident.CurrentRiskLevel },
+            statusIndicators = new { health = si.Health, education = si.Education, counseling = si.Counseling, risk = si.Risk },
+            health,
+            sessions,
+            visitations,
+            education
+        });
     }
 
     // DELETE /api/residents/:id

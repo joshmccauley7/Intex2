@@ -81,18 +81,17 @@ function formatDate(dateStr: string) {
   return d.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
-function formatAmount(amount: number | null, currency: string | null) {
+/** Whole currency units for all contribution amounts on this page. */
+function formatRoundedCurrency(amount: number | null, currency: string | null) {
   if (amount == null) return '—';
+  const rounded = Math.round(amount);
   const code = (currency ?? 'USD').toUpperCase();
-  return new Intl.NumberFormat('en-US', { style: 'currency', currency: code }).format(amount);
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: code, maximumFractionDigits: 0 }).format(rounded);
 }
 
-/** Per–safehouse card: show real hours/items (no round-up); top summary cards still use Math.ceil. */
-function formatSafehouseImpactValue(value: number) {
-  return new Intl.NumberFormat('en-US', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  }).format(value);
+/** Whole numbers for hours, items, and other non-currency impact lines. */
+function formatRoundedCount(value: number) {
+  return Math.round(value).toLocaleString('en-US');
 }
 
 const MONETARY_TYPES = ['monetary', 'cash', 'financial'];
@@ -433,21 +432,21 @@ export default function DonationHistoryPage() {
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
                           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">Monetary</p>
                           <p className="text-xl font-bold leading-snug">
-                            <span className="text-safira-blue">{formatAmount(summaryBuckets.monetaryTotal, summaryBuckets.monetaryCurrency)}</span>
+                            <span className="text-safira-blue">{formatRoundedCurrency(summaryBuckets.monetaryTotal, summaryBuckets.monetaryCurrency)}</span>
                             <span className="text-[#0f172a] dark:text-white"> donated</span>
                           </p>
                         </div>
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
                           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">In-kind</p>
                           <p className="text-xl font-bold leading-snug">
-                            <span className="text-safira-blue">{Math.ceil(summaryBuckets.inKindItems).toLocaleString()}</span>
+                            <span className="text-safira-blue">{formatRoundedCount(summaryBuckets.inKindItems)}</span>
                             <span className="text-[#0f172a] dark:text-white"> items donated</span>
                           </p>
                         </div>
                         <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 px-6 py-5 min-w-[11rem] sm:min-w-[13rem] shrink-0 snap-start shadow-sm">
                           <p className="text-sm text-slate-500 dark:text-slate-400 mb-2 font-medium">Time</p>
                           <p className="text-xl font-bold leading-snug">
-                            <span className="text-safira-blue">{Math.ceil(summaryBuckets.timeHours).toLocaleString()}</span>
+                            <span className="text-safira-blue">{formatRoundedCount(summaryBuckets.timeHours)}</span>
                             <span className="text-[#0f172a] dark:text-white"> hours devoted</span>
                           </p>
                         </div>
@@ -520,7 +519,7 @@ export default function DonationHistoryPage() {
                   )}
 
                   {/* Donation history — collapsible */}
-                  <div className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="mb-10 bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
                     <button
                       onClick={() => setHistoryOpen((o) => !o)}
                       className="w-full flex items-center justify-between px-5 py-4 text-sm font-semibold text-[#0f172a] dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors"
@@ -551,7 +550,7 @@ export default function DonationHistoryPage() {
                                 >
                                   <td className="px-4 py-3 text-[#0f172a] dark:text-white font-medium whitespace-nowrap">{formatDate(d.donationDate)}</td>
                                   <td className="px-4 py-3 text-slate-600 dark:text-slate-300">{d.donationType}</td>
-                                  <td className="px-4 py-3 font-semibold text-safira-blue">{formatAmount(d.amount, d.currencyCode)}</td>
+                                  <td className="px-4 py-3 font-semibold text-safira-blue">{formatRoundedCurrency(d.amount, d.currencyCode)}</td>
                                   <td className="px-4 py-3 text-right text-slate-400 dark:text-slate-500">
                                     {hasAllocations && (isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />)}
                                   </td>
@@ -574,8 +573,8 @@ export default function DonationHistoryPage() {
                                             {!isMonetary(d.donationType) && d.impactUnit && isCampaignImpactUnit(d.impactUnit) ? null : (
                                               <span className="text-xs font-semibold text-safira-blue">
                                                 {!isMonetary(d.donationType) && d.impactUnit
-                                                  ? `${a.amountAllocated != null ? a.amountAllocated.toFixed(1) : '—'} ${d.impactUnit}`
-                                                  : formatAmount(a.amountAllocated, d.currencyCode)}
+                                                  ? `${a.amountAllocated != null ? formatRoundedCount(a.amountAllocated) : '—'} ${d.impactUnit}`
+                                                  : formatRoundedCurrency(a.amountAllocated, d.currencyCode)}
                                               </span>
                                             )}
                                           </div>
@@ -591,6 +590,62 @@ export default function DonationHistoryPage() {
                       </table>
                     )}
                   </div>
+
+                  {/* Safehouse impact cards */}
+                  {safehouseImpact.length > 0 && (
+                    <div className="mb-10">
+                      <h2 className="text-lg font-bold text-[#0f172a] dark:text-white mb-4">Where Your Donations Went</h2>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+                        {safehouseImpact.map((s) => (
+                          <div key={s.safehouseId} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 overflow-hidden flex flex-col">
+                            {/* Photo */}
+                            <div className="h-44 overflow-hidden">
+                              <SafehouseCardPhoto safehouseId={s.safehouseId} city={s.city} />
+                            </div>
+
+                            {/* Content */}
+                            <div className="p-4 flex flex-col flex-1">
+                              <div className="flex items-start gap-1 mb-1">
+                                <MapPin size={14} className="text-safira-blue mt-0.5 shrink-0" />
+                                <div>
+                                  <p className="text-sm font-bold text-[#0f172a] dark:text-white leading-tight">{s.city} Safehouse</p>
+                                </div>
+                              </div>
+
+                              {/* Program area pills */}
+                              <div className="mb-3">
+                                <p className="text-xs font-medium text-slate-500 dark:text-slate-400 mb-1.5">Used in the following areas:</p>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {s.programAreas.map((area) => (
+                                    <span key={area} className={`text-xs font-semibold px-2 py-0.5 rounded-full ${areaColor(area)}`}>
+                                      {area}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* Contribution totals */}
+                              <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
+                                {Math.round(s.monetaryTotal) > 0 && (
+                                  <p className="text-sm font-semibold text-safira-blue">
+                                    {formatRoundedCurrency(s.monetaryTotal, s.currency)} contributed
+                                  </p>
+                                )}
+                                {s.impactLines
+                                  .filter((line) => !isCampaignImpactUnit(line.unit))
+                                  .map((line) => (
+                                    <p key={line.unit} className="text-sm font-semibold text-safira-blue">
+                                      {formatRoundedCount(line.value)}{' '}
+                                      {line.unit.toLowerCase().includes('item') ? 'items donated' : `${line.unit} devoted`}
+                                    </p>
+                                  ))}
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* CTA */}
                   <div className="mt-8 bg-safira-blue rounded-2xl p-6 text-center text-white">
