@@ -10,6 +10,14 @@ import { useAuth } from '../context/AuthContext';
 
 const FORM_STORAGE_KEY = 'safira_donate_form';
 
+/** Strip non-digits, cap at 10, then format as (XXX) XXX-XXXX */
+function formatPhone(raw: string): string {
+  const digits = raw.replace(/\D/g, '').slice(0, 10)
+  if (digits.length < 4) return digits
+  if (digits.length < 7) return `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+  return `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+}
+
 interface SavedFormState {
   fullName: string;
   email: string;
@@ -299,9 +307,9 @@ function DonationFormWithGate() {
           <input
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => setPhone(formatPhone(e.target.value))}
             className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
-            placeholder="+1 (555) 123-4567"
+            placeholder="(555) 123-4567"
             required
           />
         </div>

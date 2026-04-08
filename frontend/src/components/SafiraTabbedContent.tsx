@@ -4,7 +4,17 @@ import missionImg from "../images/tabs/Mission.jpg";
 import platformImg from "../images/tabs/Platform.png";
 import donateImg from "../images/tabs/Donate.jpg";
 
-const sections = [
+type HomeLang = "en" | "pt" | "fil";
+
+const sectionByLang: Record<HomeLang, {
+  label: string
+  image: string
+  imageAlt: string
+  accent: string
+  heading: string
+  body: string
+}[]> = {
+  en: [
   {
     label: "About",
     image: aboutImg,
@@ -37,9 +47,78 @@ const sections = [
     heading: "Your gift changes a life.",
     body: "Every donation to Safira goes directly toward shelter, meals, education, and care for the girls we serve. We believe donors deserve full transparency — that's why our platform gives you access to your giving history, real impact data, and the stories behind the numbers.",
   },
-];
+  ],
+  pt: [
+    {
+      label: "Sobre",
+      image: aboutImg,
+      imageAlt: "Fachada da casa segura da Safira",
+      accent: "#2563eb",
+      heading: "Somos a Safira.",
+      body: "A Safira e uma organizacao sem fins lucrativos dedicada a oferecer moradia segura, cuidado integral e restauracao duradoura para meninas sobreviventes de trafico e abuso.",
+    },
+    {
+      label: "Missao",
+      image: missionImg,
+      imageAlt: "Meninas estudando juntas",
+      accent: "#7c3aed",
+      heading: "Protegendo criancas. Restaurando esperanca.",
+      body: "Nossa missao e servir meninas sobreviventes com tudo o que precisam para prosperar: abrigo seguro, alimentacao, acesso a educacao e uma comunidade que as ve, escuta e ama.",
+    },
+    {
+      label: "Plataforma",
+      image: platformImg,
+      imageAlt: "Painel administrativo da Safira",
+      accent: "#059669",
+      heading: "Tecnologia para gerar impacto.",
+      body: "Criamos uma plataforma segura e centralizada para que nossa equipe gaste menos tempo com planilhas e mais tempo com as meninas que atende.",
+    },
+    {
+      label: "Doar",
+      image: donateImg,
+      imageAlt: "Uma crianca lendo no abrigo",
+      accent: "#dc2626",
+      heading: "Sua doacao muda uma vida.",
+      body: "Cada doacao para a Safira vai diretamente para abrigo, alimentacao, educacao e cuidado das meninas atendidas.",
+    },
+  ],
+  fil: [
+    {
+      label: "Tungkol",
+      image: aboutImg,
+      imageAlt: "Labas ng ligtas na tahanan ng Safira",
+      accent: "#2563eb",
+      heading: "Kami ang Safira.",
+      body: "Ang Safira ay nonprofit na nakatuon sa ligtas na tirahan, holistic na pag-aalaga, at pangmatagalang pagpapanumbalik para sa mga batang nakaligtas sa trafficking at abuso.",
+    },
+    {
+      label: "Misyon",
+      image: missionImg,
+      imageAlt: "Mga batang sabay na natututo",
+      accent: "#7c3aed",
+      heading: "Pagprotekta sa mga bata. Pagpapanumbalik ng pag-asa.",
+      body: "Misyon naming tulungan ang mga survivor gamit ang mga kailangan nila para umunlad: ligtas na tahanan, masustansyang pagkain, edukasyon, at komunidad na tunay na nagmamalasakit.",
+    },
+    {
+      label: "Plataporma",
+      image: platformImg,
+      imageAlt: "Safira admin dashboard",
+      accent: "#059669",
+      heading: "Teknolohiyang ginawa para sa epekto.",
+      body: "Gumawa kami ng secure at centralized na platform para mas kaunting oras sa spreadsheets at mas maraming oras sa mga batang pinaglilingkuran.",
+    },
+    {
+      label: "Mag-donate",
+      image: donateImg,
+      imageAlt: "Batang nagbabasa sa shelter",
+      accent: "#dc2626",
+      heading: "Ang iyong tulong ay nagbabago ng buhay.",
+      body: "Bawat donasyon sa Safira ay direktang napupunta sa tirahan, pagkain, edukasyon, at pangangalaga para sa mga batang aming sinusuportahan.",
+    },
+  ],
+};
 
-function SectionCard({ label, image, imageAlt, accent, heading, body }: typeof sections[0]) {
+function SectionCard({ label, image, imageAlt, accent, heading, body }: (typeof sectionByLang)["en"][0]) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -144,7 +223,8 @@ function SectionCard({ label, image, imageAlt, accent, heading, body }: typeof s
   );
 }
 
-export default function SafiraTabbedContent() {
+export default function SafiraTabbedContent({ homeLang = "en" }: { homeLang?: HomeLang }) {
+  const sections = sectionByLang[homeLang];
   return (
     <section style={{ background: "#ffffff", padding: "4rem 1.5rem" }}>
       <div
