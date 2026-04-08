@@ -1,4 +1,4 @@
-import { Link, NavLink, useNavigate } from 'react-router-dom';
+import { Link, NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useState } from 'react';
 import { LogOut, Globe, Menu, X } from 'lucide-react';
 import navLogoImg from '../../images/background.jpg';
@@ -77,10 +77,12 @@ const navCopy: Record<HomeLang, {
 export default function SiteNav({ homeLang = 'en' }: SiteNavProps) {
   const { session, isAdmin, isDonor, logout } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [languageMenuOpen, setLanguageMenuOpen] = useState(false);
   const copy = navCopy[homeLang];
+  const showTranslate = location.pathname === '/';
 
   async function handleLogout() {
     await logout();
@@ -127,22 +129,24 @@ export default function SiteNav({ homeLang = 'en' }: SiteNavProps) {
 
       {/* Right side (desktop) */}
       <div className="hidden md:flex items-center gap-2">
-        <div className="relative">
-          <button
-            onClick={() => setLanguageMenuOpen((open) => !open)}
-            title={copy.chooseLangTitle}
-            className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <Globe size={16} />
-          </button>
-          {languageMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 min-w-40 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1 z-50">
-              <button onClick={() => switchHomeLanguage('en')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">English</button>
-              <button onClick={() => switchHomeLanguage('pt')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Portugues</button>
-              <button onClick={() => switchHomeLanguage('fil')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Filipino</button>
-            </div>
-          )}
-        </div>
+        {showTranslate && (
+          <div className="relative">
+            <button
+              onClick={() => setLanguageMenuOpen((open) => !open)}
+              title={copy.chooseLangTitle}
+              className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <Globe size={16} />
+            </button>
+            {languageMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 min-w-40 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1 z-50">
+                <button onClick={() => switchHomeLanguage('en')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">English</button>
+                <button onClick={() => switchHomeLanguage('pt')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Portugues</button>
+                <button onClick={() => switchHomeLanguage('fil')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Filipino</button>
+              </div>
+            )}
+          </div>
+        )}
         <ThemeToggle />
         {session.isAuthenticated ? (
           <>
@@ -177,22 +181,24 @@ export default function SiteNav({ homeLang = 'en' }: SiteNavProps) {
 
       {/* Mobile controls */}
       <div className="md:hidden flex items-center gap-2">
-        <div className="relative">
-          <button
-            onClick={() => setLanguageMenuOpen((open) => !open)}
-            title={copy.chooseLangTitle}
-            className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
-          >
-            <Globe size={16} />
-          </button>
-          {languageMenuOpen && (
-            <div className="absolute right-0 top-full mt-2 min-w-40 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1 z-50">
-              <button onClick={() => switchHomeLanguage('en')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">English</button>
-              <button onClick={() => switchHomeLanguage('pt')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Portugues</button>
-              <button onClick={() => switchHomeLanguage('fil')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Filipino</button>
-            </div>
-          )}
-        </div>
+        {showTranslate && (
+          <div className="relative">
+            <button
+              onClick={() => setLanguageMenuOpen((open) => !open)}
+              title={copy.chooseLangTitle}
+              className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
+            >
+              <Globe size={16} />
+            </button>
+            {languageMenuOpen && (
+              <div className="absolute right-0 top-full mt-2 min-w-40 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-1 z-50">
+                <button onClick={() => switchHomeLanguage('en')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">English</button>
+                <button onClick={() => switchHomeLanguage('pt')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Portugues</button>
+                <button onClick={() => switchHomeLanguage('fil')} className="w-full text-left px-3 py-2 text-sm rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Filipino</button>
+              </div>
+            )}
+          </div>
+        )}
         <ThemeToggle />
         <button
           type="button"

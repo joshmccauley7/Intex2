@@ -492,11 +492,6 @@ export default function AdminDashboardPage() {
             <p className="text-xs text-slate-400 mt-1">No active donors to measure yet.</p>
           </>
         )}
-        <p className="text-xs text-slate-600 mt-3 leading-relaxed border-t border-slate-100 pt-3">
-          <span className="font-medium text-[#0f172a]">Why this matters most:</span> Mission delivery
-          depends on steady funding. The share of donors who gave recently reflects engagement and
-          predictable support better than total donor count alone.
-        </p>
       </div>
 
       {/* ── Stat cards ── */}
