@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apiFetch } from '../../api'
 import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users } from 'lucide-react'
 import ResidentStatusStrip, { type ResidentStatusIndicators, type StatusLight } from '../../components/admin/ResidentStatusStrip'
@@ -280,6 +281,7 @@ const blankForm = (): Partial<ResidentDetail> => ({
 })
 
 export default function ResidentsPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const [residents, setResidents] = useState<ResidentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -320,6 +322,15 @@ export default function ResidentsPage() {
   }
 
   useEffect(() => { fetchResidents() }, [statusFilter, safehouseFilter, categoryFilter, riskFilter, search])
+
+  // Auto-open specific record when navigated from dashboard modal
+  useEffect(() => {
+    const openId = searchParams.get('open')
+    if (openId) {
+      openDetail(Number(openId))
+      setSearchParams((prev) => { prev.delete('open'); return prev }, { replace: true })
+    }
+  }, [residents])
 
   const openDetail = (id: number) => {
     setLifecycle(null)
