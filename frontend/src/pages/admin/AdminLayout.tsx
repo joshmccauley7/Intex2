@@ -18,7 +18,7 @@ export default function AdminLayout() {
     }`
 
   return (
-    <div className="flex flex-col min-h-screen font-sans">
+    <div className="admin-shell flex flex-col min-h-screen font-sans bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
       <SiteNav />
       <div className="flex flex-1">
       {/* Desktop sidebar */}
@@ -77,12 +77,12 @@ export default function AdminLayout() {
       </aside>
 
       {/* Main content */}
-      <main className="flex-1 bg-slate-50 p-4 md:p-8 overflow-auto">
+      <main className="flex-1 bg-slate-50 dark:bg-slate-950 p-4 md:p-8 overflow-auto">
         <div className="md:hidden mb-4">
           <button
             type="button"
             onClick={() => setMobileNavOpen(true)}
-            className="inline-flex items-center gap-2 rounded-lg bg-[#0f172a] px-3 py-2 text-sm font-medium text-white shadow-sm"
+            className="inline-flex items-center gap-2 rounded-lg bg-[#0f172a] dark:bg-slate-800 px-3 py-2 text-sm font-medium text-white shadow-sm"
             aria-label="Open admin navigation"
             aria-expanded={mobileNavOpen}
             aria-controls="admin-mobile-nav"

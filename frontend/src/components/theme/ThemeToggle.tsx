@@ -17,7 +17,7 @@ export default function ThemeToggle({
       <button
         type="button"
         onClick={toggleTheme}
-        className="inline-flex items-center gap-2 rounded-lg border border-slate-200 dark:border-slate-600 bg-white/90 dark:bg-slate-800/90 px-3 py-2 text-sm font-medium text-slate-800 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors"
+        className="inline-flex items-center gap-2 rounded-lg border border-slate-300 dark:border-slate-600/80 bg-white dark:bg-slate-800/90 px-3 py-2 text-sm font-medium text-slate-700 dark:text-slate-100 hover:bg-slate-50 dark:hover:bg-slate-700/90 hover:border-slate-400 dark:hover:border-slate-500 transition-colors"
         aria-label={
           theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'
         }
@@ -27,11 +27,13 @@ export default function ThemeToggle({
             : 'Theme applies for this visit only (enable preference cookies to save)'
         }
       >
-        {theme === 'dark' ? (
-          <Sun size={18} aria-hidden />
-        ) : (
-          <Moon size={18} aria-hidden />
-        )}
+        <span className="text-amber-500 dark:text-amber-300">
+          {theme === 'dark' ? (
+            <Sun size={18} aria-hidden />
+          ) : (
+            <Moon size={18} aria-hidden />
+          )}
+        </span>
         <span className="hidden sm:inline">
           {theme === 'dark' ? 'Light' : 'Dark'}
         </span>

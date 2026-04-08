@@ -300,18 +300,17 @@ export default function HomePage() {
         {/* Text card */}
         <div className="relative z-10 h-full flex items-center px-4 sm:px-6 md:px-16">
           <div
-            className="w-full md:w-[480px] md:max-w-[55%] rounded-lg px-5 sm:px-6 md:px-8 py-4 hero-animate"
+            className="w-full md:w-[480px] md:max-w-[55%] rounded-lg px-5 sm:px-6 md:px-8 py-4 hero-animate bg-white/75 dark:bg-slate-900/80"
             style={{
-              background: 'rgba(255,255,255,0.72)',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
               boxShadow: '0 4px 24px rgba(0,0,0,0.14)',
             }}
           >
-            <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2 text-[#0f172a] hero-animate">
+            <h1 className="text-2xl sm:text-3xl font-bold leading-tight mb-2 text-[#0f172a] dark:text-slate-100 hero-animate">
               Every Child Deserves Safety
             </h1>
-            <p className="text-slate-600 mb-4 leading-relaxed text-sm sm:text-base hero-animate-delay">
+            <p className="text-slate-700 dark:text-slate-200 mb-4 leading-relaxed text-sm sm:text-base hero-animate-delay">
               Safira protects children who are victims of sexual abuse in Brazil, providing
               shelter, healing, and a path to a brighter future.
             </p>
@@ -363,7 +362,7 @@ export default function HomePage() {
       </section>
 
       {/* ── Core Values ── */}
-      <section className="px-6 pt-20 pb-16" style={{ background: '#ffffff' }}>
+      <section className="px-6 pt-20 pb-16 bg-white dark:bg-slate-900">
         <div className="max-w-7xl mx-auto">
           <div className="text-center mb-12">
             <p className="text-sm font-semibold tracking-widest uppercase text-safira-blue mb-3">What we stand for</p>
@@ -381,7 +380,7 @@ export default function HomePage() {
                   <img src={img} alt={imgAlt} style={{ width: 132, height: 132, objectFit: 'contain', borderRadius: '0.75rem' }} />
                 </div>
                 <h3 className="font-bold text-2xl text-[#0f172a] dark:text-white mb-3">{title}</h3>
-                <p className="text-base text-slate-500 dark:text-slate-400 leading-relaxed">{desc}</p>
+                <p className="text-base text-slate-700 dark:text-slate-300 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
@@ -453,10 +452,10 @@ export default function HomePage() {
               >
                 <Icon size={30} strokeWidth={1.65} className="opacity-95" />
               </div>
-              <p className="min-h-[3rem] text-[2.625rem] font-bold leading-none tracking-tight text-navy tabular-nums sm:text-5xl sm:min-h-[3.25rem]">
+              <p className="min-h-[3rem] text-[2.625rem] font-bold leading-none tracking-tight text-navy dark:text-slate-100 tabular-nums sm:text-5xl sm:min-h-[3.25rem]">
                 {value}
               </p>
-              <p className="mt-3 max-w-[11rem] text-[0.9375rem] font-medium leading-snug text-slate-600">
+              <p className="mt-3 max-w-[11rem] text-[0.9375rem] font-medium leading-snug text-slate-600 dark:text-slate-300">
                 {label}
               </p>
             </div>
