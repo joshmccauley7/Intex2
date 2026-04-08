@@ -330,7 +330,7 @@ function RecurringNudge({ donations, currency }: { donations: Donation[]; curren
           You've been giving one time at a time — which is amazing. Monthly donors unlock consistent
           impact: girls receive ongoing care without gaps. Set up a recurring gift of{' '}
           <span className="font-semibold text-safira-blue">
-            {formatAmount(suggested, currency ?? 'PHP')}/month
+            {formatRoundedCurrency(suggested, currency ?? 'PHP')}/month
           </span>{' '}
           and your support never stops.
         </p>
@@ -499,14 +499,14 @@ export default function DonationHistoryPage() {
                               <div className="mt-auto pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1">
                                 {s.monetaryTotal > 0 && (
                                   <p className="text-sm font-semibold text-safira-blue">
-                                    {formatAmount(s.monetaryTotal, s.currency)} contributed
+                                    {formatRoundedCurrency(s.monetaryTotal, s.currency)} contributed
                                   </p>
                                 )}
                                 {s.impactLines
                                   .filter((line) => !isCampaignImpactUnit(line.unit))
                                   .map((line) => (
                                     <p key={line.unit} className="text-sm font-semibold text-safira-blue">
-                                      {formatSafehouseImpactValue(line.value)}{' '}
+                                      {formatRoundedCount(line.value)}{' '}
                                       {line.unit.toLowerCase().includes('item') ? 'items donated' : `${line.unit} devoted`}
                                     </p>
                                   ))}
