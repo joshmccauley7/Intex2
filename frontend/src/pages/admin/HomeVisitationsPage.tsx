@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api'
-import { Plus, Pencil, Trash2, Home, Calendar } from 'lucide-react'
+import { Plus, Pencil, Trash2, Home, Calendar, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
 
 interface ResidentOption {
   residentId: number
@@ -122,6 +122,7 @@ export default function HomeVisitationsPage() {
   const [editVisit, setEditVisit] = useState<HomeVisitation | null>(null)
   const [visitForm, setVisitForm] = useState<Partial<HomeVisitation>>(blankVisit())
   const [deleteVisitId, setDeleteVisitId] = useState<number | null>(null)
+  const [expandedVisitId, setExpandedVisitId] = useState<number | null>(null)
 
   // Conferences state
   const [conferences, setConferences] = useState<CaseConference[]>([])
@@ -130,6 +131,7 @@ export default function HomeVisitationsPage() {
   const [editConf, setEditConf] = useState<CaseConference | null>(null)
   const [confForm, setConfForm] = useState<Partial<CaseConference>>(blankConference())
   const [deleteConfId, setDeleteConfId] = useState<number | null>(null)
+  const [expandedConfId, setExpandedConfId] = useState<number | null>(null)
 
   const [loadingResidents, setLoadingResidents] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
@@ -342,37 +344,79 @@ export default function HomeVisitationsPage() {
                 const paginated = visits.slice((visitPage - 1) * PAGE_SIZE, visitPage * PAGE_SIZE)
                 return (
                   <>
-                    <div className="flex flex-col gap-3">
-                      {paginated.map((v) => (
-                        <div key={v.visitationId} className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-2">
-                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${VISIT_TYPE_BADGE[v.visitType ?? ''] ?? 'bg-slate-100 text-slate-600'}`}>
-                                  {v.visitType ?? 'Unknown'}
-                                </span>
-                                {v.familyCooperationLevel && (
-                                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${COOPERATION_BADGE[v.familyCooperationLevel] ?? 'bg-slate-100 text-slate-600'}`}>
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                      {/* Header */}
+                      <div className="grid grid-cols-[1fr_150px_160px_100px_100px_72px_24px] items-center gap-4 px-4 py-2 border-b border-slate-100 bg-slate-50">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Date · Worker</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Type</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Cooperation</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Safety</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Follow-Up</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Actions</span>
+                        <span />
+                      </div>
+
+                      {paginated.map((v, idx) => {
+                        const isExpanded = expandedVisitId === v.visitationId
+                        return (
+                          <div key={v.visitationId} className={idx > 0 ? 'border-t border-slate-100' : ''}>
+                            <div
+                              className="grid grid-cols-[1fr_150px_160px_100px_100px_72px_24px] items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                              onClick={() => setExpandedVisitId(isExpanded ? null : v.visitationId)}
+                            >
+                              <div>
+                                <p className="font-medium text-sm text-[#0f172a]">{v.visitDate ?? '—'}</p>
+                                <p className="text-xs text-slate-400">{v.socialWorker ?? '—'}</p>
+                              </div>
+                              <div>
+                                {v.visitType ? (
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${VISIT_TYPE_BADGE[v.visitType] ?? 'bg-slate-100 text-slate-600'}`}>
+                                    {v.visitType}
+                                  </span>
+                                ) : <span className="text-xs text-slate-300">—</span>}
+                              </div>
+                              <div>
+                                {v.familyCooperationLevel ? (
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${COOPERATION_BADGE[v.familyCooperationLevel] ?? 'bg-slate-100 text-slate-600'}`}>
                                     {v.familyCooperationLevel}
                                   </span>
-                                )}
-                                {v.safetyConcernsNoted && (
-                                  <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-red-100 text-red-700">Safety Concern</span>
-                                )}
-                                <span className="text-xs text-slate-400">{v.visitDate ?? 'No date'} · {v.socialWorker ?? 'Unknown worker'}</span>
+                                ) : <span className="text-xs text-slate-300">—</span>}
                               </div>
-                              {v.locationVisited && <p className="text-sm text-slate-600 mb-1"><span className="font-medium">Location: </span>{v.locationVisited}</p>}
-                              {v.observations && <p className="text-sm text-slate-700 mb-1"><span className="font-medium">Observations: </span>{v.observations}</p>}
-                              {v.followUpNotes && <p className="text-sm text-slate-600"><span className="font-medium">Follow-up: </span>{v.followUpNotes}</p>}
-                              {v.visitOutcome && <p className="text-sm text-slate-600"><span className="font-medium">Outcome: </span>{v.visitOutcome}</p>}
+                              <div className="flex justify-center">
+                                {v.safetyConcernsNoted
+                                  ? <CheckCircle2 size={18} className="text-red-400" />
+                                  : <span className="text-slate-300 text-sm">—</span>}
+                              </div>
+                              <div className="flex justify-center">
+                                {v.followUpNeeded
+                                  ? <CheckCircle2 size={18} className="text-yellow-500" />
+                                  : <span className="text-slate-300 text-sm">—</span>}
+                              </div>
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <button onClick={() => openEditVisit(v)} className="p-1.5 text-slate-400 hover:text-safira-blue transition-colors"><Pencil size={14} /></button>
+                                <button onClick={() => setDeleteVisitId(v.visitationId)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                              </div>
+                              <div className="text-slate-400">
+                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              </div>
                             </div>
-                            <div className="flex gap-2 shrink-0">
-                              <button onClick={() => openEditVisit(v)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"><Pencil size={15} /></button>
-                              <button onClick={() => setDeleteVisitId(v.visitationId)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={15} /></button>
-                            </div>
+
+                            {isExpanded && (
+                              <div className="px-4 pb-4 pt-1 space-y-3 text-sm border-t border-slate-100 bg-slate-50/50">
+                                {v.locationVisited && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Location</p><p className="text-slate-700">{v.locationVisited}</p></div>}
+                                {v.familyMembersPresent && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Family Members Present</p><p className="text-slate-700">{v.familyMembersPresent}</p></div>}
+                                {v.purpose && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Purpose</p><p className="text-slate-700">{v.purpose}</p></div>}
+                                {v.observations && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Observations</p><p className="text-slate-700 whitespace-pre-wrap">{v.observations}</p></div>}
+                                {v.followUpNotes && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Follow-Up Notes</p><p className="text-slate-700 whitespace-pre-wrap">{v.followUpNotes}</p></div>}
+                                {v.visitOutcome && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Outcome</p><p className="text-slate-700">{v.visitOutcome}</p></div>}
+                                {!v.locationVisited && !v.familyMembersPresent && !v.purpose && !v.observations && !v.followUpNotes && !v.visitOutcome && (
+                                  <p className="text-slate-400 text-xs italic">No additional details recorded.</p>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     <Pagination current={visitPage} total={totalPages} onChange={setVisitPage} count={visits.length} pageSize={PAGE_SIZE} />
                   </>
@@ -404,34 +448,65 @@ export default function HomeVisitationsPage() {
                       </div>
                     )}
 
-                    <div className="flex flex-col gap-3">
-                      {paginated.map((c) => (
-                        <div key={c.conferenceId} className="bg-white rounded-xl border border-slate-100 p-5 shadow-sm">
-                          <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="flex items-center gap-2 flex-wrap mb-2">
-                                <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CONFERENCE_TYPE_BADGE[c.conferenceType ?? ''] ?? 'bg-slate-100 text-slate-600'}`}>
-                                  {c.conferenceType ?? 'Unknown'}
-                                </span>
-                                <span className="text-xs text-slate-400">{c.conferenceDate ?? 'No date'} · {c.socialWorker ?? 'Unknown worker'}</span>
+                    <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+                      {/* Header */}
+                      <div className="grid grid-cols-[1fr_200px_120px_72px_24px] items-center gap-4 px-4 py-2 border-b border-slate-100 bg-slate-50">
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Date · Worker</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Type</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Next Conference</span>
+                        <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Actions</span>
+                        <span />
+                      </div>
+
+                      {paginated.map((c, idx) => {
+                        const isExpanded = expandedConfId === c.conferenceId
+                        return (
+                          <div key={c.conferenceId} className={idx > 0 ? 'border-t border-slate-100' : ''}>
+                            <div
+                              className="grid grid-cols-[1fr_200px_120px_72px_24px] items-center gap-4 px-4 py-3 cursor-pointer hover:bg-slate-50 transition-colors"
+                              onClick={() => setExpandedConfId(isExpanded ? null : c.conferenceId)}
+                            >
+                              <div>
+                                <p className="font-medium text-sm text-[#0f172a]">{c.conferenceDate ?? '—'}</p>
+                                <p className="text-xs text-slate-400">{c.socialWorker ?? '—'}</p>
                               </div>
-                              {c.participants && <p className="text-sm text-slate-600 mb-1"><span className="font-medium">Participants: </span>{c.participants}</p>}
-                              {c.summary && <p className="text-sm text-slate-700 mb-1"><span className="font-medium">Summary: </span>{c.summary}</p>}
-                              {c.decisionsMade && <p className="text-sm text-slate-600 mb-1"><span className="font-medium">Decisions: </span>{c.decisionsMade}</p>}
-                              {c.nextConferenceDate && (
-                                <p className={`text-sm font-medium ${c.nextConferenceDate >= TODAY ? 'text-blue-600' : 'text-slate-500'}`}>
-                                  <span className="font-medium">Next conference: </span>{c.nextConferenceDate}
-                                  {c.nextConferenceDate >= TODAY && <span className="ml-1 text-xs bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Upcoming</span>}
-                                </p>
-                              )}
+                              <div>
+                                {c.conferenceType ? (
+                                  <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${CONFERENCE_TYPE_BADGE[c.conferenceType] ?? 'bg-slate-100 text-slate-600'}`}>
+                                    {c.conferenceType}
+                                  </span>
+                                ) : <span className="text-xs text-slate-300">—</span>}
+                              </div>
+                              <div>
+                                {c.nextConferenceDate ? (
+                                  <span className={`text-xs font-medium ${c.nextConferenceDate >= TODAY ? 'text-blue-600' : 'text-slate-500'}`}>
+                                    {c.nextConferenceDate}
+                                    {c.nextConferenceDate >= TODAY && <span className="ml-1 bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full">Upcoming</span>}
+                                  </span>
+                                ) : <span className="text-xs text-slate-300">—</span>}
+                              </div>
+                              <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+                                <button onClick={() => openEditConf(c)} className="p-1.5 text-slate-400 hover:text-safira-blue transition-colors"><Pencil size={14} /></button>
+                                <button onClick={() => setDeleteConfId(c.conferenceId)} className="p-1.5 text-slate-400 hover:text-red-500 transition-colors"><Trash2 size={14} /></button>
+                              </div>
+                              <div className="text-slate-400">
+                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                              </div>
                             </div>
-                            <div className="flex gap-2 shrink-0">
-                              <button onClick={() => openEditConf(c)} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"><Pencil size={15} /></button>
-                              <button onClick={() => setDeleteConfId(c.conferenceId)} className="p-1.5 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50 transition-colors"><Trash2 size={15} /></button>
-                            </div>
+
+                            {isExpanded && (
+                              <div className="px-4 pb-4 pt-1 space-y-3 text-sm border-t border-slate-100 bg-slate-50/50">
+                                {c.participants && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Participants</p><p className="text-slate-700">{c.participants}</p></div>}
+                                {c.summary && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Summary</p><p className="text-slate-700 whitespace-pre-wrap">{c.summary}</p></div>}
+                                {c.decisionsMade && <div><p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Decisions Made</p><p className="text-slate-700 whitespace-pre-wrap">{c.decisionsMade}</p></div>}
+                                {!c.participants && !c.summary && !c.decisionsMade && (
+                                  <p className="text-slate-400 text-xs italic">No additional details recorded.</p>
+                                )}
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        )
+                      })}
                     </div>
                     <Pagination current={confPage} total={totalPages} onChange={setConfPage} count={conferences.length} pageSize={PAGE_SIZE} />
                   </>
