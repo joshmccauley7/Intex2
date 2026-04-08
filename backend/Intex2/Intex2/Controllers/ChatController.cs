@@ -17,9 +17,8 @@ public class ChatController : ControllerBase
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ILogger<ChatController> _logger;
 
-    // Point this at your local Ollama instance
-    private const string OllamaBaseUrl = "http://localhost:11434";
-    private const string ModelName = "gemma4:e2b";
+    // Claude Haiku is fast and cheap — swap to claude-sonnet-4-6 for higher quality
+    private const string ModelName = "claude-haiku-4-5-20251001";
 
     public ChatController(AppDbContext db, IHttpClientFactory httpClientFactory, ILogger<ChatController> logger)
     {
@@ -46,17 +45,17 @@ public class ChatController : ControllerBase
             // 2. Build the system prompt with gathered data
             var systemPrompt = BuildSystemPrompt(contextData);
 
-            // 3. Call Ollama and get a response
-            var response = await CallOllama(systemPrompt, request.Message, request.History);
+            // 3. Call Claude and get a response
+            var response = await CallClaude(systemPrompt, request.Message, request.History);
 
             return Ok(new { response });
         }
         catch (HttpRequestException ex)
         {
-            _logger.LogError(ex, "Could not reach Ollama at {Url}", OllamaBaseUrl);
+            _logger.LogError(ex, "Could not reach Anthropic API");
             return StatusCode(503, new
             {
-                error = "The AI model is currently unavailable. Make sure Ollama is running locally (ollama serve)."
+                error = "The AI service is currently unavailable. Please check your API key and try again."
             });
         }
         catch (Exception ex)
@@ -541,15 +540,13 @@ public class ChatController : ControllerBase
 
     // ─── Ollama call ──────────────────────────────────────────────────────────
 
-    private async Task<string> CallOllama(string systemPrompt, string userMessage, List<ChatHistoryItem>? history)
+    private async Task<string> CallClaude(string systemPrompt, string userMessage, List<ChatHistoryItem>? history)
     {
-        var client = _httpClientFactory.CreateClient("ollama");
+        var client = _httpClientFactory.CreateClient("anthropic");
 
-        // Build the message list
-        var messages = new List<object>
-        {
-            new { role = "system", content = systemPrompt }
-        };
+        // Anthropic's API takes system prompt at the top level (not as a message role)
+        // Messages must strictly alternate user / assistant
+        var messages = new List<object>();
 
         if (history != null)
         {
@@ -563,13 +560,10 @@ public class ChatController : ControllerBase
         var requestBody = new
         {
             model = ModelName,
-            messages,
-            stream = false,
-            options = new
-            {
-                temperature = 0.4,   // Keep responses factual / less creative
-                num_predict = 512    // Cap token length for snappy responses
-            }
+            max_tokens = 1024,
+            temperature = 0.4,
+            system = systemPrompt,
+            messages
         };
 
         var json = JsonSerializer.Serialize(requestBody, new JsonSerializerOptions
@@ -577,14 +571,14 @@ public class ChatController : ControllerBase
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase
         });
 
-        var content = new StringContent(json, Encoding.UTF8, "application/json");
-        var httpResponse = await client.PostAsync("/api/chat", content);
+        var httpContent = new StringContent(json, Encoding.UTF8, "application/json");
+        var httpResponse = await client.PostAsync("/v1/messages", httpContent);
         httpResponse.EnsureSuccessStatusCode();
 
         var responseText = await httpResponse.Content.ReadAsStringAsync();
-        var ollamaResponse = JsonSerializer.Deserialize<OllamaResponse>(responseText);
+        var claudeResponse = JsonSerializer.Deserialize<ClaudeResponse>(responseText);
 
-        return ollamaResponse?.Message?.Content?.Trim()
+        return claudeResponse?.Content?.FirstOrDefault()?.Text?.Trim()
                ?? "I wasn't able to generate a response. Please try again.";
     }
 }
@@ -594,14 +588,17 @@ public class ChatController : ControllerBase
 public record ChatRequest(string Message, List<ChatHistoryItem>? History);
 public record ChatHistoryItem(string Role, string Content);
 
-internal class OllamaResponse
-{
-    [JsonPropertyName("message")]
-    public OllamaMessage? Message { get; set; }
-}
-
-internal class OllamaMessage
+internal class ClaudeResponse
 {
     [JsonPropertyName("content")]
-    public string? Content { get; set; }
+    public List<ClaudeContentBlock>? Content { get; set; }
+}
+
+internal class ClaudeContentBlock
+{
+    [JsonPropertyName("type")]
+    public string? Type { get; set; }
+
+    [JsonPropertyName("text")]
+    public string? Text { get; set; }
 }

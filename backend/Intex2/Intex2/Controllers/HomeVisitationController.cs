@@ -31,6 +31,11 @@ public class HomeVisitationController : ControllerBase
     public async Task<IActionResult> CreateVisitation(int residentId, [FromBody] HomeVisitation visit)
     {
         visit.ResidentId = residentId;
+        if (visit.VisitationId <= 0)
+        {
+            var maxId = await _db.HomeVisitations.MaxAsync(v => (int?)v.VisitationId) ?? 0;
+            visit.VisitationId = maxId + 1;
+        }
         _db.HomeVisitations.Add(visit);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetVisitationById), new { id = visit.VisitationId }, visit);
@@ -100,6 +105,11 @@ public class HomeVisitationController : ControllerBase
     {
         conference.ResidentId = residentId;
         conference.CreatedAt = DateTime.UtcNow;
+        if (conference.ConferenceId <= 0)
+        {
+            var maxId = await _db.CaseConferences.MaxAsync(c => (int?)c.ConferenceId) ?? 0;
+            conference.ConferenceId = maxId + 1;
+        }
         _db.CaseConferences.Add(conference);
         await _db.SaveChangesAsync();
         return CreatedAtAction(nameof(GetConferenceById), new { id = conference.ConferenceId }, conference);
