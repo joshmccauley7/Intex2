@@ -22,6 +22,7 @@ import StripeSettingsPage from './pages/admin/StripeSettingsPage';
 import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import UserManagementPage from './pages/admin/UserManagementPage';
 import SocialMediaPage from './pages/admin/SocialMediaPage';
+import ChatWidget from './components/ui/ChatWidget';
 
 function RequireAdmin({ children }: { children: React.ReactNode }) {
   const { isLoading, isAdmin } = useAuth();
@@ -46,6 +47,8 @@ export default function App() {
           <AnalyticsConsentBridge />
           <CookieBanner />
           <CookieSettingsModal />
+          {/* AI Helper — only visible to admins, floats bottom-left on every page */}
+          <ChatWidget />
           <Routes>
             <Route path="/" element={<HomePage />} />
             <Route path="/impact" element={<ImpactDashboard />} />

@@ -53,6 +53,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<ResidentStatusCalculator>();
 
+// ─── HTTP client for local Ollama AI ────────────────────────────────────────
+builder.Services.AddHttpClient("ollama", client =>
+{
+    client.BaseAddress = new Uri(
+        Environment.GetEnvironmentVariable("OLLAMA_BASE_URL") ?? "http://localhost:11434");
+    client.Timeout = TimeSpan.FromSeconds(120); // Generous timeout for local LLM inference
+});
+
 // ─── Identity database (PostgreSQL — same server as app DB) ──────────────────
 builder.Services.AddDbContext<AuthIdentityDbContext>(options =>
     options.UseNpgsql(connectionString));
