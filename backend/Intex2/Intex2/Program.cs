@@ -53,12 +53,14 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 
 builder.Services.AddScoped<ResidentStatusCalculator>();
 
-// ─── HTTP client for local Ollama AI ────────────────────────────────────────
-builder.Services.AddHttpClient("ollama", client =>
+// ─── HTTP client for Anthropic Claude API ───────────────────────────────────
+builder.Services.AddHttpClient("anthropic", client =>
 {
-    client.BaseAddress = new Uri(
-        Environment.GetEnvironmentVariable("OLLAMA_BASE_URL") ?? "http://localhost:11434");
-    client.Timeout = TimeSpan.FromSeconds(120); // Generous timeout for local LLM inference
+    client.BaseAddress = new Uri("https://api.anthropic.com");
+    client.DefaultRequestHeaders.Add("x-api-key",
+        Environment.GetEnvironmentVariable("ANTHROPIC_API_KEY") ?? "");
+    client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
+    client.Timeout = TimeSpan.FromSeconds(60);
 });
 
 // ─── Identity database (PostgreSQL — same server as app DB) ──────────────────
