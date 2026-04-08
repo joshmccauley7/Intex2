@@ -127,6 +127,17 @@ const MODAL_CONFIG: Record<string, SectionConfig> = {
       { key: 'giftCount',    label: 'Gifts' },
     ],
   },
+  'churn-all': {
+    title: 'Donor Churn Risk — All Tiers',
+    linkTo: '/admin/donors', linkLabel: 'View all donors',
+    columns: [
+      { key: 'riskLevel',        label: 'Risk' },
+      { key: 'displayName',      label: 'Donor' },
+      { key: 'churnProbability', label: 'Churn %', fmt: (v) => `${v}%` },
+      { key: 'lastDonation',     label: 'Last Donation' },
+      { key: 'valueInPeriod',    label: 'Total Donated (PHP)', fmt: fmtPhp },
+    ],
+  },
   'churn-high': {
     title: 'High Churn Risk — Priority Outreach Queue',
     linkTo: '/admin/donors', linkLabel: 'View all donors',
@@ -206,6 +217,16 @@ const MODAL_CONFIG: Record<string, SectionConfig> = {
       { key: 'sessionDate',           label: 'Date' },
       { key: 'socialWorker',          label: 'Social Worker' },
       { key: 'sessionDurationMinutes',label: 'Duration', fmt: (v) => v != null ? `${v} min` : '—' },
+    ],
+  },
+  'risk-all': {
+    title: 'Active Resident Risk — All Tiers',
+    linkTo: '/admin/residents', linkLabel: 'View all residents',
+    columns: [
+      { key: 'riskLevel',    label: 'Risk' },
+      { key: 'internalCode', label: 'Code' },
+      { key: 'safehouse',    label: 'Safe House' },
+      { key: 'caseStatus',   label: 'Status' },
     ],
   },
   'risk-high': {
@@ -338,7 +359,7 @@ const PERIOD_OPTIONS = [
 ]
 
 // Sections where current state doesn't meaningfully change by period — hide the dropdown
-const NO_PERIOD_SECTIONS = ['residents', 'safehouses', 'risk-high', 'risk-medium', 'risk-low', 'churn-high', 'churn-medium', 'churn-low']
+const NO_PERIOD_SECTIONS = ['residents', 'safehouses', 'risk-all', 'risk-high', 'risk-medium', 'risk-low', 'churn-all', 'churn-high', 'churn-medium', 'churn-low']
 
 export default function AdminDashboardPage() {
   const navigate = useNavigate()
@@ -385,8 +406,8 @@ export default function AdminDashboardPage() {
     }
   }
 
-  const DONOR_SECTIONS    = ['donors', 'churn-high', 'churn-medium', 'churn-low', 'okr-recent', 'okr-lapsed', 'donations']
-  const RESIDENT_SECTIONS = ['residents', 'risk-high', 'risk-medium', 'risk-low', 'health', 'education', 'counseling', 'conferences']
+  const DONOR_SECTIONS    = ['donors', 'churn-all', 'churn-high', 'churn-medium', 'churn-low', 'okr-recent', 'okr-lapsed', 'donations']
+  const RESIDENT_SECTIONS = ['residents', 'risk-all', 'risk-high', 'risk-medium', 'risk-low', 'health', 'education', 'counseling', 'conferences']
 
   function resolveRowClickable(section: string, row: Record<string, unknown>): boolean {
     const supporterId = row.supporterId ?? row.SupporterId
@@ -666,7 +687,7 @@ export default function AdminDashboardPage() {
         {/* Donor churn risk breakdown */}
         <div
           className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
-          onClick={() => openModal('churn-high')}
+          onClick={() => openModal('churn-all')}
           title="Click to explore churn risk detail"
         >
           <h2 className="font-semibold text-slate-800 text-sm mb-4">Donor Churn Risk Breakdown</h2>
@@ -677,12 +698,7 @@ export default function AdminDashboardPage() {
               {['High', 'Medium', 'Low'].map((level) => {
                 const count = data.churnCounts.find((c) => c.riskLevel === level)?.count ?? 0
                 return (
-                  <div
-                    key={level}
-                    className="group"
-                    onClick={(e) => { e.stopPropagation(); openModal(`churn-${level.toLowerCase()}`) }}
-                    title={`View ${level} churn risk donors`}
-                  >
+                  <div key={level} className="group">
                     <div className="flex items-center justify-between mb-1">
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${CHURN_BADGE[level]}`}>{level}</span>
                       <span className="text-xs text-slate-500">{count} / {totalChurn}</span>
@@ -698,7 +714,7 @@ export default function AdminDashboardPage() {
               })}
             </div>
           )}
-          <p className="text-xs text-slate-400 mt-4">Click a bar or card to drill into risk tier analytics</p>
+          <p className="text-xs text-slate-400 mt-4">Click to view all churn risk donors</p>
         </div>
       </div>
 
@@ -805,7 +821,7 @@ export default function AdminDashboardPage() {
         {/* Active resident risk */}
         <div
           className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
-          onClick={() => openModal('risk-high')}
+          onClick={() => openModal('risk-all')}
           title="Click to explore resident risk analytics"
         >
           <div className="flex items-center gap-2 mb-4">
@@ -821,12 +837,7 @@ export default function AdminDashboardPage() {
                 return ['High', 'Medium', 'Low'].map((level) => {
                   const count = data.activeRiskCounts.find((r) => r.riskLevel === level)?.count ?? 0
                   return (
-                    <div
-                      key={level}
-                      className="group"
-                      onClick={(e) => { e.stopPropagation(); openModal(`risk-${level.toLowerCase()}`) }}
-                      title={`View ${level} risk residents`}
-                    >
+                    <div key={level} className="group">
                       <div className="flex items-center justify-between mb-1">
                         <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${RISK_BADGE[level]}`}>{level}</span>
                         <span className="text-xs text-slate-500">{count} / {total}</span>
@@ -843,7 +854,7 @@ export default function AdminDashboardPage() {
               })()}
             </div>
           )}
-          <p className="text-xs text-slate-400 mt-4">Click a bar or card to drill into risk analytics</p>
+          <p className="text-xs text-slate-400 mt-4">Click to view all active resident risk</p>
         </div>
       </div>
 

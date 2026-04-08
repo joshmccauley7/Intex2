@@ -12,11 +12,13 @@ public class DonationsController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ILogger<DonationsController> _logger;
+    private readonly ChurnScoringService _churn;
 
-    public DonationsController(AppDbContext db, ILogger<DonationsController> logger)
+    public DonationsController(AppDbContext db, ILogger<DonationsController> logger, ChurnScoringService churn)
     {
         _db = db;
         _logger = logger;
+        _churn = churn;
     }
 
     [HttpGet("my-profile")]
@@ -178,6 +180,8 @@ public class DonationsController : ControllerBase
             $"Stripe PI: {req.PaymentIntentId}. {req.Message ?? ""}".Trim()
         );
 
+        await _churn.ScoreAndUpsertAsync(supporter.SupporterId);
+
         _logger.LogInformation("Recorded Stripe donation {PaymentIntentId} as donation {DonationId}", req.PaymentIntentId, donation.DonationId);
         return Ok(new { message = "Donation recorded.", donationId = donation.DonationId });
     }
@@ -221,6 +225,8 @@ public class DonationsController : ControllerBase
             true,
             $"Stripe Checkout Session: {req.SessionId}. {message ?? ""}".Trim()
         );
+
+        await _churn.ScoreAndUpsertAsync(supporter.SupporterId);
 
         return Ok(new { message = "Recurring donation recorded.", donationId = donation.DonationId });
     }

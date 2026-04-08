@@ -228,14 +228,12 @@ export default function DonorsPage() {
 
   const onSort = (column: typeof sortBy) => {
     setCurrentPage(1)
-    setSortBy((prev) => {
-      if (prev === column) {
-        setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
-        return prev
-      }
+    if (sortBy === column) {
+      setSortDir((d) => (d === 'asc' ? 'desc' : 'asc'))
+    } else {
+      setSortBy(column)
       setSortDir('asc')
-      return column
-    })
+    }
   }
 
   const hasDonationFilter = activeFilters.some((f) => f.field === 'donation')

@@ -52,6 +52,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString));
 
 builder.Services.AddScoped<ResidentStatusCalculator>();
+builder.Services.AddScoped<ChurnScoringService>();
 
 // ─── HTTP client for local Ollama AI ────────────────────────────────────────
 builder.Services.AddHttpClient("ollama", client =>

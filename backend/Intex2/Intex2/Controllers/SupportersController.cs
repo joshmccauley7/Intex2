@@ -9,11 +9,13 @@ public class SupportersController : ControllerBase
 {
     private readonly AppDbContext _db;
     private readonly ImpactEmailService _emailService;
+    private readonly ChurnScoringService _churn;
 
-    public SupportersController(AppDbContext db, ImpactEmailService emailService)
+    public SupportersController(AppDbContext db, ImpactEmailService emailService, ChurnScoringService churn)
     {
         _db = db;
         _emailService = emailService;
+        _churn = churn;
     }
 
     // GET /api/supporters?type=MonetaryDonor&status=Active
@@ -257,6 +259,9 @@ public class SupportersController : ControllerBase
         donation.SupporterId = id;
         _db.Donations.Add(donation);
         await _db.SaveChangesAsync();
+
+        await _churn.ScoreAndUpsertAsync(id);
+
         return CreatedAtAction(nameof(GetById), new { id }, donation);
     }
 }
