@@ -8,10 +8,12 @@ using Microsoft.EntityFrameworkCore;
 public class SupportersController : ControllerBase
 {
     private readonly AppDbContext _db;
+    private readonly ImpactEmailService _emailService;
 
-    public SupportersController(AppDbContext db)
+    public SupportersController(AppDbContext db, ImpactEmailService emailService)
     {
         _db = db;
+        _emailService = emailService;
     }
 
     // GET /api/supporters?type=MonetaryDonor&status=Active
@@ -65,6 +67,63 @@ public class SupportersController : ControllerBase
             .ToListAsync();
 
         return Ok(supporters);
+    }
+
+    // GET /api/supporters/outreach-queue
+    [HttpGet("outreach-queue")]
+    public async Task<IActionResult> GetOutreachQueue()
+    {
+        var today = DateOnly.FromDateTime(DateTime.UtcNow);
+
+        var queue = await _db.DonorChurnPredictions
+            .Where(p => p.RiskLevel == "High")
+            .Join(_db.Supporters,
+                p => p.SupporterId,
+                s => s.SupporterId,
+                (p, s) => new { p, s })
+            .Select(x => new
+            {
+                x.s.SupporterId,
+                x.s.DisplayName,
+                x.s.Email,
+                x.s.SupporterType,
+                x.s.Status,
+                x.s.Region,
+                x.p.RiskLevel,
+                x.p.ChurnProbability,
+                x.p.ScoredAt,
+                LastDonationDate = _db.Donations
+                    .Where(d => d.SupporterId == x.s.SupporterId)
+                    .Select(d => (DateOnly?)d.DonationDate)
+                    .Max(),
+                TotalDonations = _db.Donations.Count(d => d.SupporterId == x.s.SupporterId),
+                IsRecurring = _db.Donations.Any(d => d.SupporterId == x.s.SupporterId && d.IsRecurring),
+            })
+            .ToListAsync();
+
+        var result = queue
+            .Select(x => new
+            {
+                x.SupporterId,
+                x.DisplayName,
+                x.Email,
+                x.SupporterType,
+                x.Status,
+                x.Region,
+                x.RiskLevel,
+                x.ChurnProbability,
+                x.ScoredAt,
+                x.LastDonationDate,
+                x.TotalDonations,
+                x.IsRecurring,
+                DaysSinceLastGift = x.LastDonationDate.HasValue
+                    ? today.DayNumber - x.LastDonationDate.Value.DayNumber
+                    : (int?)null,
+            })
+            .OrderByDescending(x => x.DaysSinceLastGift)
+            .ToList();
+
+        return Ok(result);
     }
 
     // GET /api/supporters/:id
@@ -164,6 +223,27 @@ public class SupportersController : ControllerBase
                 message = "Unable to delete supporter because related records still exist.",
                 detail = ex.InnerException?.Message ?? ex.Message
             });
+        }
+    }
+
+    // POST /api/supporters/:id/send-impact-email
+    [HttpPost("{id}/send-impact-email")]
+    public async Task<IActionResult> SendImpactEmail(int id)
+    {
+        try
+        {
+            await _emailService.SendImpactRecapAsync(id);
+            return Ok(new { message = "Impact recap email sent." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex)
+        {
+            var inner = ex.InnerException?.Message ?? "";
+            Console.WriteLine($"[EMAIL ERROR] {ex.GetType().Name}: {ex.Message} | Inner: {inner}");
+            return StatusCode(500, new { message = "Failed to send email.", detail = ex.Message, inner });
         }
     }
 

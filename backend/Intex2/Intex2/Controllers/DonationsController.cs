@@ -51,7 +51,7 @@ public class DonationsController : ControllerBase
         var options = new PaymentIntentCreateOptions
         {
             Amount = amountCents,
-            Currency = "usd",
+            Currency = "php",
             AutomaticPaymentMethods = new PaymentIntentAutomaticPaymentMethodsOptions
             {
                 Enabled = true
@@ -103,7 +103,7 @@ public class DonationsController : ControllerBase
                     Quantity = 1,
                     PriceData = new SessionLineItemPriceDataOptions
                     {
-                        Currency = "usd",
+                        Currency = "php",
                         UnitAmount = amountCents,
                         Recurring = new SessionLineItemPriceDataRecurringOptions
                         {
@@ -265,7 +265,7 @@ public class DonationsController : ControllerBase
             DonationDate = DateOnly.FromDateTime(DateTime.UtcNow),
             IsRecurring = isRecurring,
             ChannelSource = "Stripe",
-            CurrencyCode = "USD",
+            CurrencyCode = "PHP",
             Amount = amountUsd,
             Notes = notes
         };

@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Resend;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -103,6 +104,16 @@ builder.Services.AddAuthorization(options =>
 
 // ─── HttpClient (for proxying to Python prediction API) ──────────────────────
 builder.Services.AddHttpClient();
+
+// ─── Resend email service ─────────────────────────────────────────────────────
+builder.Services.AddOptions();
+builder.Services.AddHttpClient<ResendClient>();
+builder.Services.Configure<ResendClientOptions>(o =>
+{
+    o.ApiToken = Environment.GetEnvironmentVariable("RESEND_API_KEY") ?? "";
+});
+builder.Services.AddTransient<IResend, ResendClient>();
+builder.Services.AddTransient<ImpactEmailService>();
 
 // ─── Controllers ─────────────────────────────────────────────────────────────
 builder.Services.AddControllers()

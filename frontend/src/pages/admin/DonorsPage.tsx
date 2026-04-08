@@ -1,6 +1,39 @@
 import { useEffect, useState } from 'react'
 import { apiFetch } from '../../api'
-import { Plus, Eye, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, Mail, CheckCircle, AlertTriangle, RefreshCw } from 'lucide-react'
+
+// ── Outreach queue types ──────────────────────────────────────────────────────
+
+interface OutreachEntry {
+  supporterId: number
+  displayName: string
+  email: string | null
+  supporterType: string
+  status: string
+  region: string | null
+  riskLevel: string
+  churnProbability: number
+  scoredAt: string | null
+  lastDonationDate: string | null
+  totalDonations: number
+  isRecurring: boolean
+  daysSinceLastGift: number | null
+}
+
+const RISK_ROW = 'border-l-4 border-l-red-400'
+
+function RiskBar({ probability }: { probability: number }) {
+  const pct = Math.round(probability * 100)
+  const color = pct >= 70 ? 'bg-red-400' : 'bg-yellow-400'
+  return (
+    <div className="flex items-center gap-2">
+      <div className="w-20 h-1.5 rounded-full bg-slate-200 overflow-hidden">
+        <div className={`h-full rounded-full ${color}`} style={{ width: `${pct}%` }} />
+      </div>
+      <span className="text-xs font-semibold text-slate-600">{pct}%</span>
+    </div>
+  )
+}
 
 interface Supporter {
   supporterId: number
@@ -59,6 +92,9 @@ const DONATION_TYPE_BADGE: Record<string, string> = {
 const PAGE_SIZE = 20
 
 export default function DonorsPage() {
+  const [activeTab, setActiveTab] = useState<'donors' | 'outreach'>('donors')
+
+  // ── Donors tab state ────────────────────────────────────────────────────────
   const [supporters, setSupporters] = useState<Supporter[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -73,6 +109,59 @@ export default function DonorsPage() {
   const [editSupporter, setEditSupporter] = useState<SupporterDetail | null>(null)
   const [showDonationModal, setShowDonationModal] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<number | null>(null)
+  const [emailSending, setEmailSending] = useState(false)
+  const [emailSent, setEmailSent] = useState<number | null>(null)
+  const [emailError, setEmailError] = useState<string | null>(null)
+
+  const sendImpactEmail = async (id: number) => {
+    setEmailSending(true)
+    setEmailError(null)
+    try {
+      await apiFetch(`/api/supporters/${id}/send-impact-email`, { method: 'POST' })
+      setEmailSent(id)
+    } catch (e: unknown) {
+      setEmailError(e instanceof Error ? e.message : 'Failed to send email')
+    } finally {
+      setEmailSending(false)
+    }
+  }
+
+  // ── Outreach tab state ──────────────────────────────────────────────────────
+  const [queue, setQueue] = useState<OutreachEntry[]>([])
+  const [queueLoading, setQueueLoading] = useState(false)
+  const [queueError, setQueueError] = useState<string | null>(null)
+  const [queueLoaded, setQueueLoaded] = useState(false)
+  const [queueEmailSending, setQueueEmailSending] = useState<number | null>(null)
+  const [queueEmailSent, setQueueEmailSent] = useState<Set<number>>(new Set())
+  const [queueEmailErrors, setQueueEmailErrors] = useState<Record<number, string>>({})
+
+  const loadQueue = () => {
+    setQueueLoading(true)
+    setQueueError(null)
+    apiFetch('/api/supporters/outreach-queue')
+      .then((data: OutreachEntry[]) => { setQueue(data); setQueueLoaded(true) })
+      .catch((e: Error) => setQueueError(e.message))
+      .finally(() => setQueueLoading(false))
+  }
+
+  const sendQueueEmail = async (id: number) => {
+    setQueueEmailSending(id)
+    setQueueEmailErrors((prev) => { const n = { ...prev }; delete n[id]; return n })
+    try {
+      await apiFetch(`/api/supporters/${id}/send-impact-email`, { method: 'POST' })
+      setQueueEmailSent((prev) => new Set(prev).add(id))
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : 'Failed to send'
+      setQueueEmailErrors((prev) => ({ ...prev, [id]: msg }))
+    } finally {
+      setQueueEmailSending(null)
+    }
+  }
+
+  const handleTabChange = (tab: 'donors' | 'outreach') => {
+    setActiveTab(tab)
+    if (tab === 'outreach' && !queueLoaded) loadQueue()
+  }
 
   const fetchSupporters = () => {
     setLoading(true)
@@ -102,19 +191,138 @@ export default function DonorsPage() {
     fetchSupporters()
   }
 
+  const tabClass = (tab: 'donors' | 'outreach') =>
+    `px-4 py-2 text-sm font-semibold border-b-2 transition-colors ${
+      activeTab === tab
+        ? 'border-safira-blue text-safira-blue'
+        : 'border-transparent text-slate-500 hover:text-slate-700'
+    }`
+
+  const highCount = queue.length
+
   return (
     <div>
       {/* Header */}
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-2xl font-bold text-[#0f172a]">Donors &amp; Contributors</h1>
-        <button
-          onClick={() => setShowCreateModal(true)}
-          className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
-        >
-          <Plus size={16} />
-          Add Supporter
+        {activeTab === 'donors' && (
+          <button
+            onClick={() => setShowCreateModal(true)}
+            className="flex items-center gap-2 bg-safira-blue hover:bg-safira-blue-dark text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors"
+          >
+            <Plus size={16} />
+            Add Supporter
+          </button>
+        )}
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-0 border-b border-slate-200 mb-6">
+        <button className={tabClass('donors')} onClick={() => handleTabChange('donors')}>All Donors</button>
+        <button className={tabClass('outreach')} onClick={() => handleTabChange('outreach')}>
+          Outreach Queue
+          {highCount > 0 && (
+            <span className="ml-2 inline-block bg-red-100 text-red-700 text-xs font-bold px-1.5 py-0.5 rounded-full">
+              {highCount}
+            </span>
+          )}
         </button>
       </div>
+
+      {/* ── Outreach Queue tab ─────────────────────────────────────────────── */}
+      {activeTab === 'outreach' && (
+        <div>
+          {/* Summary strip */}
+          <div className="flex gap-4 mb-6">
+            <div className="bg-white rounded-xl border border-slate-200 px-5 py-4 flex items-center gap-3 shadow-sm">
+              <AlertTriangle size={18} className="text-red-500 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-500 font-medium">At Risk</p>
+                <p className="text-xl font-bold text-[#0f172a]">{highCount}</p>
+              </div>
+            </div>
+            <div className="bg-white rounded-xl border border-slate-200 px-5 py-4 flex items-center gap-3 shadow-sm">
+              <CheckCircle size={18} className="text-emerald-500 shrink-0" />
+              <div>
+                <p className="text-xs text-slate-500 font-medium">Emailed</p>
+                <p className="text-xl font-bold text-[#0f172a]">{queueEmailSent.size}</p>
+              </div>
+            </div>
+          </div>
+
+          {queueLoading && <p className="text-sm text-slate-500">Loading queue...</p>}
+          {queueError && <p className="text-sm text-red-500">{queueError}</p>}
+
+          {!queueLoading && !queueError && (
+            <div className="bg-white rounded-xl border border-slate-200 overflow-hidden">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-slate-50 border-b border-slate-200">
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Donor</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Churn Probability</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Days Since Last Gift</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Gifts</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Recurring</th>
+                    <th className="px-4 py-3" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {queue.map((entry) => {
+                    const sent = queueEmailSent.has(entry.supporterId)
+                    const sending = queueEmailSending === entry.supporterId
+                    const emailErr = queueEmailErrors[entry.supporterId]
+                    return (
+                      <tr key={entry.supporterId} className={`${RISK_ROW} hover:bg-slate-50 transition-colors`}>
+                        <td className="px-4 py-3">
+                          <p className="font-semibold text-[#0f172a]">{entry.displayName}</p>
+                          <p className="text-xs text-slate-400">{entry.email ?? '—'}</p>
+                        </td>
+                        <td className="px-4 py-3"><RiskBar probability={entry.churnProbability} /></td>
+                        <td className="px-4 py-3">
+                          {entry.daysSinceLastGift != null ? (
+                            <span className={`font-bold ${entry.daysSinceLastGift >= 90 ? 'text-red-600' : entry.daysSinceLastGift >= 60 ? 'text-yellow-600' : 'text-slate-700'}`}>
+                              {entry.daysSinceLastGift}d
+                            </span>
+                          ) : '—'}
+                          {entry.lastDonationDate && (
+                            <p className="text-xs text-slate-400">{entry.lastDonationDate}</p>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-slate-600">{entry.totalDonations}</td>
+                        <td className="px-4 py-3">
+                          {entry.isRecurring
+                            ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600"><RefreshCw size={11} /> Yes</span>
+                            : <span className="text-xs text-slate-400">No</span>}
+                        </td>
+                        <td className="px-4 py-3 text-right">
+                          <div className="flex flex-col items-end gap-1">
+                            <button
+                              onClick={() => sendQueueEmail(entry.supporterId)}
+                              disabled={sending || sent || !entry.email}
+                              title={!entry.email ? 'No email on file' : undefined}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg border transition-colors disabled:opacity-50 disabled:cursor-not-allowed
+                                ${sent ? 'border-emerald-200 text-emerald-700 bg-emerald-50' : 'border-slate-200 text-slate-600 hover:border-safira-blue hover:text-safira-blue'}`}
+                            >
+                              {sent ? <><CheckCircle size={12} /> Sent</> : sending ? <><Mail size={12} /> Sending...</> : <><Mail size={12} /> Send Impact Email</>}
+                            </button>
+                            {emailErr && <p className="text-xs text-red-500 max-w-[160px] text-right">{emailErr}</p>}
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                  {queue.length === 0 && (
+                    <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400 text-sm">No donors in the outreach queue.</td></tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── All Donors tab ─────────────────────────────────────────────────── */}
+      {activeTab === 'donors' && <>
 
       {/* Filters */}
       <div className="flex gap-3 mb-6">
@@ -204,6 +412,8 @@ export default function DonorsPage() {
         )
       })()}
 
+      </> /* end donors tab */}
+
       {/* Delete confirmation modal */}
       {deleteConfirmId !== null && (
         <Modal onClose={() => setDeleteConfirmId(null)}>
@@ -287,10 +497,27 @@ export default function DonorsPage() {
                 )}
               </div>
 
-              <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
-                <button onClick={() => setShowDonationModal(true)} className="px-4 py-2 text-sm font-medium text-safira-blue border border-safira-blue rounded-lg hover:bg-blue-50 transition-colors">+ Add Donation</button>
-                <button onClick={() => setEditSupporter(selectedSupporter)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Edit</button>
-                <button onClick={() => setSelectedSupporter(null)} className="px-4 py-2 text-sm font-medium text-white bg-safira-blue hover:bg-safira-blue-dark rounded-lg transition-colors">Close</button>
+              {emailError && (
+                <p className="text-sm text-red-500 mt-2">{emailError}</p>
+              )}
+              <div className="flex gap-3 justify-between pt-2 border-t border-slate-100 flex-wrap">
+                <button
+                  onClick={() => sendImpactEmail(selectedSupporter.supporterId)}
+                  disabled={emailSending || emailSent === selectedSupporter.supporterId}
+                  className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg border transition-colors disabled:opacity-60
+                    text-emerald-700 border-emerald-200 hover:bg-emerald-50"
+                >
+                  {emailSent === selectedSupporter.supporterId
+                    ? <><CheckCircle size={14} /> Sent!</>
+                    : emailSending
+                    ? <><Mail size={14} /> Sending...</>
+                    : <><Mail size={14} /> Send Impact Email</>}
+                </button>
+                <div className="flex gap-3">
+                  <button onClick={() => setShowDonationModal(true)} className="px-4 py-2 text-sm font-medium text-safira-blue border border-safira-blue rounded-lg hover:bg-blue-50 transition-colors">+ Add Donation</button>
+                  <button onClick={() => setEditSupporter(selectedSupporter)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Edit</button>
+                  <button onClick={() => setSelectedSupporter(null)} className="px-4 py-2 text-sm font-medium text-white bg-safira-blue hover:bg-safira-blue-dark rounded-lg transition-colors">Close</button>
+                </div>
               </div>
             </>
           )}
