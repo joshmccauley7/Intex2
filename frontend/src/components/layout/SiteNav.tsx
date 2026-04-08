@@ -17,6 +17,29 @@ export default function SiteNav() {
     navigate('/');
   }
 
+  function handleTranslateClick() {
+    const rawUrl = window.location.href;
+    const isLocalHost =
+      window.location.hostname === 'localhost' ||
+      window.location.hostname === '127.0.0.1' ||
+      window.location.hostname === '::1';
+
+    if (isLocalHost) {
+      // Google Translate cannot fetch localhost/private URLs.
+      alert('Google Translate cannot open local development pages. Use a deployed URL to translate the full page.');
+      return;
+    }
+
+    const url = encodeURIComponent(rawUrl);
+    const translateUrl = `https://translate.google.com/?sl=auto&tl=fil&op=websites&url=${url}`;
+    const opened = window.open(translateUrl, '_blank', 'noopener,noreferrer');
+
+    // Fallback when popup blockers prevent opening a new tab.
+    if (!opened) {
+      window.location.href = translateUrl;
+    }
+  }
+
   const linkClass = ({ isActive }: { isActive: boolean }) =>
     isActive
       ? 'text-safira-blue dark:text-blue-300 transition-colors'
@@ -51,10 +74,7 @@ export default function SiteNav() {
       {/* Right side (desktop) */}
       <div className="hidden md:flex items-center gap-2">
         <button
-          onClick={() => {
-            const url = encodeURIComponent(window.location.href);
-            window.open(`https://translate.google.com/translate?sl=en&u=${url}`, '_blank');
-          }}
+          onClick={handleTranslateClick}
           title="Translate this page"
           className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
         >
@@ -95,10 +115,7 @@ export default function SiteNav() {
       {/* Mobile controls */}
       <div className="md:hidden flex items-center gap-2">
         <button
-          onClick={() => {
-            const url = encodeURIComponent(window.location.href);
-            window.open(`https://translate.google.com/translate?sl=en&u=${url}`, '_blank');
-          }}
+          onClick={handleTranslateClick}
           title="Translate this page"
           className="flex items-center text-slate-500 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white transition-colors px-2 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800"
         >
