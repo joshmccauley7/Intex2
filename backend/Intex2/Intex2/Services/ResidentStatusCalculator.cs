@@ -103,7 +103,7 @@ public class ResidentStatusCalculator
         return today.DayNumber - recordDate.Value.DayNumber > StalenessDays;
     }
 
-    /// <summary>Scores in Lighthouse data are ~2.5–3.5 on a ~1–5 style scale.</summary>
+    /// <summary>Scores in Safira data are ~2.5–3.5 on a ~1–5 style scale.</summary>
     private static string ComputeHealth(HealthWellbeingRecord? latest, DateOnly today)
     {
         if (latest == null || IsStale(latest.RecordDate, today))
