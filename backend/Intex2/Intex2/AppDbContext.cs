@@ -18,4 +18,5 @@ public class AppDbContext : DbContext
     public DbSet<HealthWellbeingRecord> HealthWellbeingRecords => Set<HealthWellbeingRecord>();
     public DbSet<EducationRecord> EducationRecords => Set<EducationRecord>();
     public DbSet<SocialMediaPost> SocialMediaPosts => Set<SocialMediaPost>();
+    public DbSet<InterventionPlan> InterventionPlans => Set<InterventionPlan>();
 }
