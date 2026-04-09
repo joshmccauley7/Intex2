@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api'
 import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users, ChevronDown, X, Info, Home, ShieldAlert, CheckCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
@@ -117,8 +117,6 @@ interface EducationEvent {
   progressPercent: number | null
   completionStatus: string | null
 }
-
-type LifecycleEvent = HealthEvent | SessionEvent | VisitationEvent | EducationEvent
 
 interface InterventionPlan {
   planCategory: string | null
@@ -298,6 +296,7 @@ const blankForm = (): Partial<ResidentDetail> => ({
 
 export default function ResidentsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [residents, setResidents] = useState<ResidentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -569,9 +568,22 @@ export default function ResidentsPage() {
                   <ReintegrationCard resident={selectedResident} lifecycle={lifecycle} />
                   <SectionHeading>Goal Progress</SectionHeading>
                   <ProgressSnapshot resident={selectedResident} lifecycle={lifecycle} />
-                  <ResidentTimeline lifecycle={lifecycle} />
                   <SectionHeading>Incident Reports</SectionHeading>
                   <IncidentSection incidents={lifecycle.incidents} />
+                  <div className="flex gap-4 pt-2 border-t border-slate-100 mt-2">
+                    <button
+                      onClick={() => navigate(`/admin/process-recordings?residentId=${selectedResident.residentId}`)}
+                      className="text-xs font-medium text-safira-blue hover:underline flex items-center gap-1"
+                    >
+                      Go to counseling sessions <ArrowRight size={11} />
+                    </button>
+                    <button
+                      onClick={() => navigate(`/admin/home-visitations?residentId=${selectedResident.residentId}`)}
+                      className="text-xs font-medium text-safira-blue hover:underline flex items-center gap-1"
+                    >
+                      Go to home visits <ArrowRight size={11} />
+                    </button>
+                  </div>
                 </>
               ) : (
                 <p className="text-sm text-slate-400">Loading progress data…</p>
@@ -876,8 +888,8 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   const progressIssues = getProgressIssues()
 
   // ── Dot row helper ──────────────────────────────────────────────────────────
-  function DotRow({ label, count, total, totalLabel, dots, info, dates }: {
-    label: string; count: number; total: number; totalLabel: string; dots: React.ReactNode[]; info?: string; dates?: (string | null)[]
+  function DotRow({ label, dots, dates, passing, summary }: {
+    label: string; dots: React.ReactNode[]; dates?: (string | null)[]; passing?: boolean; summary?: string
   }) {
     const fmtMmYy = (d: string | null) => {
       if (!d) return ''
@@ -887,19 +899,16 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
 
     return (
       <div>
-        <div className="flex items-center gap-1 mb-0.5">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">{label}</p>
-          {info && (
-            <div className="relative group">
-              <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
-              <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
-                {info}
-                <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
-              </div>
-            </div>
+        <div className="flex items-center justify-between gap-2 mb-1">
+          <p className="text-xs font-semibold text-slate-600">{label}</p>
+          {passing !== undefined && (
+            <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${passing ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              {passing ? '✓ On track' : '⚠ Needs attention'}
+            </span>
           )}
         </div>
-        <div className="inline-flex border border-slate-100 rounded-lg overflow-hidden mt-2">
+        {summary && <p className="text-xs text-slate-400 mb-2">{summary}</p>}
+        <div className="inline-flex border border-slate-100 rounded-lg overflow-hidden">
           {dots.map((dot, i) => (
             <div key={i} className={`flex flex-col items-center gap-0.5 px-2 py-1 ${i > 0 ? 'border-l border-slate-100' : ''}`}>
               <div className="scale-75">{dot}</div>
@@ -927,23 +936,19 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Family Reunification') {
       return (
         <div className="pt-3 border-t border-slate-100">
-        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators For Family Reunification</p>
         <div className="grid grid-cols-2 gap-4">
           {recentVisits.length > 0 && (
             <DotRow
               label="Family Cooperation"
-              info="How cooperative the family has been during recent home visits. Dark green = highly cooperative, green = cooperative, yellow = neutral, red = uncooperative."
-              count={cooperativeCount}
-              total={totalVisits}
-              totalLabel="total visits"
+              passing={!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')}
+              summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
               dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
               dots={[
                 ...recentVisits.map((v, i) => (
                   <div key={i} title={v.familyCooperationLevel ?? 'Unknown'}
                     className={`w-4 h-4 rounded-full ${
-                      v.familyCooperationLevel === 'Highly Cooperative' ? 'bg-emerald-600' :
-                      v.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-400' :
-                      v.familyCooperationLevel === 'Uncooperative' ? 'bg-red-400' : 'bg-yellow-400'
+                      v.familyCooperationLevel === 'Highly Cooperative' || v.familyCooperationLevel === 'Cooperative'
+                        ? 'bg-slate-600' : 'bg-slate-200'
                     }`} />
                 )),
                 ...Array.from({ length: DOTS - recentVisits.length }).map((_, i) => (
@@ -955,15 +960,13 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              info="Whether progress was noted by the social worker at the end of each recent counseling session. Green = progress noted."
-              count={progressCount}
-              total={totalSessions}
-              totalLabel="total sessions"
+              passing={!isStale(latestSession?.date)}
+              summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
               dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
                 ...recentSessions.map((s, i) => (
                   <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
-                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-slate-600' : 'bg-slate-200'}`} />
                 )),
                 ...Array.from({ length: DOTS - recentSessions.length }).map((_, i) => (
                   <div key={`e-${i}`} className="w-4 h-4 rounded-full bg-slate-100" />
@@ -979,20 +982,17 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Foster Care') {
       return (
         <div className="pt-3 border-t border-slate-100">
-        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators For Foster Care</p>
         <div className="grid grid-cols-2 gap-4">
           {recentHealth.length > 0 && (
             <DotRow
               label="Psych Checkups"
-              info="Whether a psychological checkup was completed at each recent health record. Green = completed."
-              count={psychCount}
-              total={lifecycle.health.length}
-              totalLabel="total records"
+              passing={latestHealth != null && !isStale(latestHealth.date, 540)}
+              summary={`${psychCount} of ${recentHealth.length} most recent records had psych checkup`}
               dates={[...recentHealth.map(h => h.date), ...Array(Math.max(0, DOTS - recentHealth.length)).fill(null)]}
               dots={[
                 ...recentHealth.map((h, i) => (
                   <div key={i} title={h.psychologicalCheckupDone ? 'Done' : 'Not done'}
-                    className={`w-4 h-4 rounded-full ${h.psychologicalCheckupDone ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                    className={`w-4 h-4 rounded-full ${h.psychologicalCheckupDone ? 'bg-slate-600' : 'bg-slate-200'}`} />
                 )),
                 ...Array.from({ length: DOTS - recentHealth.length }).map((_, i) => (
                   <div key={`e-${i}`} className="w-4 h-4 rounded-full bg-slate-100" />
@@ -1003,15 +1003,13 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              info="Whether progress was noted by the social worker at the end of each recent counseling session. Green = progress noted."
-              count={progressCount}
-              total={totalSessions}
-              totalLabel="total sessions"
+              passing={!isStale(latestSession?.date)}
+              summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
               dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
                 ...recentSessions.map((s, i) => (
                   <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
-                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-emerald-500' : 'bg-slate-200'}`} />
+                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-slate-600' : 'bg-slate-200'}`} />
                 )),
                 ...Array.from({ length: DOTS - recentSessions.length }).map((_, i) => (
                   <div key={`e-${i}`} className="w-4 h-4 rounded-full bg-slate-100" />
@@ -1046,33 +1044,24 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
 
       return (
         <div className="pt-3 border-t border-slate-100">
-          <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators For {reType}</p>
           <div className="grid grid-cols-2 gap-6">
             <div>
-              <div className="flex items-center gap-1 mb-1">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Home Visits</p>
-                <div className="relative group">
-                  <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
-                    Total home visits conducted. The trend compares the most recent 90 days to the 90 days prior.
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
-                  </div>
-                </div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-xs font-semibold text-slate-600">Home Visits</p>
+                <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${(visitsRecent > 0 && (visitsPrior === 0 || visitsRecent >= visitsPrior)) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {(visitsRecent > 0 && (visitsPrior === 0 || visitsRecent >= visitsPrior)) ? '✓ On track' : '⚠ Needs attention'}
+                </span>
               </div>
               <p className="text-2xl font-bold text-[#0f172a]">{totalVisits}</p>
               <p className="text-xs text-slate-400 mb-1">total conducted</p>
               {monthTrend(visitsRecent, visitsPrior)}
             </div>
             <div>
-              <div className="flex items-center gap-1 mb-1">
-                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Counseling Sessions</p>
-                <div className="relative group">
-                  <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
-                    Total counseling sessions attended. The trend compares the most recent 90 days to the 90 days prior.
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
-                  </div>
-                </div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-xs font-semibold text-slate-600">Counseling Sessions</p>
+                <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${(sessionsRecent > 0 && (sessionsPrior === 0 || sessionsRecent >= sessionsPrior)) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {(sessionsRecent > 0 && (sessionsPrior === 0 || sessionsRecent >= sessionsPrior)) ? '✓ On track' : '⚠ Needs attention'}
+                </span>
               </div>
               <p className="text-2xl font-bold text-[#0f172a]">{totalSessions}</p>
               <p className="text-xs text-slate-400 mb-1">total attended</p>
@@ -1103,22 +1092,19 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
 
       return (
         <div className="pt-3 border-t border-slate-100">
-        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators For Independent Living</p>
         <div className="grid grid-cols-2 gap-4">
           {recentEducation.length > 0 && (
             <DotRow
               label="Attendance"
-              info="School attendance rate from recent education records. Green ≥80%, yellow ≥60%, red <60%."
-              count={goodAttendanceCount}
-              total={recentEducation.length}
-              totalLabel="recent records"
+              passing={latestEducation != null && !isStale(latestEducation.date, 540) && (latestEducation.attendanceRate ?? 0) >= 0.5}
+              summary={`${goodAttendanceCount} of ${recentEducation.length} most recent records ≥80% attendance`}
               dates={[...recentEducation.map(e => e.date), ...Array(Math.max(0, DOTS - recentEducation.length)).fill(null)]}
               dots={[
                 ...recentEducation.map((e, i) => {
                   const rate = e.attendanceRate ?? 0
                   return (
                     <div key={i} title={`${Math.round(rate * 100)}% attendance`}
-                      className={`w-4 h-4 rounded-full ${rate >= 0.8 ? 'bg-emerald-500' : rate >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'}`} />
+                      className={`w-4 h-4 rounded-full ${rate >= 0.8 ? 'bg-slate-600' : 'bg-slate-200'}`} />
                   )
                 }),
                 ...Array.from({ length: DOTS - recentEducation.length }).map((_, i) => (
@@ -1128,15 +1114,11 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             />
           )}
           <div>
-            <div className="flex items-center gap-1 mb-1">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Social Worker Contact</p>
-              <div className="relative group">
-                <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
-                <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
-                  Total counseling sessions attended and home visits conducted — key markers of ongoing support engagement for independent living preparation.
-                  <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
-                </div>
-              </div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <p className="text-xs font-semibold text-slate-600">Social Worker Contact</p>
+              <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${!isStale(latestSession?.date) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                {!isStale(latestSession?.date) ? '✓ On track' : '⚠ Needs attention'}
+              </span>
             </div>
             <p className="text-2xl font-bold text-[#0f172a]">{totalSessions + totalVisits}</p>
             <p className="text-xs text-slate-400 mb-1">{totalSessions} sessions · {totalVisits} home visits</p>
@@ -1150,22 +1132,19 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     // Fallback — generic
     return (recentVisits.length > 0 || recentSessions.length > 0) ? (
       <div className="pt-3 border-t border-slate-100">
-      <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators</p>
       <div className="grid grid-cols-2 gap-4">
         {recentVisits.length > 0 && (
           <DotRow
             label="Family Cooperation"
-            info="How cooperative the family has been during recent home visits. Dark green = highly cooperative, green = cooperative, yellow = neutral, red = uncooperative."
-            count={cooperativeCount}
-            total={totalVisits}
-            totalLabel="total visits"
+            passing={!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')}
+            summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
             dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
             dots={[
               ...recentVisits.map((v, i) => (
                 <div key={i} title={v.familyCooperationLevel ?? 'Unknown'}
                   className={`w-4 h-4 rounded-full ${
-                    v.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-500' :
-                    v.familyCooperationLevel === 'Uncooperative' ? 'bg-red-400' : 'bg-yellow-400'
+                    v.familyCooperationLevel === 'Cooperative' || v.familyCooperationLevel === 'Highly Cooperative'
+                      ? 'bg-slate-600' : 'bg-slate-200'
                   }`} />
               )),
               ...Array.from({ length: DOTS - recentVisits.length }).map((_, i) => (
@@ -1177,10 +1156,8 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         {recentSessions.length > 0 && (
           <DotRow
             label="Counseling Progress"
-            info="Whether progress was noted by the social worker at the end of each recent counseling session. Green = progress noted."
-            count={progressCount}
-            total={totalSessions}
-            totalLabel="total sessions"
+            passing={!isStale(latestSession?.date)}
+            summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
             dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
             dots={[
               ...recentSessions.map((s, i) => (
@@ -1228,12 +1205,12 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {renderIndicators()}
           {progressIssues.length > 0 && (
             <div className="pt-3 border-t border-slate-100 space-y-1">
-              <p className="text-xs font-semibold text-amber-600 mb-1">
+              <p className="text-xs font-semibold text-slate-700 mb-1">
                 Progress was marked {progressIssues.length === 1 ? 'yellow' : 'red'} due to:
               </p>
               {progressIssues.map((issue, i) => (
-                <p key={i} className="flex items-start gap-1.5 text-xs text-amber-600">
-                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                <p key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber-500" />
                   {issue}
                 </p>
               ))}
@@ -1430,13 +1407,11 @@ function RiskJourney({ initial, current }: { initial: string | null; current: st
       <SectionHeading>Risk Journey</SectionHeading>
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-white">
         <div className="flex items-center gap-1.5">
-          <div className={`w-2.5 h-2.5 rounded-full ${RISK_BG[initial ?? ''] ?? 'bg-slate-300'}`} />
           <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Admission</span>
           <span className={`text-sm font-bold ml-1 ${RISK_COLOR[initial ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{initial ?? '—'}</span>
         </div>
         <ArrowRight size={14} className="text-slate-300 shrink-0" />
         <div className="flex items-center gap-1.5">
-          <div className={`w-2.5 h-2.5 rounded-full ${RISK_BG[current ?? ''] ?? 'bg-slate-300'}`} />
           <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Current</span>
           <span className={`text-sm font-bold ml-1 ${RISK_COLOR[current ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{current ?? '—'}</span>
         </div>
@@ -1458,18 +1433,6 @@ function fmtShortDate(d: string | null) {
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function scoreBar(value: number | null) {
-  if (value == null) return null
-  const pct = Math.round((value / 5) * 100)
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div className="h-full bg-safira-blue rounded-full" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs text-slate-500 w-6 text-right">{value.toFixed(1)}</span>
-    </div>
-  )
-}
 
 function avgHealth(ev: HealthEvent): number | null {
   const vals = [ev.generalHealthScore, ev.nutritionScore, ev.sleepQualityScore, ev.energyLevelScore].filter((v): v is number => v != null)
@@ -1481,210 +1444,9 @@ function TrendBadge({ delta, unit = '' }: { delta: number; unit?: string }) {
   const up = delta > 0
   const label = `${up ? '+' : ''}${unit === '%' ? Math.round(delta) : delta.toFixed(1)}${unit}`
   return (
-    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+    <span className={`text-xs font-semibold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
       {up ? '↑' : '↓'} {label}
     </span>
-  )
-}
-
-function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
-  const latest = <T,>(arr: T[]) => arr.at(-1) ?? null
-
-  const latestHealth    = latest(lifecycle.health)
-  const latestSession   = latest(lifecycle.sessions)
-  const latestVisit     = latest(lifecycle.visitations)
-  const latestEducation = latest(lifecycle.education)
-
-  const events: LifecycleEvent[] = [latestHealth, latestSession, latestVisit, latestEducation]
-    .filter((e): e is LifecycleEvent => e !== null)
-
-  if (events.length === 0) return null
-
-  const TYPE_META = {
-    health: { label: 'Health Check', color: 'bg-emerald-500', light: 'bg-emerald-50 border-emerald-100', icon: <Heart size={12} className="text-emerald-600" /> },
-    session: { label: 'Counseling Session', color: 'bg-purple-500', light: 'bg-purple-50 border-purple-100', icon: <Users size={12} className="text-purple-600" /> },
-    visitation: { label: 'Home Visit', color: 'bg-blue-500', light: 'bg-blue-50 border-blue-100', icon: <Home size={12} className="text-blue-600" /> },
-    education: { label: 'Education Record', color: 'bg-yellow-500', light: 'bg-yellow-50 border-yellow-100', icon: <GraduationCap size={12} className="text-yellow-600" /> },
-  }
-
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
-  const toggle = (i: number) =>
-    setExpanded(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s })
-
-  return (
-    <div className="mt-6">
-      <SectionHeading>Most Recent Activity</SectionHeading>
-      <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
-        {events.map((ev, i) => {
-          const meta = TYPE_META[ev.type]
-          const open = expanded.has(i)
-          const hasConcern =
-            (ev.type === 'session' && ev.concernsFlagged) ||
-            (ev.type === 'visitation' && ev.safetyConcernsNoted)
-
-          return (
-            <div key={i}>
-              <button
-                onClick={() => toggle(i)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${meta.color}`} />
-                  {meta.icon}
-                  <span className="text-sm font-medium text-slate-700">{meta.label}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  {hasConcern && (
-                    <span className="flex items-center gap-1 text-xs font-medium text-orange-500">
-                      <AlertTriangle size={13} />
-                      Concern Flagged
-                    </span>
-                  )}
-                  <span className="text-xs text-slate-400">{fmtShortDate(ev.date)}</span>
-                  <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
-
-              {open && (
-                <div className="px-4 pb-3 pt-1 bg-slate-50 border-t border-slate-100">
-                  {ev.type === 'health' && (
-                    <div className="space-y-1">
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                        <div><span className="text-xs text-slate-400">Health</span>{scoreBar(ev.generalHealthScore)}</div>
-                        <div><span className="text-xs text-slate-400">Nutrition</span>{scoreBar(ev.nutritionScore)}</div>
-                        <div><span className="text-xs text-slate-400">Sleep</span>{scoreBar(ev.sleepQualityScore)}</div>
-                        <div><span className="text-xs text-slate-400">Energy</span>{scoreBar(ev.energyLevelScore)}</div>
-                      </div>
-                      <div className="flex gap-2 mt-1 flex-wrap">
-                        {[
-                          [ev.medicalCheckupDone, 'Medical'],
-                          [ev.dentalCheckupDone, 'Dental'],
-                          [ev.psychologicalCheckupDone, 'Psych'],
-                        ].map(([done, label]) => (
-                          <span
-                            key={label as string}
-                            className={`text-xs px-1.5 py-0.5 rounded font-medium ${done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}
-                          >
-                            {done ? '✓' : '✗'} {label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {ev.type === 'session' && (
-                    <div className="text-xs space-y-3">
-                      {/* Row 1 — Type / Social Worker / Duration */}
-                      <div className="grid grid-cols-3 gap-4 pb-3 border-b border-slate-100">
-                        <div>
-                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1">Type</p>
-                          <p className="font-medium text-slate-700">{ev.sessionType ?? '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1">Social Worker</p>
-                          <p className="font-medium text-slate-700">{ev.socialWorker ?? '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1">Duration</p>
-                          <p className="font-medium text-slate-700">{ev.sessionDurationMinutes ? `${ev.sessionDurationMinutes} min` : '—'}</p>
-                        </div>
-                      </div>
-                      {/* Row 2 — Emotional State */}
-                      {ev.emotionalStateObserved && ev.emotionalStateEnd && (
-                        <div className="pb-3 border-b border-slate-100">
-                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1.5">Emotional State</p>
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-600 font-medium">{ev.emotionalStateObserved}</span>
-                            <ArrowRight size={12} className="text-slate-300 shrink-0" />
-                            <span className="px-2 py-0.5 bg-purple-100 rounded text-purple-700 font-medium">{ev.emotionalStateEnd}</span>
-                          </div>
-                        </div>
-                      )}
-                      {/* Row 3 — Progress / Concerns badges */}
-                      <div className="flex gap-2">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${ev.progressNoted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-                          {ev.progressNoted ? '✓ Progress noted' : 'No progress noted'}
-                        </span>
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${ev.concernsFlagged ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
-                          {ev.concernsFlagged ? '⚠ Concerns flagged' : 'No concerns'}
-                        </span>
-                      </div>
-                      {/* Row 4 — Interventions */}
-                      {ev.interventionsApplied && (
-                        <div className="pt-1 border-t border-slate-100">
-                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1">Interventions</p>
-                          <p className="text-slate-600">{ev.interventionsApplied}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {ev.type === 'visitation' && (
-                    <div className="text-xs space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Visit Type</p>
-                          <p className="font-medium text-slate-700">{ev.visitType ?? '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Location</p>
-                          <p className="font-medium text-slate-700">{ev.locationVisited ?? '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Family Cooperation</p>
-                          <span className={`inline-block px-2 py-0.5 rounded font-medium ${
-                            ev.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-100 text-emerald-700' :
-                            ev.familyCooperationLevel === 'Highly Cooperative' ? 'bg-emerald-100 text-emerald-700' :
-                            ev.familyCooperationLevel === 'Uncooperative' ? 'bg-red-100 text-red-600' :
-                            'bg-slate-100 text-slate-500'
-                          }`}>{ev.familyCooperationLevel ?? '—'}</span>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Outcome</p>
-                          <p className="font-medium text-slate-700">{ev.visitOutcome ?? '—'}</p>
-                        </div>
-                      </div>
-                      {ev.safetyConcernsNoted && (
-                        <div className="flex items-center gap-1.5 text-orange-600 font-medium bg-orange-50 rounded px-2 py-1">
-                          <span>⚠</span><span>Safety concerns noted</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {ev.type === 'education' && (
-                    <div className="text-xs text-slate-600 space-y-0.5">
-                      <div className="flex gap-3 flex-wrap">
-                        {ev.enrollmentStatus && <span className={`font-medium ${ev.enrollmentStatus === 'Enrolled' ? 'text-emerald-600' : 'text-slate-500'}`}>{ev.enrollmentStatus}</span>}
-                        {ev.completionStatus && <span className="text-slate-400">{ev.completionStatus}</span>}
-                      </div>
-                      {ev.attendanceRate != null && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-slate-400 w-20">Attendance</span>
-                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${Math.round(ev.attendanceRate * 100)}%` }} />
-                          </div>
-                          <span className="text-slate-500 w-8 text-right">{Math.round(ev.attendanceRate * 100)}%</span>
-                        </div>
-                      )}
-                      {ev.progressPercent != null && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-slate-400 w-20">Progress</span>
-                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${Math.round(ev.progressPercent)}%` }} />
-                          </div>
-                          <span className="text-slate-500 w-8 text-right">{Math.round(ev.progressPercent)}%</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 
@@ -2070,10 +1832,10 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
   )
 }
 
-const SEVERITY_STYLE: Record<string, string> = {
-  High:   'bg-red-100 text-red-700',
-  Medium: 'bg-yellow-100 text-yellow-700',
-  Low:    'bg-slate-100 text-slate-600',
+const SEVERITY_DOT: Record<string, string> = {
+  High:   'bg-red-500',
+  Medium: 'bg-yellow-400',
+  Low:    'bg-slate-300',
 }
 
 function IncidentSection({ incidents }: { incidents: IncidentEvent[] }) {
@@ -2098,7 +1860,7 @@ function IncidentSection({ incidents }: { incidents: IncidentEvent[] }) {
       <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
         {incidents.map((inc) => {
           const isOpen = expanded.has(inc.incidentId)
-          const severityStyle = SEVERITY_STYLE[inc.severity ?? ''] ?? 'bg-slate-100 text-slate-600'
+          const severityDot = SEVERITY_DOT[inc.severity ?? ''] ?? 'bg-slate-300'
           return (
             <div key={inc.incidentId}>
               <button
@@ -2106,15 +1868,16 @@ function IncidentSection({ incidents }: { incidents: IncidentEvent[] }) {
                 onClick={() => toggle(inc.incidentId)}
               >
                 <div className="flex items-center gap-3">
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${severityStyle}`}>
-                    {inc.severity ?? 'Unknown'}
-                  </span>
+                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${severityDot}`} title={inc.severity ?? 'Unknown'} />
                   <span className="text-sm font-medium text-slate-700">{inc.incidentType ?? 'Incident'}</span>
-                  {inc.followUpRequired && (
-                    <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Follow-up required</span>
-                  )}
                 </div>
                 <div className="flex items-center gap-3 shrink-0">
+                  {inc.followUpRequired && (
+                    <span className="flex items-center gap-1 text-xs font-medium text-orange-500">
+                      <AlertTriangle size={13} />
+                      Follow-up required
+                    </span>
+                  )}
                   <span className="text-xs text-slate-400">{inc.incidentDate ?? '—'}</span>
                   {inc.resolved
                     ? <CheckCircle size={14} className="text-emerald-500" />
