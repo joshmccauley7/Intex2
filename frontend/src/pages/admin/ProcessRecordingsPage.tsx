@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apiFetch } from '../../api'
 import { Plus, Pencil, Trash2, FileText, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
 
@@ -37,6 +38,7 @@ const SESSION_TYPE_BADGE: Record<string, string> = {
 }
 
 export default function ProcessRecordingsPage() {
+  const [searchParams] = useSearchParams()
   const [residents, setResidents] = useState<ResidentOption[]>([])
   const [selectedResidentId, setSelectedResidentId] = useState<number | null>(null)
   const [recordings, setRecordings] = useState<ProcessRecording[]>([])
@@ -54,7 +56,14 @@ export default function ProcessRecordingsPage() {
 
   useEffect(() => {
     apiFetch('/api/residents')
-      .then(setResidents)
+      .then((data: ResidentOption[]) => {
+        setResidents(data)
+        const paramId = searchParams.get('residentId')
+        if (paramId) {
+          const id = parseInt(paramId)
+          if (data.some((r) => r.residentId === id)) handleSelectResident(id)
+        }
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoadingResidents(false))
   }, [])

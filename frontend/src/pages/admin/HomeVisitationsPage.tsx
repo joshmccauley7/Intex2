@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { apiFetch } from '../../api'
 import { Plus, Pencil, Trash2, Home, Calendar, ChevronDown, ChevronRight, CheckCircle2 } from 'lucide-react'
 
@@ -111,6 +112,7 @@ const blankConference = (): Partial<CaseConference> => ({
 })
 
 export default function HomeVisitationsPage() {
+  const [searchParams] = useSearchParams()
   const [residents, setResidents] = useState<ResidentOption[]>([])
   const [selectedResidentId, setSelectedResidentId] = useState<number | null>(null)
   const [activeTab, setActiveTab] = useState<'visits' | 'conferences'>('visits')
@@ -140,7 +142,14 @@ export default function HomeVisitationsPage() {
 
   useEffect(() => {
     apiFetch('/api/residents')
-      .then(setResidents)
+      .then((data: ResidentOption[]) => {
+        setResidents(data)
+        const paramId = searchParams.get('residentId')
+        if (paramId) {
+          const id = parseInt(paramId)
+          if (data.some((r) => r.residentId === id)) handleSelectResident(id)
+        }
+      })
       .catch((e) => setError(e.message))
       .finally(() => setLoadingResidents(false))
   }, [])
