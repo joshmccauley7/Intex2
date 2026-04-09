@@ -129,119 +129,50 @@ function SectionCard({ label, image, imageAlt, accent, heading, body, cta }: (ty
     <div
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
+      className="relative rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 transition-all duration-250 cursor-default"
       style={{
-        borderRadius: "16px",
-        overflow: "hidden",
-        border: "1px solid #e8e5df",
         boxShadow: hovered ? "0 8px 32px rgba(0,0,0,0.18)" : "0 2px 12px rgba(0,0,0,0.07)",
-        background: "#fff",
-        position: "relative",
-        cursor: "default",
-        transition: "box-shadow 0.25s ease, transform 0.25s ease",
         transform: hovered ? "translateY(-4px)" : "translateY(0)",
+        transition: "box-shadow 0.25s ease, transform 0.25s ease",
       }}
     >
       {/* Image */}
       <img
         src={image}
         alt={imageAlt}
-        style={{
-          width: "100%",
-          height: "320px",
-          objectFit: "cover",
-          display: "block",
-          transition: "opacity 0.3s ease",
-          opacity: hovered ? 0.15 : 1,
-        }}
+        className="w-full block object-cover transition-opacity duration-300"
+        style={{ height: "320px", opacity: hovered ? 0.1 : 1 }}
       />
 
       {/* Label (hidden on hover) */}
       <div
-        style={{
-          padding: "1.25rem 1.5rem",
-          textAlign: "center",
-          transition: "opacity 0.2s ease",
-          opacity: hovered ? 0 : 1,
-        }}
+        className="px-6 py-5 text-center transition-opacity duration-200"
+        style={{ opacity: hovered ? 0 : 1 }}
       >
-        <span
-          style={{
-            fontFamily: "'Sora', 'DM Sans', sans-serif",
-            fontSize: "1.25rem",
-            fontWeight: "700",
-            color: "#0f172a",
-          }}
-        >
+        <span className="font-sans text-xl font-bold text-slate-900 dark:text-white">
           {label}
         </span>
       </div>
 
       {/* Hover overlay */}
       <div
-        style={{
-          position: "absolute",
-          inset: 0,
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "center",
-          padding: "2rem",
-          opacity: hovered ? 1 : 0,
-          transition: "opacity 0.25s ease",
-          pointerEvents: hovered ? "auto" : "none",
-        }}
+        className="absolute inset-0 flex flex-col justify-center p-8 transition-opacity duration-250"
+        style={{ opacity: hovered ? 1 : 0, pointerEvents: hovered ? "auto" : "none" }}
       >
         <div
-          style={{
-            width: "36px",
-            height: "4px",
-            borderRadius: "2px",
-            background: accent,
-            marginBottom: "1rem",
-          }}
+          className="w-9 h-1 rounded-sm mb-4"
+          style={{ background: accent }}
         />
-        <h3
-          style={{
-            fontFamily: "'Lora', Georgia, serif",
-            fontSize: "1.3rem",
-            fontWeight: "600",
-            color: "#0f172a",
-            margin: "0 0 0.75rem",
-            lineHeight: "1.3",
-          }}
-        >
+        <h3 className="font-sans text-[1.3rem] font-bold text-slate-900 dark:text-white m-0 mb-3 leading-snug">
           {heading}
         </h3>
-        <p
-          style={{
-            fontFamily: "'Sora', 'DM Sans', sans-serif",
-            fontSize: "0.9rem",
-            lineHeight: "1.75",
-            color: "#3d3d38",
-            margin: 0,
-          }}
-        >
+        <p className="font-sans text-[0.9rem] leading-relaxed text-slate-600 dark:text-slate-300 m-0">
           {body}
         </p>
         {cta && (
           <a
             href={cta.href}
-            style={{
-              display: "inline-flex",
-              alignItems: "center",
-              marginTop: "1.25rem",
-              padding: "0.75rem 1.5rem",
-              borderRadius: "8px",
-              background: "#2563eb",
-              color: "#fff",
-              fontFamily: "'Sora', 'DM Sans', sans-serif",
-              fontSize: "0.875rem",
-              fontWeight: "600",
-              textDecoration: "none",
-              transition: "background 0.15s",
-              boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
-            }}
-            onMouseEnter={e => (e.currentTarget.style.background = "#1d4ed8")}
-            onMouseLeave={e => (e.currentTarget.style.background = "#2563eb")}
+            className="inline-flex items-center mt-5 px-6 py-3 rounded-lg bg-safira-blue hover:bg-safira-blue-dark text-white font-sans text-sm font-semibold no-underline transition-colors shadow"
           >
             {cta.text}
           </a>
@@ -254,16 +185,8 @@ function SectionCard({ label, image, imageAlt, accent, heading, body, cta }: (ty
 export default function SafiraTabbedContent({ homeLang = "en" }: { homeLang?: HomeLang }) {
   const sections = sectionByLang[homeLang];
   return (
-    <section style={{ background: "#ffffff", padding: "4rem 1.5rem" }}>
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(2, 1fr)",
-          gap: "1.5rem",
-          maxWidth: "1100px",
-          margin: "0 auto",
-        }}
-      >
+    <section className="bg-white dark:bg-slate-900 px-6 py-16">
+      <div className="grid grid-cols-2 gap-6 max-w-[1100px] mx-auto">
         {sections.map((s) => (
           <SectionCard key={s.label} {...s} />
         ))}
