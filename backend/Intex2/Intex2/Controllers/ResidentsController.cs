@@ -94,6 +94,7 @@ public class ResidentsController : ControllerBase
                 r.CurrentRiskLevel,
                 r.DateOfAdmission,
                 statusIndicators = new { health = si.Health, education = si.Education, counseling = si.Counseling, risk = si.Risk },
+                reintegrationProgress = si.ReintegrationProgress,
             };
         }));
     }

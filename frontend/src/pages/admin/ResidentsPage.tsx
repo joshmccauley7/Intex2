@@ -19,6 +19,8 @@ interface ResidentRow {
   reintegrationType: string | null
   currentRiskLevel: string | null
   dateOfAdmission: string | null
+  reintegrationProgress?: string | null
+  statusIndicators?: { health: string; education: string; counseling: string; risk: string } | null
 }
 
 interface ResidentDetail {
@@ -445,6 +447,7 @@ export default function ResidentsPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration Type</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Progress</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                   </tr>
                 </thead>
@@ -462,12 +465,15 @@ export default function ResidentsPage() {
                       <td className="px-4 py-3 text-slate-600">{r.presentAge ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{r.caseCategory ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{r.reintegrationType && r.reintegrationType !== 'None' ? r.reintegrationType : '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.reintegrationStatus ?? '—'}</td>
                       <td className="px-4 py-3">
-                        {r.reintegrationStatus ? (
-                          <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${REINTEGRATION_COLOR[r.reintegrationStatus] ?? 'bg-slate-100 text-slate-500'}`}>
-                            {r.reintegrationStatus}
-                          </span>
-                        ) : '—'}
+                        {r.caseStatus === 'Active' ? (
+                          <div className={`w-3 h-3 rounded-full ${
+                            r.reintegrationProgress === 'green' ? 'bg-emerald-500' :
+                            r.reintegrationProgress === 'red' ? 'bg-red-500' :
+                            'bg-yellow-400'
+                          }`} title={`Reintegration progress: ${r.reintegrationProgress ?? 'unknown'}`} />
+                        ) : <span className="text-slate-300">—</span>}
                       </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
@@ -479,7 +485,7 @@ export default function ResidentsPage() {
                     </tr>
                   ))}
                   {residents.length === 0 && (
-                    <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400">No residents found.</td></tr>
+                    <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-400">No residents found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -541,11 +547,12 @@ export default function ResidentsPage() {
             <>
               {lifecycle ? (
                 <>
-                  <ReintegrationCard resident={selectedResident} lifecycle={lifecycle} />
                   <RiskJourney
                     initial={lifecycle.riskJourney.initial}
                     current={lifecycle.riskJourney.current}
                   />
+                  <SectionHeading>Reintegration</SectionHeading>
+                  <ReintegrationCard resident={selectedResident} lifecycle={lifecycle} />
                   <SectionHeading>Goal Progress</SectionHeading>
                   <ProgressSnapshot resident={selectedResident} lifecycle={lifecycle} />
                   <ResidentTimeline lifecycle={lifecycle} />
@@ -726,8 +733,17 @@ function GoalChart({
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                 <YAxis domain={[0, yMax]} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => `${v}${yLabel}`} width={40} />
                 <Tooltip
-                  formatter={(v: number) => [`${v}${yLabel}`, dataKey]}
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null
+                    const val = payload.find(p => p.dataKey === 'value' || String(p.dataKey).startsWith('seg_'))?.value
+                    if (val == null) return null
+                    return (
+                      <div style={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', padding: '8px 12px' }}>
+                        <p style={{ color: '#94a3b8', marginBottom: 4 }}>{label}</p>
+                        <p style={{ fontWeight: 600 }}>{dataKey}: {val}{yLabel}</p>
+                      </div>
+                    )
+                  }}
                 />
                 {target != null && (
                   <ReferenceLine y={target} stroke="#64748b" strokeDasharray="4 3" label={{ value: 'Goal', fontSize: 11, fill: '#64748b', position: 'insideTopRight' }} />
@@ -777,6 +793,72 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   const goodAttendanceCount = recentEducation.filter(e => (e.attendanceRate ?? 0) >= 0.8).length
 
 
+  // ── Progress failure reasons ────────────────────────────────────────────────
+  const STALE_DAYS = 90
+  const isStale = (dateStr: string | null | undefined, days = STALE_DAYS) => {
+    if (!dateStr) return true
+    return (Date.now() - new Date(dateStr).getTime()) / 86_400_000 > days
+  }
+  const latestVisit = lifecycle.visitations.at(-1)
+  const latestSession = lifecycle.sessions.at(-1)
+  const latestHealth = lifecycle.health.at(-1)
+  const latestEducation = lifecycle.education.at(-1)
+
+  function getProgressIssues(): string[] {
+    if (resident.caseStatus !== 'Active') return []
+    const issues: string[] = []
+    const type = reType.toLowerCase()
+
+    if (type === 'family reunification') {
+      const coop = latestVisit?.familyCooperationLevel ?? ''
+      if (isStale(latestVisit?.date)) {
+        issues.push('No home visits in the last 90 days')
+      } else if (coop !== 'Cooperative' && coop !== 'Highly Cooperative') {
+        issues.push(`Latest home visit shows ${coop || 'unknown'} family cooperation`)
+      }
+      if (isStale(latestSession?.date)) issues.push('No recent counseling sessions in the last 90 days')
+    } else if (type === 'foster care') {
+      if (isStale(latestHealth?.date, 540)) issues.push('Health records are out of date (last recorded > 18 months ago)')
+      if (isStale(latestSession?.date)) issues.push('No recent counseling sessions in the last 90 days')
+    } else if (type.startsWith('adoption')) {
+      const allDates = [...lifecycle.visitations.map(v => v.date), ...lifecycle.sessions.map(s => s.date)].filter(Boolean).sort()
+      const anchor = allDates.at(-1) ? new Date(allDates.at(-1)!) : new Date()
+      const DAY_MS = 86_400_000
+      const recentStartStr = new Date(anchor.getTime() - 90 * DAY_MS).toISOString().split('T')[0]
+      const priorStartStr  = new Date(anchor.getTime() - 180 * DAY_MS).toISOString().split('T')[0]
+      const visitsRecent   = lifecycle.visitations.filter(v => v.date >= recentStartStr).length
+      const visitsPrior    = lifecycle.visitations.filter(v => v.date >= priorStartStr && v.date < recentStartStr).length
+      const sessionsRecent = lifecycle.sessions.filter(s => s.date >= recentStartStr).length
+      const sessionsPrior  = lifecycle.sessions.filter(s => s.date >= priorStartStr && s.date < recentStartStr).length
+      const m1 = visitsRecent > 0 && (visitsPrior === 0 || visitsRecent >= visitsPrior)
+      const m2 = sessionsRecent > 0 && (sessionsPrior === 0 || sessionsRecent >= sessionsPrior)
+      if (!m1) {
+        if (visitsRecent === 0) issues.push('No home visits in the last 90 days')
+        else issues.push(`Home visits down ${Math.round((1 - visitsRecent / visitsPrior) * 100)}% compared to the prior 90 days`)
+      }
+      if (!m2) {
+        if (sessionsRecent === 0) issues.push('No counseling sessions in the last 90 days')
+        else issues.push(`Counseling sessions down ${Math.round((1 - sessionsRecent / sessionsPrior) * 100)}% compared to the prior 90 days`)
+      }
+    } else if (type === 'independent living') {
+      const att = latestEducation?.attendanceRate ?? null
+      if (isStale(latestEducation?.date, 540)) {
+        issues.push('Education records are out of date (last recorded > 18 months ago)')
+      } else if (att !== null && att < 0.5) {
+        issues.push(`Attendance rate is low (${Math.round(att * 100)}%)`)
+      } else if (latestEducation?.enrollmentStatus?.toLowerCase().includes('drop') || latestEducation?.enrollmentStatus?.toLowerCase().includes('withdraw')) {
+        issues.push(`Enrollment status: ${latestEducation.enrollmentStatus}`)
+      }
+      if (isStale(latestSession?.date)) issues.push('No recent social worker contact in the last 90 days')
+    } else {
+      if (isStale(latestHealth?.date, 540)) issues.push('Health records are out of date (last recorded > 18 months ago)')
+      if (isStale(latestSession?.date)) issues.push('No recent counseling sessions in the last 90 days')
+    }
+    return issues
+  }
+
+  const progressIssues = getProgressIssues()
+
   // ── Dot row helper ──────────────────────────────────────────────────────────
   function DotRow({ label, count, total, totalLabel, dots, info, dates }: {
     label: string; count: number; total: number; totalLabel: string; dots: React.ReactNode[]; info?: string; dates?: (string | null)[]
@@ -801,12 +883,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             </div>
           )}
         </div>
-        <p className="text-xs text-slate-500 mb-2">
-          <span className="font-semibold text-[#0f172a]">{count}/{dots.length}</span> recent
-          <span className="text-slate-300 mx-1">·</span>
-          <span className="font-semibold text-[#0f172a]">{total}</span> {totalLabel}
-        </p>
-        <div className="inline-flex border border-slate-100 rounded-lg overflow-hidden">
+        <div className="inline-flex border border-slate-100 rounded-lg overflow-hidden mt-2">
           {dots.map((dot, i) => (
             <div key={i} className={`flex flex-col items-center gap-0.5 px-2 py-1 ${i > 0 ? 'border-l border-slate-100' : ''}`}>
               <div className="scale-75">{dot}</div>
@@ -834,7 +911,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Family Reunification') {
       return (
         <div className="pt-3 border-t border-slate-100">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators For Family Reunification</p>
+        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators For Family Reunification</p>
         <div className="grid grid-cols-2 gap-4">
           {recentVisits.length > 0 && (
             <DotRow
@@ -886,15 +963,15 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Foster Care') {
       return (
         <div className="pt-3 border-t border-slate-100">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators For Foster Care</p>
+        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators For Foster Care</p>
         <div className="grid grid-cols-2 gap-4">
           {recentHealth.length > 0 && (
             <DotRow
               label="Psych Checkups"
               info="Whether a psychological checkup was completed at each recent health record. Green = completed."
               count={psychCount}
-              total={recentHealth.length}
-              totalLabel="recent records"
+              total={lifecycle.health.length}
+              totalLabel="total records"
               dates={[...recentHealth.map(h => h.date), ...Array(Math.max(0, DOTS - recentHealth.length)).fill(null)]}
               dots={[
                 ...recentHealth.map((h, i) => (
@@ -934,8 +1011,8 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Adoption (Domestic)' || reType === 'Adoption (Inter-Country)') {
       const allDates = [...lifecycle.visitations.map(v => v.date), ...lifecycle.sessions.map(s => s.date)].filter(Boolean).sort()
       const anchor = allDates.at(-1) ? new Date(allDates.at(-1)!) : new Date()
-      const recentStart = new Date(anchor.getFullYear(), anchor.getMonth() - 2, 1).toISOString().split('T')[0]
-      const priorStart  = new Date(anchor.getFullYear(), anchor.getMonth() - 5, 1).toISOString().split('T')[0]
+      const recentStart = new Date(anchor.getTime() - 90 * 86_400_000).toISOString().split('T')[0]
+      const priorStart  = new Date(anchor.getTime() - 180 * 86_400_000).toISOString().split('T')[0]
 
       const visitsRecent = lifecycle.visitations.filter(v => v.date >= recentStart).length
       const visitsPrior  = lifecycle.visitations.filter(v => v.date >= priorStart && v.date < recentStart).length
@@ -946,14 +1023,14 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         if (prev === 0 && current === 0) return <span className="text-xs text-slate-400">No activity in the last 12 months</span>
         if (prev === 0) return <span className="text-xs text-emerald-600">↑ {current} recent (no prior activity)</span>
         const pct = Math.round(((current - prev) / prev) * 100)
-        if (pct > 0) return <span className="text-xs text-emerald-600">↑ {pct}% over the last 3 months</span>
-        if (pct < 0) return <span className="text-xs text-red-500">↓ {Math.abs(pct)}% over the last 3 months</span>
-        return <span className="text-xs text-slate-400">→ No change over the last 3 months</span>
+        if (pct > 0) return <span className="text-xs text-emerald-600">↑ {pct}% over the last 90 days</span>
+        if (pct < 0) return <span className="text-xs text-red-500">↓ {Math.abs(pct)}% over the last 90 days</span>
+        return <span className="text-xs text-slate-400">→ No change over the last 90 days</span>
       }
 
       return (
         <div className="pt-3 border-t border-slate-100">
-          <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators For {reType}</p>
+          <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators For {reType}</p>
           <div className="grid grid-cols-2 gap-6">
             <div>
               <div className="flex items-center gap-1 mb-1">
@@ -961,7 +1038,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
                 <div className="relative group">
                   <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
-                    Total home visits conducted. The trend compares the most recent 3 months to the 3 months prior.
+                    Total home visits conducted. The trend compares the most recent 90 days to the 90 days prior.
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                   </div>
                 </div>
@@ -976,7 +1053,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
                 <div className="relative group">
                   <Info size={12} className="text-slate-300 hover:text-slate-400 cursor-default transition-colors" />
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 z-10 hidden group-hover:block w-48 bg-slate-800 text-white text-xs rounded-lg px-2.5 py-1.5 leading-snug shadow-lg pointer-events-none">
-                    Total counseling sessions attended. The trend compares the most recent 3 months to the 3 months prior.
+                    Total counseling sessions attended. The trend compares the most recent 90 days to the 90 days prior.
                     <div className="absolute top-full left-1/2 -translate-x-1/2 border-4 border-transparent border-t-slate-800" />
                   </div>
                 </div>
@@ -993,8 +1070,8 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Independent Living') {
       const ilAllDates = [...lifecycle.sessions.map(s => s.date), ...lifecycle.visitations.map(v => v.date)].filter(Boolean).sort()
       const ilAnchor = ilAllDates.at(-1) ? new Date(ilAllDates.at(-1)!) : new Date()
-      const ilRecentStart = new Date(ilAnchor.getFullYear(), ilAnchor.getMonth() - 2, 1).toISOString().split('T')[0]
-      const ilPriorStart  = new Date(ilAnchor.getFullYear(), ilAnchor.getMonth() - 5, 1).toISOString().split('T')[0]
+      const ilRecentStart = new Date(ilAnchor.getTime() - 90 * 86_400_000).toISOString().split('T')[0]
+      const ilPriorStart  = new Date(ilAnchor.getTime() - 180 * 86_400_000).toISOString().split('T')[0]
 
       const sessionsRecent = lifecycle.sessions.filter(s => s.date >= ilRecentStart).length
       const sessionsPrior  = lifecycle.sessions.filter(s => s.date >= ilPriorStart && s.date < ilRecentStart).length
@@ -1003,14 +1080,14 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         if (sessionsPrior === 0 && sessionsRecent === 0) return <span className="text-xs text-slate-400">No session activity</span>
         if (sessionsPrior === 0) return <span className="text-xs text-emerald-600">↑ {sessionsRecent} recent (no prior activity)</span>
         const pct = Math.round(((sessionsRecent - sessionsPrior) / sessionsPrior) * 100)
-        if (pct > 0) return <span className="text-xs text-emerald-600">↑ {pct}% over the last 3 months</span>
-        if (pct < 0) return <span className="text-xs text-red-500">↓ {Math.abs(pct)}% over the last 3 months</span>
-        return <span className="text-xs text-slate-400">→ No change over the last 3 months</span>
+        if (pct > 0) return <span className="text-xs text-emerald-600">↑ {pct}% over the last 90 days</span>
+        if (pct < 0) return <span className="text-xs text-red-500">↓ {Math.abs(pct)}% over the last 90 days</span>
+        return <span className="text-xs text-slate-400">→ No change over the last 90 days</span>
       }
 
       return (
         <div className="pt-3 border-t border-slate-100">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators For Independent Living</p>
+        <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators For Independent Living</p>
         <div className="grid grid-cols-2 gap-4">
           {recentEducation.length > 0 && (
             <DotRow
@@ -1057,7 +1134,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     // Fallback — generic
     return (recentVisits.length > 0 || recentSessions.length > 0) ? (
       <div className="pt-3 border-t border-slate-100">
-      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Key Indicators</p>
+      <p className="text-xs font-bold text-slate-600 uppercase tracking-wide mb-3">Key Indicators</p>
       <div className="grid grid-cols-2 gap-4">
         {recentVisits.length > 0 && (
           <DotRow
@@ -1113,7 +1190,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {/* Top row — status / type / length of stay */}
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Reintegration</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Status</p>
               <p className={`text-lg font-bold ${textColor}`}>{status}</p>
             </div>
             <div className="text-right">
@@ -1133,6 +1210,19 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           </div>
 
           {renderIndicators()}
+          {progressIssues.length > 0 && (
+            <div className="pt-3 border-t border-slate-100 space-y-1">
+              <p className="text-xs font-semibold text-amber-600 mb-1">
+                Progress was marked {progressIssues.length === 1 ? 'yellow' : 'red'} due to:
+              </p>
+              {progressIssues.map((issue, i) => (
+                <p key={i} className="flex items-start gap-1.5 text-xs text-amber-600">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0" />
+                  {issue}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1317,42 +1407,28 @@ function RiskJourney({ initial, current }: { initial: string | null; current: st
   const trendLabel = improved ? 'Improving' : worsened ? 'Escalated' : 'Unchanged'
 
 
+  const delta = Math.abs((RISK_RANK[current ?? ''] ?? 0) - (RISK_RANK[initial ?? ''] ?? 0))
+
   return (
     <div className="mb-5">
       <SectionHeading>Risk Journey</SectionHeading>
-      <div className="rounded-xl border border-slate-200 overflow-hidden">
-        <div className="flex">
-          {/* At admission */}
-          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-white border-r border-slate-200">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">At Admission</p>
-            <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[initial ?? ''] ?? 'bg-slate-300'}`} />
-            <p className={`text-lg font-bold ${RISK_COLOR[initial ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{initial ?? '—'}</p>
-          </div>
-
-          {/* Center */}
-          <div className="flex flex-col items-center justify-center px-6 bg-white">
-            <ArrowRight size={20} className="text-slate-300" />
-          </div>
-
-          {/* Current */}
-          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-white border-l border-slate-200">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Current</p>
-            <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[current ?? ''] ?? 'bg-slate-300'}`} />
-            <p className={`text-lg font-bold ${RISK_COLOR[current ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{current ?? '—'}</p>
-          </div>
+      <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-white">
+        <div className="flex items-center gap-1.5">
+          <div className={`w-2.5 h-2.5 rounded-full ${RISK_BG[initial ?? ''] ?? 'bg-slate-300'}`} />
+          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Admission</span>
+          <span className={`text-sm font-bold ml-1 ${RISK_COLOR[initial ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{initial ?? '—'}</span>
         </div>
-
-        {/* Trend badge */}
-        {(improved || worsened) && (() => {
-          const delta = Math.abs((RISK_RANK[current ?? ''] ?? 0) - (RISK_RANK[initial ?? ''] ?? 0))
-          return (
-            <div className={`flex justify-center py-2 border-t border-slate-100 ${improved ? 'bg-emerald-50' : 'bg-red-50'}`}>
-              <span className={`text-xs font-semibold ${improved ? 'text-emerald-700' : 'text-red-600'}`}>
-                {improved ? '↑' : '↓'} {trendLabel} · {delta} level{delta > 1 ? 's' : ''}
-              </span>
-            </div>
-          )
-        })()}
+        <ArrowRight size={14} className="text-slate-300 shrink-0" />
+        <div className="flex items-center gap-1.5">
+          <div className={`w-2.5 h-2.5 rounded-full ${RISK_BG[current ?? ''] ?? 'bg-slate-300'}`} />
+          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Current</span>
+          <span className={`text-sm font-bold ml-1 ${RISK_COLOR[current ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{current ?? '—'}</span>
+        </div>
+        {(improved || worsened) && (
+          <span className={`ml-auto text-xs font-semibold ${improved ? 'text-emerald-600' : 'text-red-500'}`}>
+            {improved ? '↑' : '↓'} {trendLabel} · {delta} level{delta > 1 ? 's' : ''}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -1481,24 +1557,26 @@ function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
                   )}
 
                   {ev.type === 'session' && (
-                    <div className="text-xs space-y-2">
-                      <div className="grid grid-cols-3 gap-2">
+                    <div className="text-xs space-y-3">
+                      {/* Row 1 — Type / Social Worker / Duration */}
+                      <div className="grid grid-cols-3 gap-4 pb-3 border-b border-slate-100">
                         <div>
-                          <p className="text-slate-400 mb-0.5">Type</p>
+                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1">Type</p>
                           <p className="font-medium text-slate-700">{ev.sessionType ?? '—'}</p>
                         </div>
                         <div>
-                          <p className="text-slate-400 mb-0.5">Social Worker</p>
+                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1">Social Worker</p>
                           <p className="font-medium text-slate-700">{ev.socialWorker ?? '—'}</p>
                         </div>
                         <div>
-                          <p className="text-slate-400 mb-0.5">Duration</p>
+                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1">Duration</p>
                           <p className="font-medium text-slate-700">{ev.sessionDurationMinutes ? `${ev.sessionDurationMinutes} min` : '—'}</p>
                         </div>
                       </div>
+                      {/* Row 2 — Emotional State */}
                       {ev.emotionalStateObserved && ev.emotionalStateEnd && (
-                        <div>
-                          <p className="text-slate-400 mb-1">Emotional State</p>
+                        <div className="pb-3 border-b border-slate-100">
+                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1.5">Emotional State</p>
                           <div className="flex items-center gap-2">
                             <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-600 font-medium">{ev.emotionalStateObserved}</span>
                             <ArrowRight size={12} className="text-slate-300 shrink-0" />
@@ -1506,17 +1584,19 @@ function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
                           </div>
                         </div>
                       )}
-                      <div className="flex gap-2 pt-0.5">
-                        <span className={`px-2 py-0.5 rounded font-medium ${ev.progressNoted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
+                      {/* Row 3 — Progress / Concerns badges */}
+                      <div className="flex gap-2">
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${ev.progressNoted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
                           {ev.progressNoted ? '✓ Progress noted' : 'No progress noted'}
                         </span>
-                        <span className={`px-2 py-0.5 rounded font-medium ${ev.concernsFlagged ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium ${ev.concernsFlagged ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
                           {ev.concernsFlagged ? '⚠ Concerns flagged' : 'No concerns'}
                         </span>
                       </div>
+                      {/* Row 4 — Interventions */}
                       {ev.interventionsApplied && (
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Interventions</p>
+                        <div className="pt-1 border-t border-slate-100">
+                          <p className="text-slate-400 uppercase tracking-wide text-[10px] font-semibold mb-1">Interventions</p>
                           <p className="text-slate-600">{ev.interventionsApplied}</p>
                         </div>
                       )}
