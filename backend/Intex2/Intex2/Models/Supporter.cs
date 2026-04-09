@@ -51,5 +51,8 @@ public class Supporter
     [Column("acquisition_channel")]
     public string? AcquisitionChannel { get; set; }
 
+    [Column("last_contacted_at")]
+    public DateTime? LastContactedAt { get; set; }
+
     public ICollection<Donation> Donations { get; set; } = new List<Donation>();
 }
