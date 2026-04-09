@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -193,8 +194,18 @@ public record LoginRequest(string UserName, string Password, bool RememberMe = f
 
 public sealed class RegisterRequest
 {
+    [Required]
+    [EmailAddress]
+    [StringLength(200)]
     public string Email { get; set; } = "";
+
+    [Required]
+    [StringLength(200, MinimumLength = 14)]
     public string Password { get; set; } = "";
+
+    [Required]
     public string ConfirmPassword { get; set; } = "";
+
+    [StringLength(200)]
     public string? FullName { get; set; }
 }

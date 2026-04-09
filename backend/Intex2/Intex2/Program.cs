@@ -180,6 +180,17 @@ if (app.Environment.IsDevelopment())
 if (!app.Environment.IsDevelopment())
     app.UseHsts();
 
+// ─── Global exception handler ────────────────────────────────────────────────
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async ctx =>
+    {
+        ctx.Response.StatusCode = 500;
+        ctx.Response.ContentType = "application/json";
+        await ctx.Response.WriteAsJsonAsync(new { message = "An unexpected error occurred. Please try again later." });
+    });
+});
+
 app.UseCors();
 app.UseHttpsRedirection();
 

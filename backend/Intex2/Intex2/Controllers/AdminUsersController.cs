@@ -1,3 +1,4 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
@@ -185,9 +186,19 @@ public class AdminUsersController : ControllerBase
 
 public sealed class AdminCreateUserRequest
 {
+    [Required]
+    [EmailAddress]
+    [StringLength(200)]
     public string Email { get; set; } = "";
+
+    [Required]
+    [StringLength(200, MinimumLength = 14)]
     public string Password { get; set; } = "";
+
+    [Required]
     public string ConfirmPassword { get; set; } = "";
+
+    [Required]
     public string Role { get; set; } = AdminSeeder.DonorRole;
 }
 

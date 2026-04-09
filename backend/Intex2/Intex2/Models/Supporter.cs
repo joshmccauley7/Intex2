@@ -10,36 +10,51 @@ public class Supporter
     public int SupporterId { get; set; }
 
     [Column("supporter_type")]
+    [Required]
+    [StringLength(50)]
     public string SupporterType { get; set; } = "";
 
     [Column("display_name")]
+    [Required]
+    [StringLength(200)]
     public string DisplayName { get; set; } = "";
 
     [Column("organization_name")]
+    [StringLength(200)]
     public string? OrganizationName { get; set; }
 
     [Column("first_name")]
+    [StringLength(100)]
     public string? FirstName { get; set; }
 
     [Column("last_name")]
+    [StringLength(100)]
     public string? LastName { get; set; }
 
     [Column("relationship_type")]
+    [StringLength(50)]
     public string? RelationshipType { get; set; }
 
     [Column("region")]
+    [StringLength(100)]
     public string? Region { get; set; }
 
     [Column("country")]
+    [StringLength(100)]
     public string? Country { get; set; }
 
     [Column("email")]
+    [EmailAddress]
+    [StringLength(200)]
     public string? Email { get; set; }
 
     [Column("phone")]
+    [StringLength(30)]
     public string? Phone { get; set; }
 
     [Column("status")]
+    [Required]
+    [StringLength(50)]
     public string Status { get; set; } = "";
 
     [Column("created_at")]

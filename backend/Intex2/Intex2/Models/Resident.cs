@@ -10,18 +10,22 @@ public class Resident
     public int ResidentId { get; set; }
 
     [Column("case_control_no")]
+    [StringLength(50)]
     public string? CaseControlNo { get; set; }
 
     [Column("internal_code")]
+    [StringLength(50)]
     public string? InternalCode { get; set; }
 
     [Column("safehouse_id")]
     public int? SafehouseId { get; set; }
 
     [Column("case_status")]
+    [StringLength(50)]
     public string? CaseStatus { get; set; }
 
     [Column("sex")]
+    [StringLength(20)]
     public string? Sex { get; set; }
 
     [Column("date_of_birth")]
@@ -37,6 +41,7 @@ public class Resident
     public string? Religion { get; set; }
 
     [Column("case_category")]
+    [StringLength(100)]
     public string? CaseCategory { get; set; }
 
     [Column("sub_cat_orphaned")]
@@ -121,6 +126,7 @@ public class Resident
     public DateOnly? DateColbObtained { get; set; }
 
     [Column("assigned_social_worker")]
+    [StringLength(100)]
     public string? AssignedSocialWorker { get; set; }
 
     [Column("initial_case_assessment")]
@@ -130,15 +136,19 @@ public class Resident
     public DateOnly? DateCaseStudyPrepared { get; set; }
 
     [Column("reintegration_type")]
+    [StringLength(100)]
     public string? ReintegrationType { get; set; }
 
     [Column("reintegration_status")]
+    [StringLength(50)]
     public string? ReintegrationStatus { get; set; }
 
     [Column("initial_risk_level")]
+    [StringLength(20)]
     public string? InitialRiskLevel { get; set; }
 
     [Column("current_risk_level")]
+    [StringLength(20)]
     public string? CurrentRiskLevel { get; set; }
 
     [Column("date_enrolled")]
