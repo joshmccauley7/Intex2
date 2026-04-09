@@ -933,6 +933,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   }
 
   // ── Per-type indicators ─────────────────────────────────────────────────────
+  const isActive = resident.caseStatus === 'Active'
   function renderIndicators() {
     if (reType === 'Family Reunification') {
       return (
@@ -941,7 +942,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentVisits.length > 0 && (
             <DotRow
               label="Family Cooperation"
-              passing={!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')}
+              passing={isActive ? (!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')) : undefined}
               summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
               dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
               dots={[
@@ -961,7 +962,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              passing={!isStale(latestSession?.date)}
+              passing={isActive ? !isStale(latestSession?.date) : undefined}
               summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
               dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
@@ -987,7 +988,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentHealth.length > 0 && (
             <DotRow
               label="Psych Checkups"
-              passing={latestHealth != null && !isStale(latestHealth.date, 540)}
+              passing={isActive ? (latestHealth != null && !isStale(latestHealth.date, 540)) : undefined}
               summary={`${psychCount} of ${recentHealth.length} most recent records had psych checkup`}
               dates={[...recentHealth.map(h => h.date), ...Array(Math.max(0, DOTS - recentHealth.length)).fill(null)]}
               dots={[
@@ -1004,7 +1005,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              passing={!isStale(latestSession?.date)}
+              passing={isActive ? !isStale(latestSession?.date) : undefined}
               summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
               dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
@@ -1097,7 +1098,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentEducation.length > 0 && (
             <DotRow
               label="Attendance"
-              passing={latestEducation != null && !isStale(latestEducation.date, 540) && (latestEducation.attendanceRate ?? 0) >= 0.5}
+              passing={isActive ? (latestEducation != null && !isStale(latestEducation.date, 540) && (latestEducation.attendanceRate ?? 0) >= 0.5) : undefined}
               summary={`${goodAttendanceCount} of ${recentEducation.length} most recent records ≥80% attendance`}
               dates={[...recentEducation.map(e => e.date), ...Array(Math.max(0, DOTS - recentEducation.length)).fill(null)]}
               dots={[
@@ -1117,9 +1118,11 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           <div>
             <div className="flex items-center justify-between gap-2 mb-1">
               <p className="text-xs font-semibold text-slate-600">Social Worker Contact</p>
-              <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${!isStale(latestSession?.date) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                {!isStale(latestSession?.date) ? '✓ On track' : '⚠ Needs attention'}
-              </span>
+              {isActive && (
+                <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${!isStale(latestSession?.date) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {!isStale(latestSession?.date) ? '✓ On track' : '⚠ Needs attention'}
+                </span>
+              )}
             </div>
             <p className="text-2xl font-bold text-[#0f172a]">{totalSessions + totalVisits}</p>
             <p className="text-xs text-slate-400 mb-1">{totalSessions} sessions · {totalVisits} home visits</p>
@@ -1137,7 +1140,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         {recentVisits.length > 0 && (
           <DotRow
             label="Family Cooperation"
-            passing={!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')}
+            passing={isActive ? (!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')) : undefined}
             summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
             dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
             dots={[
@@ -1157,7 +1160,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         {recentSessions.length > 0 && (
           <DotRow
             label="Counseling Progress"
-            passing={!isStale(latestSession?.date)}
+            passing={isActive ? !isStale(latestSession?.date) : undefined}
             summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
             dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
             dots={[
