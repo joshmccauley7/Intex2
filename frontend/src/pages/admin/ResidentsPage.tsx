@@ -570,18 +570,18 @@ export default function ResidentsPage() {
                   <ProgressSnapshot resident={selectedResident} lifecycle={lifecycle} />
                   <SectionHeading>Incident Reports</SectionHeading>
                   <IncidentSection incidents={lifecycle.incidents} />
-                  <div className="flex gap-4 pt-2 border-t border-slate-100 mt-2">
+                  <div className="flex gap-3 pt-4 border-t border-slate-100 mt-2">
                     <button
                       onClick={() => navigate(`/admin/process-recordings?residentId=${selectedResident.residentId}`)}
-                      className="text-xs font-medium text-safira-blue hover:underline flex items-center gap-1"
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                     >
-                      Go to counseling sessions <ArrowRight size={11} />
+                      Counseling Sessions <ArrowRight size={13} />
                     </button>
                     <button
                       onClick={() => navigate(`/admin/home-visitations?residentId=${selectedResident.residentId}`)}
-                      className="text-xs font-medium text-safira-blue hover:underline flex items-center gap-1"
+                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
                     >
-                      Go to home visits <ArrowRight size={11} />
+                      Home Visits <ArrowRight size={13} />
                     </button>
                   </div>
                 </>
