@@ -570,7 +570,8 @@ export default function ResidentsPage() {
                   <ProgressSnapshot resident={selectedResident} lifecycle={lifecycle} />
                   <SectionHeading>Incident Reports</SectionHeading>
                   <IncidentSection incidents={lifecycle.incidents} />
-                  <div className="flex gap-3 pt-4 border-t border-slate-100 mt-2">
+                  <SectionHeading>Quick Navigation</SectionHeading>
+                  <div className="flex gap-3">
                     <button
                       onClick={() => navigate(`/admin/process-recordings?residentId=${selectedResident.residentId}`)}
                       className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
