@@ -76,7 +76,7 @@ const RISK_BADGE: Record<string, string> = {
   Medium: 'bg-yellow-100 text-yellow-700',
   Low: 'bg-green-100 text-green-700',
 }
-const cardHover = 'cursor-pointer hover:shadow-md hover:border-safira-blue/30 transition-all'
+const cardHover = 'cursor-pointer hover:shadow-md hover:border-safira-blue/30 transition-all select-none'
 
 // ── Currency formatter ────────────────────────────────────────────────────────
 
