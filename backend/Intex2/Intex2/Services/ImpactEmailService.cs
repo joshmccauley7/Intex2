@@ -185,7 +185,7 @@ public class ImpactEmailService
 
             <!-- CTA -->
             <div style='text-align:center;margin:36px 0 0;'>
-              <a href='https://safira.org/donate'
+              <a href='https://frontend-theta-orcin-86.vercel.app/donate'
                  style='display:inline-block;background:#0ea5e9;color:#fff;font-weight:700;font-size:15px;
                         padding:14px 32px;border-radius:8px;text-decoration:none;'>
                 Give Again &rarr;
