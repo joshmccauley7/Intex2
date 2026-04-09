@@ -458,7 +458,9 @@ export default function DonorsPage() {
       {/* Filters */}
       <div className="mb-6">
         <div className="flex gap-2">
+          <label htmlFor="donor-filter-value" className="sr-only">Filter value</label>
           <input
+            id="donor-filter-value"
             type="text"
             value={filterInputValue}
             onChange={(e) => setFilterInputValue(e.target.value)}
@@ -472,7 +474,9 @@ export default function DonorsPage() {
               {DONATION_SUGGESTIONS.map((s) => <option key={s} value={s} />)}
             </datalist>
           )}
+          <label htmlFor="donor-filter-field" className="sr-only">Filter field</label>
           <select
+            id="donor-filter-field"
             value={filterField}
             onChange={(e) => setFilterField(e.target.value)}
             className="text-sm border border-slate-200 rounded-lg px-3 py-2 bg-white text-slate-700 focus:outline-none focus:ring-2 focus:ring-safira-blue"

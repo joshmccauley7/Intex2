@@ -247,7 +247,7 @@ function DonationFormWithGate() {
   }
 
   if (isLoading) {
-    return <p className="text-sm text-slate-500 dark:text-slate-400">Loading...</p>;
+    return <p className="text-sm text-slate-600 dark:text-slate-300">Loading...</p>;
   }
 
   return (
@@ -275,8 +275,9 @@ function DonationFormWithGate() {
 
       <form onSubmit={handleSubmit} className="space-y-4">
         <div>
-          <label className="block text-sm font-medium mb-1">Full name</label>
+          <label htmlFor="donate-full-name" className="block text-sm font-medium mb-1">Full name</label>
           <input
+            id="donate-full-name"
             value={fullName}
             onChange={(e) => setFullName(e.target.value)}
             className="w-full rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-2 outline-none focus:ring-2 focus:ring-safira-blue"
@@ -284,12 +285,13 @@ function DonationFormWithGate() {
             required
           />
           {isAuthenticated && !fullName && (
-            <p className="text-xs text-slate-400 mt-1">Enter your name as it should appear on the donation.</p>
+            <p className="text-xs text-slate-600 dark:text-slate-300 mt-1">Enter your name as it should appear on the donation.</p>
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Email</label>
+          <label htmlFor="donate-email" className="block text-sm font-medium mb-1">Email</label>
           <input
+            id="donate-email"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -303,8 +305,9 @@ function DonationFormWithGate() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Phone number</label>
+          <label htmlFor="donate-phone" className="block text-sm font-medium mb-1">Phone number</label>
           <input
+            id="donate-phone"
             type="tel"
             value={phone}
             onChange={(e) => setPhone(formatPhone(e.target.value))}
@@ -313,12 +316,13 @@ function DonationFormWithGate() {
             required
           />
         </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Donation type</label>
-          <div className="grid grid-cols-2 gap-2">
+        <fieldset>
+          <legend className="block text-sm font-medium mb-1">Donation type</legend>
+          <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Donation type">
             <button
               type="button"
               onClick={() => setFrequency('one_time')}
+              aria-pressed={frequency === 'one_time'}
               className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                 frequency === 'one_time'
                   ? 'border-safira-blue bg-cyan-50 text-safira-blue'
@@ -330,6 +334,7 @@ function DonationFormWithGate() {
             <button
               type="button"
               onClick={() => setFrequency('monthly')}
+              aria-pressed={frequency === 'monthly'}
               className={`rounded-lg border px-3 py-2 text-sm font-semibold transition-colors ${
                 frequency === 'monthly'
                   ? 'border-safira-blue bg-cyan-50 text-safira-blue'
@@ -339,10 +344,11 @@ function DonationFormWithGate() {
               Recurring Monthly
             </button>
           </div>
-        </div>
+        </fieldset>
         <div>
-          <label className="block text-sm font-medium mb-1">Donation amount (PHP ₱)</label>
+          <label htmlFor="donate-amount" className="block text-sm font-medium mb-1">Donation amount (PHP ₱)</label>
           <input
+            id="donate-amount"
             type="number"
             min="1"
             step="1"
@@ -353,13 +359,13 @@ function DonationFormWithGate() {
           />
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Card details</label>
+          <label htmlFor="donate-card-details" className="block text-sm font-medium mb-1">Card details</label>
           {frequency === 'monthly' ? (
-            <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-3 text-sm text-slate-500 dark:text-slate-400">
+            <div id="donate-card-details" className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-3 text-sm text-slate-600 dark:text-slate-300">
               You'll enter your card securely on Stripe's checkout page after clicking the button below.
             </div>
           ) : (
-            <div className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-3">
+            <div id="donate-card-details" className="rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 px-3 py-3" aria-label="Card details input">
               <CardElement
                 options={{
                   style: {
@@ -374,8 +380,9 @@ function DonationFormWithGate() {
           )}
         </div>
         <div>
-          <label className="block text-sm font-medium mb-1">Message (optional)</label>
+          <label htmlFor="donate-message" className="block text-sm font-medium mb-1">Message (optional)</label>
           <textarea
+            id="donate-message"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
             rows={3}
@@ -384,8 +391,8 @@ function DonationFormWithGate() {
           />
         </div>
 
-        {error && <p className="text-sm text-rose-600">{error}</p>}
-        {status && <p className="text-sm text-emerald-600">{status}</p>}
+        {error && <p className="text-sm text-rose-600" role="alert">{error}</p>}
+        {status && <p className="text-sm text-emerald-600" role="status" aria-live="polite">{status}</p>}
 
         <button
           type="submit"
@@ -465,7 +472,7 @@ export default function DonatePage() {
               {stripeConfigError}
             </p>
           ) : !stripePromise ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400">Loading secure payment form...</p>
+            <p className="text-sm text-slate-600 dark:text-slate-300">Loading secure payment form...</p>
           ) : (
             <Elements stripe={stripePromise}>
               <DonationFormWithGate />
