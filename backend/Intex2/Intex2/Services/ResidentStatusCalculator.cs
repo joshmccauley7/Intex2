@@ -30,8 +30,17 @@ public class ResidentStatusCalculator
         var residentMeta = await _db.Residents
             .AsNoTracking()
             .Where(r => idSet.Contains(r.ResidentId))
-            .Select(r => new { r.ResidentId, r.CurrentRiskLevel, r.ReintegrationType })
+            .Select(r => new { r.ResidentId, r.CurrentRiskLevel, r.ReintegrationType, r.ReintegrationStatus })
             .ToDictionaryAsync(x => x.ResidentId, x => x, cancellationToken);
+
+        var unresolvedHighIncidentIds = (await _db.IncidentReports
+            .AsNoTracking()
+            .Where(i => i.ResidentId != null && idSet.Contains(i.ResidentId.Value)
+                && i.Resolved != true
+                && (i.Severity == "High" || i.Severity == "Critical"))
+            .Select(i => i.ResidentId!.Value)
+            .ToListAsync(cancellationToken))
+            .ToHashSet();
 
         var healthByResident = await LatestPerResidentAsync(
             _db.HealthWellbeingRecords.AsNoTracking().Where(h => h.ResidentId != null && idSet.Contains(h.ResidentId.Value)),
@@ -77,6 +86,7 @@ public class ResidentStatusCalculator
             residentMeta.TryGetValue(id, out var meta);
             var currentRisk = meta?.CurrentRiskLevel;
             var reintegrationType = meta?.ReintegrationType;
+            var reintegrationStatus = meta?.ReintegrationStatus;
 
             healthByResident.TryGetValue(id, out var health);
             educationByResident.TryGetValue(id, out var education);
@@ -90,7 +100,7 @@ public class ResidentStatusCalculator
             var educationLevel = ComputeEducation(education, today);
             var counselingLevel = ComputeCounseling(session, today);
             var riskLevel = ComputeRisk(currentRisk, visit, today);
-            var reintegrationProgress = ComputeReintegrationProgress(reintegrationType, health, visit, session, education, healthLevel, educationLevel, counselingLevel, today, visitDates, sessionDates);
+            var reintegrationProgress = ComputeReintegrationProgress(reintegrationType, reintegrationStatus, currentRisk, unresolvedHighIncidentIds.Contains(id), health, visit, session, education, healthLevel, educationLevel, counselingLevel, today, visitDates, sessionDates);
 
             result[id] = new ResidentStatusIndicatorsDto(healthLevel, educationLevel, counselingLevel, riskLevel, reintegrationProgress);
         }
@@ -247,9 +257,13 @@ public class ResidentStatusCalculator
 
     /// <summary>
     /// Green = both type-specific metrics progressing, Yellow = one, Red = neither.
+    /// Overrides: Critical risk → at least yellow; unresolved High/Critical incident → at least yellow; On Hold → cap at yellow.
     /// </summary>
     private static string ComputeReintegrationProgress(
         string? reintegrationType,
+        string? reintegrationStatus,
+        string? currentRiskLevel,
+        bool hasUnresolvedHighIncident,
         HealthWellbeingRecord? health,
         HomeVisitation? visit,
         ProcessRecording? session,
@@ -318,8 +332,21 @@ public class ResidentStatusCalculator
                 break;
         }
 
-        if (m1 && m2) return "green";
-        if (m1 || m2) return "yellow";
-        return "red";
+        var result = (m1 && m2) ? "green" : (m1 || m2) ? "yellow" : "red";
+
+        // Override: Critical risk → at least yellow
+        var risk = currentRiskLevel?.Trim().ToLowerInvariant() ?? "";
+        if (risk == "critical" && result == "green")
+            result = "yellow";
+
+        // Override: unresolved High/Critical incident → bump one level worse
+        if (hasUnresolvedHighIncident)
+            result = BumpRiskWorse(result);
+
+        // Override: On Hold → cap at yellow
+        if ((reintegrationStatus?.Trim().ToLowerInvariant() ?? "") == "on hold" && result == "green")
+            result = "yellow";
+
+        return result;
     }
 }

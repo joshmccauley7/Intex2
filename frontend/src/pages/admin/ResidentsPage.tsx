@@ -872,18 +872,35 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
       }
     } else if (type === 'independent living') {
       const att = latestEducation?.attendanceRate ?? null
+      const enrollStatus = latestEducation?.enrollmentStatus?.toLowerCase() ?? ''
+      const completionStatus = latestEducation?.completionStatus?.toLowerCase() ?? ''
       if (isStale(latestEducation?.date, 540)) {
         issues.push('Education records are out of date (last recorded > 18 months ago)')
       } else if (att !== null && att < 0.5) {
         issues.push(`Attendance rate is low (${Math.round(att * 100)}%)`)
-      } else if (latestEducation?.enrollmentStatus?.toLowerCase().includes('drop') || latestEducation?.enrollmentStatus?.toLowerCase().includes('withdraw')) {
-        issues.push(`Enrollment status: ${latestEducation.enrollmentStatus}`)
+      } else if (enrollStatus.includes('drop') || enrollStatus.includes('withdraw')) {
+        issues.push(`Enrollment status: ${latestEducation!.enrollmentStatus}`)
+      } else if (completionStatus.includes('fail') || completionStatus.includes('terminated')) {
+        issues.push(`Completion status: ${latestEducation!.completionStatus}`)
       }
       if (isStale(latestSession?.date)) issues.push('No recent social worker contact in the last 90 days')
     } else {
       if (isStale(latestHealth?.date, 540)) issues.push('Health records are out of date (last recorded > 18 months ago)')
       if (isStale(latestSession?.date)) issues.push('No recent counseling sessions in the last 90 days')
     }
+
+    // Overrides — apply regardless of type
+    const riskLevel = resident.currentRiskLevel?.toLowerCase() ?? ''
+    if (riskLevel === 'critical' && issues.length === 0)
+      issues.push('Risk level is Critical')
+    const hasHighIncident = lifecycle.incidents.some(i =>
+      !i.resolved && (i.severity?.toLowerCase() === 'high' || i.severity?.toLowerCase() === 'critical')
+    )
+    if (hasHighIncident)
+      issues.push('Has an unresolved high-severity incident')
+    if (resident.reintegrationStatus === 'On Hold' && issues.length === 0)
+      issues.push('Reintegration is on hold')
+
     return issues
   }
 
@@ -943,7 +960,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentVisits.length > 0 && (
             <DotRow
               label="Family Cooperation"
-              passing={isActive ? (!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')) : undefined}
+              passing={isActive ? (!isStale(latestVisit?.date) && cooperativeCount >= 3) : undefined}
               summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
               dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
               dots={[
@@ -963,7 +980,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              passing={isActive ? !isStale(latestSession?.date) : undefined}
+              passing={isActive ? (!isStale(latestSession?.date) && progressCount >= 3) : undefined}
               summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
               dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
@@ -1006,7 +1023,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              passing={isActive ? !isStale(latestSession?.date) : undefined}
+              passing={isActive ? (!isStale(latestSession?.date) && progressCount >= 3) : undefined}
               summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
               dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
@@ -1098,8 +1115,8 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         <div className="grid grid-cols-2 gap-6">
           {recentEducation.length > 0 && (
             <DotRow
-              label="Attendance"
-              passing={isActive ? (latestEducation != null && !isStale(latestEducation.date, 540) && (latestEducation.attendanceRate ?? 0) >= 0.5) : undefined}
+              label="Education Attendance"
+              passing={isActive ? (latestEducation != null && !isStale(latestEducation.date, 540) && (latestEducation.attendanceRate ?? 0) >= 0.8) : undefined}
               summary={`${goodAttendanceCount} of ${recentEducation.length} most recent records ≥80% attendance`}
               dates={[...recentEducation.map(e => e.date), ...Array(Math.max(0, DOTS - recentEducation.length)).fill(null)]}
               dots={[
