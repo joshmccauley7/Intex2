@@ -294,15 +294,15 @@ export default function ChatWidget() {
       </button>
 
       {/* ── Chat panel ──────────────────────────────────────────────────── */}
+      {isOpen && (
       <div
         className={[
           'fixed bottom-5 left-5 z-50 flex flex-col w-80 sm:w-96 h-[560px]',
           'rounded-2xl shadow-2xl border',
           'bg-[var(--page-bg)] border-slate-200 dark:border-slate-700',
           'transition-all duration-200 ease-out origin-bottom-left',
-          isOpen ? 'opacity-100 scale-100 translate-y-0' : 'opacity-0 scale-95 translate-y-4 pointer-events-none',
+          'opacity-100 scale-100 translate-y-0',
         ].join(' ')}
-        aria-hidden={!isOpen}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
@@ -474,6 +474,7 @@ export default function ChatWidget() {
           </form>
         )}
       </div>
+      )}
     </>
   );
 }

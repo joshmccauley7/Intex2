@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react'
+import { useState, useEffect, useCallback, useMemo, useId } from 'react'
 import { Share2, Sparkles, TrendingUp, ChevronRight, ArrowRight, BarChart2, RefreshCw, ChevronLeft } from 'lucide-react'
 import { apiFetch } from '../../api'
 
@@ -225,13 +225,15 @@ function SelectField({
   onChange: (v: string) => void
   rateHint?: { rate: number; overall: number }
 }) {
+  const id = useId()
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <label className="text-sm font-medium text-slate-700">{label}</label>
+        <label htmlFor={id} className="text-sm font-medium text-slate-700">{label}</label>
         {rateHint && <RateBadge rate={rateHint.rate} overall={rateHint.overall} />}
       </div>
       <select
+        id={id}
         value={value}
         onChange={e => onChange(e.target.value)}
         className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb] focus:border-transparent"
@@ -262,6 +264,7 @@ function ToggleField({
         className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#2563eb] focus:ring-offset-2 ${checked ? 'bg-[#2563eb]' : 'bg-slate-200'}`}
         aria-checked={checked}
         role="switch"
+        aria-label={label}
       >
         <span
           className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${checked ? 'translate-x-6' : 'translate-x-1'}`}
@@ -282,11 +285,12 @@ function NumberSlider({
   formatter?: (v: number) => string
   rateHint?: { rate: number; overall: number }
 }) {
+  const id = useId()
   return (
     <div>
       <div className="flex justify-between items-center mb-1">
         <div className="flex items-center gap-2">
-          <label className="text-sm font-medium text-slate-700">{label}</label>
+          <label htmlFor={id} className="text-sm font-medium text-slate-700">{label}</label>
           {rateHint && <RateBadge rate={rateHint.rate} overall={rateHint.overall} />}
         </div>
         <span className="text-sm font-semibold text-[#2563eb]">
@@ -294,6 +298,7 @@ function NumberSlider({
         </span>
       </div>
       <input
+        id={id}
         type="range"
         min={min}
         max={max}
@@ -698,7 +703,7 @@ export default function SocialMediaPage() {
             <BarChart2 size={18} className="text-[#2563eb]" />
             <h2 className="text-base font-semibold text-[#0f172a]">Platform Insights</h2>
             {insights.overall && (
-              <span className="ml-auto text-xs text-slate-400">
+              <span className="ml-auto text-xs text-slate-500">
                 {insights.overall.totalPosts.toLocaleString()} posts · avg {pct(insights.overall.overallConversionRate)} conversion
               </span>
             )}
@@ -776,7 +781,9 @@ export default function SocialMediaPage() {
         <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-3">
           <h2 className="text-base font-semibold text-[#0f172a]">Post History</h2>
           <div className="flex items-center gap-3">
+            <label htmlFor="history-platform-filter" className="sr-only">Filter history by platform</label>
             <select
+              id="history-platform-filter"
               value={historyFilter}
               onChange={e => { setHistoryFilter(e.target.value); setHistoryPage(1) }}
               className="border border-slate-200 rounded-lg px-3 py-1.5 text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-[#2563eb]"
@@ -785,7 +792,7 @@ export default function SocialMediaPage() {
               {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
             {historyTotal > 0 && (
-              <span className="text-xs text-slate-400">{historyTotal.toLocaleString()} posts</span>
+              <span className="text-xs text-slate-500">{historyTotal.toLocaleString()} posts</span>
             )}
           </div>
         </div>
@@ -850,6 +857,7 @@ export default function SocialMediaPage() {
                     disabled={historyPage <= 1}
                     onClick={() => { fetchHistory(historyPage - 1, historyFilter); setHistoryPage(p => p - 1) }}
                     className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Previous history page"
                   >
                     <ChevronLeft size={14} />
                   </button>
@@ -857,6 +865,7 @@ export default function SocialMediaPage() {
                     disabled={historyPage >= historyPages}
                     onClick={() => { fetchHistory(historyPage + 1, historyFilter); setHistoryPage(p => p + 1) }}
                     className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
+                    aria-label="Next history page"
                   >
                     <ChevronRight size={14} />
                   </button>
