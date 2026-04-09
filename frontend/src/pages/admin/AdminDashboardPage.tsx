@@ -493,14 +493,43 @@ export default function AdminDashboardPage() {
   const activeConfig = activeModal ? MODAL_CONFIG[activeModal] : null
 
   return (
-    <div className="flex flex-col gap-8">
-      <div>
-        <h1 className="text-2xl font-bold text-[#0f172a]">Dashboard</h1>
-        <p className="text-sm text-slate-500 mt-1">Operations overview for Safira staff</p>
+    <div className="min-h-screen bg-slate-50 p-6 space-y-6">
+
+      {/* ── Section divider: Donor Operations ── */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Donor Operations</span>
+        <div className="flex-1 h-px bg-slate-200" />
       </div>
 
-      {/* ── Primary OKR + High Churn Risk ── */}
+      {/* ── Donor stat cards ── */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StatCard
+          icon={<Heart size={20} className="text-safira-blue" />}
+          label="Active Donors"
+          value={data.activeDonors}
+          onClick={() => openModal('donors')}
+        />
+        <StatCard
+          icon={<ShieldAlert size={20} className="text-red-500" />}
+          label="High Churn Risk"
+          value={data.highChurnCount}
+          sub="donors at risk of lapsing"
+          highlight
+          onClick={() => openModal('churn-high')}
+          action={
+            <button
+              className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-left"
+              onClick={() => navigate('/admin/donors?tab=outreach')}
+            >
+              Go to Outreach Queue →
+            </button>
+          }
+        />
+      </div>
+
+      {/* ── Donor: OKR + churn breakdown ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Primary OKR */}
         <div
           className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
           onClick={() => openModal(data.donorOkrPercent != null ? 'okr-recent' : 'donors')}
@@ -534,154 +563,6 @@ export default function AdminDashboardPage() {
             depends on steady funding. The share of donors who gave recently reflects engagement and
             predictable support better than total donor count alone.
           </p>
-        </div>
-        <StatCard
-          icon={<ShieldAlert size={20} className="text-red-500" />}
-          label="High Churn Risk"
-          value={data.highChurnCount}
-          sub="donors at risk of lapsing"
-          highlight
-          onClick={() => openModal('churn-high')}
-          action={
-            <button
-              className="w-full text-xs font-semibold text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors text-left"
-              onClick={() => navigate('/admin/donors?tab=outreach')}
-            >
-              Go to Outreach Queue →
-            </button>
-          }
-        />
-      </div>
-
-      {/* ── Stat cards ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <StatCard
-          icon={<Users size={20} className="text-safira-blue" />}
-          label="Active Residents"
-          value={data.activeResidents}
-          sub={`across ${data.activeSafehouses} safe houses`}
-          onClick={() => openModal('residents')}
-        />
-        <StatCard
-          icon={<Home size={20} className="text-safira-blue" />}
-          label="Active Safe Houses"
-          value={data.activeSafehouses}
-          onClick={() => openModal('safehouses')}
-        />
-        <StatCard
-          icon={<Heart size={20} className="text-safira-blue" />}
-          label="Active Donors"
-          value={data.activeDonors}
-          onClick={() => openModal('donors')}
-        />
-      </div>
-
-      {/* ── Middle row: donations + conferences ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <CollapsibleSection
-            icon={<TrendingUp size={16} className="text-safira-blue" />}
-            title="Recent Donations"
-            badge={String(data.recentDonations.length)}
-            defaultOpen={false}
-          >
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="bg-slate-50 border-b border-slate-100">
-                  {['Donor', 'Date', 'Amount', 'Type'].map((h) => (
-                    <th key={h} className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {data.recentDonations.length === 0 ? (
-                  <tr>
-                    <td colSpan={4} className="px-5 py-6 text-center text-slate-400 text-xs">
-                      No recent donations.
-                    </td>
-                  </tr>
-                ) : data.recentDonations.map((d) => (
-                  <tr key={d.donationId} className="hover:bg-slate-50 transition-colors">
-                    <td className="px-5 py-3 font-medium text-slate-800">{d.donorName}</td>
-                    <td className="px-5 py-3 text-slate-500">{d.donationDate}</td>
-                    <td className="px-5 py-3 text-slate-800 font-medium">
-                      {d.amount != null ? phpFmt.format(d.amount) : '—'}
-                    </td>
-                    <td className="px-5 py-3 text-slate-500">{d.donationType ?? '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            <div className="px-5 py-3 border-t border-slate-100">
-              <button onClick={() => openModal('donations')} className="text-xs font-medium text-safira-blue hover:underline">
-                View all donations →
-              </button>
-            </div>
-          </CollapsibleSection>
-        </div>
-
-        <CollapsibleSection
-          icon={<Calendar size={16} className="text-safira-blue" />}
-          title="Upcoming Conferences"
-          badge={String(data.upcomingConferences.length)}
-          defaultOpen={false}
-        >
-          <div className="divide-y divide-slate-50">
-            {data.upcomingConferences.length === 0 ? (
-              <p className="px-5 py-6 text-center text-slate-400 text-xs">No upcoming conferences scheduled.</p>
-            ) : data.upcomingConferences.map((c) => (
-              <div key={c.conferenceId} className="px-5 py-3">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="font-medium text-slate-800 text-sm">
-                    {c.residentCode ?? `Resident ${c.conferenceId}`}
-                  </span>
-                  <span className="text-xs text-slate-400">{c.nextConferenceDate}</span>
-                </div>
-                <div className="text-xs text-slate-500 mt-0.5">
-                  {c.conferenceType ?? 'Conference'}{c.socialWorker ? ` · ${c.socialWorker}` : ''}
-                </div>
-              </div>
-            ))}
-          </div>
-          <div className="px-5 py-3 border-t border-slate-100">
-            <button onClick={() => openModal('conferences')} className="text-xs font-medium text-safira-blue hover:underline">
-              View all conferences →
-            </button>
-          </div>
-        </CollapsibleSection>
-      </div>
-
-      {/* ── Bottom row: breakdowns ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-
-        {/* Resident status breakdown */}
-        <div
-          className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
-          onClick={() => openModal('residents')}
-          title="Click to explore resident roster"
-        >
-          <h2 className="font-semibold text-slate-800 text-sm mb-4">Resident Status Breakdown</h2>
-          <div className="flex flex-col gap-3">
-            {data.residentStatusCounts.map((s) => (
-              <div key={s.status} className="group">
-                <div className="flex items-center justify-between mb-1">
-                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[s.status ?? ''] ?? 'bg-slate-100 text-slate-600'}`}>
-                    {s.status ?? 'Unknown'}
-                  </span>
-                  <span className="text-xs text-slate-500">{s.count} / {totalResidents}</span>
-                </div>
-                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-safira-blue rounded-full group-hover:opacity-80 transition-opacity"
-                    style={{ width: `${(s.count / totalResidents) * 100}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="text-xs text-slate-400 mt-4">Click to view full resident analytics</p>
         </div>
 
         {/* Donor churn risk breakdown */}
@@ -718,14 +599,180 @@ export default function AdminDashboardPage() {
         </div>
       </div>
 
-      {/* ── Resident progress row ── */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      {/* ── Donor: recent donations ── */}
+      <CollapsibleSection
+        icon={<TrendingUp size={16} className="text-safira-blue" />}
+        title="Recent Donations"
+        badge={String(data.recentDonations.length)}
+        defaultOpen={false}
+      >
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="bg-slate-50 border-b border-slate-100">
+              {['Donor', 'Date', 'Amount', 'Type'].map((h) => (
+                <th key={h} className="text-left px-5 py-2.5 text-xs font-semibold text-slate-500 uppercase tracking-wide">
+                  {h}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-50">
+            {data.recentDonations.length === 0 ? (
+              <tr>
+                <td colSpan={4} className="px-5 py-6 text-center text-slate-400 text-xs">
+                  No recent donations.
+                </td>
+              </tr>
+            ) : data.recentDonations.map((d) => (
+              <tr key={d.donationId} className="hover:bg-slate-50 transition-colors">
+                <td className="px-5 py-3 font-medium text-slate-800">{d.donorName}</td>
+                <td className="px-5 py-3 text-slate-500">{d.donationDate}</td>
+                <td className="px-5 py-3 text-slate-800 font-medium">
+                  {d.amount != null ? phpFmt.format(d.amount) : '—'}
+                </td>
+                <td className="px-5 py-3 text-slate-500">{d.donationType ?? '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <div className="px-5 py-3 border-t border-slate-100">
+          <button onClick={() => openModal('donations')} className="text-xs font-medium text-safira-blue hover:underline">
+            View all donations →
+          </button>
+        </div>
+      </CollapsibleSection>
 
+      {/* ── Section divider: Resident Operations ── */}
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-bold uppercase tracking-widest text-slate-400 whitespace-nowrap">Resident Operations</span>
+        <div className="flex-1 h-px bg-slate-200" />
+      </div>
+
+      {/* ── Resident stat cards ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <StatCard
+          icon={<Users size={20} className="text-safira-blue" />}
+          label="Active Residents"
+          value={data.activeResidents}
+          sub={`across ${data.activeSafehouses} safe houses`}
+          onClick={() => openModal('residents')}
+        />
+        <StatCard
+          icon={<Home size={20} className="text-safira-blue" />}
+          label="Active Safe Houses"
+          value={data.activeSafehouses}
+          onClick={() => openModal('safehouses')}
+        />
+      </div>
+
+      {/* ── Resident: upcoming conferences ── */}
+      <CollapsibleSection
+        icon={<Calendar size={16} className="text-safira-blue" />}
+        title="Upcoming Conferences"
+        badge={String(data.upcomingConferences.length)}
+        defaultOpen={false}
+      >
+        <div className="divide-y divide-slate-50">
+          {data.upcomingConferences.length === 0 ? (
+            <p className="px-5 py-6 text-center text-slate-400 text-xs">No upcoming conferences scheduled.</p>
+          ) : data.upcomingConferences.map((c) => (
+            <div key={c.conferenceId} className="px-5 py-3">
+              <div className="flex items-center justify-between gap-2">
+                <span className="font-medium text-slate-800 text-sm">
+                  {c.residentCode ?? `Resident ${c.conferenceId}`}
+                </span>
+                <span className="text-xs text-slate-400">{c.nextConferenceDate}</span>
+              </div>
+              <div className="text-xs text-slate-500 mt-0.5">
+                {c.conferenceType ?? 'Conference'}{c.socialWorker ? ` · ${c.socialWorker}` : ''}
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="px-5 py-3 border-t border-slate-100">
+          <button onClick={() => openModal('conferences')} className="text-xs font-medium text-safira-blue hover:underline">
+            View all conferences →
+          </button>
+        </div>
+      </CollapsibleSection>
+
+      {/* ── Resident: status + risk ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Resident status breakdown */}
+        <div
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
+          onClick={() => openModal('residents')}
+          title="Click to explore resident roster"
+        >
+          <h2 className="font-semibold text-slate-800 text-sm mb-4">Resident Status Breakdown</h2>
+          <div className="flex flex-col gap-3">
+            {data.residentStatusCounts.map((s) => (
+              <div key={s.status} className="group">
+                <div className="flex items-center justify-between mb-1">
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${STATUS_BADGE[s.status ?? ''] ?? 'bg-slate-100 text-slate-600'}`}>
+                    {s.status ?? 'Unknown'}
+                  </span>
+                  <span className="text-xs text-slate-500">{s.count} / {totalResidents}</span>
+                </div>
+                <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-safira-blue rounded-full group-hover:opacity-80 transition-opacity"
+                    style={{ width: `${(s.count / totalResidents) * 100}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-xs text-slate-400 mt-4">Click to view full resident analytics</p>
+        </div>
+
+        {/* Active resident risk */}
+        <div
+          className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
+          onClick={() => openModal('risk-all')}
+          title="Click to explore resident risk analytics"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <ShieldAlert size={16} className="text-safira-blue" />
+            <h2 className="font-semibold text-slate-800 text-sm">Active Resident Risk</h2>
+          </div>
+          {data.activeRiskCounts.length === 0 ? (
+            <p className="text-xs text-slate-400">No risk data.</p>
+          ) : (
+            <div className="flex flex-col gap-3">
+              {(() => {
+                const total = data.activeRiskCounts.reduce((s, r) => s + r.count, 0)
+                return ['High', 'Medium', 'Low'].map((level) => {
+                  const count = data.activeRiskCounts.find((r) => r.riskLevel === level)?.count ?? 0
+                  return (
+                    <div key={level} className="group">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${RISK_BADGE[level]}`}>{level}</span>
+                        <span className="text-xs text-slate-500">{count} / {total}</span>
+                      </div>
+                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                        <div
+                          className={`h-full rounded-full ${BAR_COLOR[level]} group-hover:opacity-80 transition-opacity`}
+                          style={{ width: total > 0 ? `${(count / total) * 100}%` : '0%' }}
+                        />
+                      </div>
+                    </div>
+                  )
+                })
+              })()}
+            </div>
+          )}
+          <p className="text-xs text-slate-400 mt-4">Click to view all active resident risk</p>
+        </div>
+      </div>
+
+      {/* ── Resident: health + education + counseling ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Health */}
         <div className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`} onClick={() => openModal('health')}>
           <div className="flex items-center gap-2 mb-4">
             <Activity size={16} className="text-safira-blue" />
-            <h2 className="font-semibold text-slate-800 text-sm">Health</h2>
+            <h2 className="font-semibold text-slate-800 text-sm">Health & Wellbeing</h2>
           </div>
           {!data.healthAvg ? (
             <p className="text-xs text-slate-400">No health data.</p>
@@ -775,7 +822,7 @@ export default function AdminDashboardPage() {
                   </div>
                 </div>
               ))}
-              <div className="flex flex-col gap-1 mt-1">
+              <div className="flex flex-col gap-1 mt-1 pt-2 border-t border-slate-100">
                 {data.enrollmentCounts.map((e) => (
                   <div key={e.status} className="flex justify-between text-xs">
                     <span className="text-slate-500">{e.status ?? 'Unknown'}</span>
@@ -811,50 +858,11 @@ export default function AdminDashboardPage() {
                   </div>
                 ))
               })()}
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-slate-400 mt-1 pt-2 border-t border-slate-100">
                 {data.counselingCounts.reduce((s, c) => s + c.count, 0).toLocaleString()} total sessions
               </p>
             </div>
           )}
-        </div>
-
-        {/* Active resident risk */}
-        <div
-          className={`bg-white rounded-xl border border-slate-200 p-5 ${cardHover}`}
-          onClick={() => openModal('risk-all')}
-          title="Click to explore resident risk analytics"
-        >
-          <div className="flex items-center gap-2 mb-4">
-            <ShieldAlert size={16} className="text-safira-blue" />
-            <h2 className="font-semibold text-slate-800 text-sm">Active Resident Risk</h2>
-          </div>
-          {data.activeRiskCounts.length === 0 ? (
-            <p className="text-xs text-slate-400">No risk data.</p>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {(() => {
-                const total = data.activeRiskCounts.reduce((s, r) => s + r.count, 0)
-                return ['High', 'Medium', 'Low'].map((level) => {
-                  const count = data.activeRiskCounts.find((r) => r.riskLevel === level)?.count ?? 0
-                  return (
-                    <div key={level} className="group">
-                      <div className="flex items-center justify-between mb-1">
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${RISK_BADGE[level]}`}>{level}</span>
-                        <span className="text-xs text-slate-500">{count} / {total}</span>
-                      </div>
-                      <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                        <div
-                          className={`h-full rounded-full ${BAR_COLOR[level]} group-hover:opacity-80 transition-opacity`}
-                          style={{ width: total > 0 ? `${(count / total) * 100}%` : '0%' }}
-                        />
-                      </div>
-                    </div>
-                  )
-                })
-              })()}
-            </div>
-          )}
-          <p className="text-xs text-slate-400 mt-4">Click to view all active resident risk</p>
         </div>
       </div>
 
