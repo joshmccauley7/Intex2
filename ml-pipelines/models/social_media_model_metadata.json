@@ -1,0 +1,185 @@
+{
+  "model_name": "social_media_conversion_predictor",
+  "model_type": "RandomForestClassifier",
+  "version": "v1.0",
+  "trained_at": "2026-04-09T16:24:56.107402",
+  "training_samples": 812,
+  "conversion_rate": 0.6428571428571429,
+  "test_auc_roc": 0.909688013136289,
+  "prediction_threshold": 0.4,
+  "categorical_features": [
+    "platform",
+    "post_type",
+    "media_type",
+    "content_topic",
+    "sentiment_tone",
+    "day_of_week",
+    "call_to_action_type"
+  ],
+  "boolean_features": [
+    "has_call_to_action",
+    "features_resident_story",
+    "is_boosted"
+  ],
+  "numeric_features": [
+    "post_hour",
+    "num_hashtags",
+    "caption_length"
+  ],
+  "all_features": [
+    "platform",
+    "post_type",
+    "media_type",
+    "content_topic",
+    "sentiment_tone",
+    "day_of_week",
+    "call_to_action_type",
+    "has_call_to_action",
+    "features_resident_story",
+    "is_boosted",
+    "post_hour",
+    "num_hashtags",
+    "caption_length"
+  ],
+  "feature_best_values": {
+    "platform": "YouTube",
+    "post_type": "ImpactStory",
+    "media_type": "Reel",
+    "content_topic": "CampaignLaunch",
+    "sentiment_tone": "Celebratory",
+    "day_of_week": "Saturday",
+    "call_to_action_type": "SignUp"
+  },
+  "feature_conversion_rates": {
+    "platform": {
+      "Facebook": 0.6131,
+      "Instagram": 0.6829,
+      "LinkedIn": 0.4051,
+      "TikTok": 0.7528,
+      "Twitter": 0.6325,
+      "WhatsApp": 0.6452,
+      "YouTube": 0.7746
+    },
+    "post_type": {
+      "Campaign": 0.8205,
+      "EducationalContent": 0.3509,
+      "EventPromotion": 0.3359,
+      "FundraisingAppeal": 0.8111,
+      "ImpactStory": 0.9458,
+      "ThankYou": 0.3814
+    },
+    "media_type": {
+      "Carousel": 0.6327,
+      "Photo": 0.5903,
+      "Reel": 0.8017,
+      "Text": 0.5195,
+      "Video": 0.7028
+    },
+    "content_topic": {
+      "AwarenessRaising": 0.5783,
+      "CampaignLaunch": 0.7333,
+      "DonorImpact": 0.646,
+      "Education": 0.6587,
+      "EventRecap": 0.5238,
+      "Gratitude": 0.5904,
+      "Health": 0.6966,
+      "Reintegration": 0.6582,
+      "SafehouseLife": 0.6393
+    },
+    "sentiment_tone": {
+      "Celebratory": 0.7434,
+      "Emotional": 0.7246,
+      "Grateful": 0.6385,
+      "Hopeful": 0.6443,
+      "Informative": 0.4938,
+      "Urgent": 0.6583
+    },
+    "day_of_week": {
+      "Friday": 0.6378,
+      "Monday": 0.6574,
+      "Saturday": 0.681,
+      "Sunday": 0.6569,
+      "Thursday": 0.6106,
+      "Tuesday": 0.625,
+      "Wednesday": 0.6364
+    },
+    "call_to_action_type": {
+      "DonateNow": 0.6911,
+      "LearnMore": 0.687,
+      "None": 0.5611,
+      "ShareStory": 0.6529,
+      "SignUp": 0.7542
+    }
+  },
+  "risk_thresholds": {
+    "high": 0.6,
+    "medium": 0.3,
+    "low": 0.0
+  },
+  "categorical_values": {
+    "platform": [
+      "Facebook",
+      "Instagram",
+      "LinkedIn",
+      "TikTok",
+      "Twitter",
+      "WhatsApp",
+      "YouTube"
+    ],
+    "post_type": [
+      "Campaign",
+      "EducationalContent",
+      "EventPromotion",
+      "FundraisingAppeal",
+      "ImpactStory",
+      "ThankYou"
+    ],
+    "media_type": [
+      "Carousel",
+      "Photo",
+      "Reel",
+      "Text",
+      "Video"
+    ],
+    "content_topic": [
+      "AwarenessRaising",
+      "CampaignLaunch",
+      "DonorImpact",
+      "Education",
+      "EventRecap",
+      "Gratitude",
+      "Health",
+      "Reintegration",
+      "SafehouseLife"
+    ],
+    "sentiment_tone": [
+      "Celebratory",
+      "Emotional",
+      "Grateful",
+      "Hopeful",
+      "Informative",
+      "Urgent"
+    ],
+    "day_of_week": [
+      "Friday",
+      "Monday",
+      "Saturday",
+      "Sunday",
+      "Thursday",
+      "Tuesday",
+      "Wednesday"
+    ],
+    "call_to_action_type": [
+      "DonateNow",
+      "LearnMore",
+      "None",
+      "ShareStory",
+      "SignUp"
+    ]
+  },
+  "best_params": {
+    "clf__max_depth": 10,
+    "clf__min_samples_leaf": 5,
+    "clf__n_estimators": 200
+  }
+}

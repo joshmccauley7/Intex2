@@ -2,7 +2,7 @@
   "model_name": "donor_churn_classifier",
   "model_type": "RandomForestClassifier",
   "version": "v1.0",
-  "trained_at": "2026-04-09T15:54:34.408527",
+  "trained_at": "2026-04-09T16:18:48.328135",
   "training_samples": 63,
   "churn_rate": 0.23809523809523808,
   "analysis_date": "2026-04-10",
