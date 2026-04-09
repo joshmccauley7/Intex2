@@ -195,7 +195,7 @@ public class ImpactEmailService
             <hr style='margin:36px 0;border:none;border-top:1px solid #f1f5f9;'/>
             <p style='margin:0;color:#94a3b8;font-size:12px;text-align:center;line-height:1.6;'>
               Safira Foundation &bull; Making safe spaces for girls in crisis<br/>
-              You're receiving this because you're a registered donor.
+              You're receiving this because you're a registered supporter.
             </p>
 
           </td>
