@@ -78,70 +78,54 @@ public class ImpactEmailService
     {
         var firstName = supporter.DisplayName?.Split(' ')[0] ?? "friend";
 
-        // Aggregate monetary total
-        var monetary = donations
-            .Where(d => d.DonationType?.ToLower() is "monetary" or "cash" or "financial")
-            .Sum(d => d.Amount ?? 0);
-
-        // Time/skills hours
-        var hours = donations
-            .Where(d => d.DonationType?.ToLower() is "time" or "skills")
-            .Sum(d => d.EstimatedValue ?? d.Amount ?? 0);
-
-        // In-kind items
-        var items = donations
-            .Where(d => d.DonationType?.ToLower() is "inkind" or "in-kind" or "in kind")
-            .Sum(d => d.EstimatedValue ?? 0);
-
-        // Per-safehouse breakdown
-        var safehouseGroups = allocations
-            .Where(a => a.SafehouseId != null && safehouses.ContainsKey(a.SafehouseId.Value))
-            .GroupBy(a => a.SafehouseId!.Value)
-            .Select(g =>
-            {
-                var sh = safehouses[g.Key];
-                var areas = g.Select(a => a.ProgramArea ?? "General").Distinct().ToList();
-                var allocated = g.Sum(a => a.AmountAllocated ?? 0);
-                var imgUrl = $"{frontendUrl}/safehouses/Phil_lighthouse_{sh.SafehouseId}.jpg";
-                return new { sh.City, sh.Name, sh.SafehouseId, Areas = areas, Allocated = allocated, ImgUrl = imgUrl };
-            })
-            .OrderByDescending(x => x.Allocated)
-            .ToList();
-
         var currency = donations.FirstOrDefault(d => d.CurrencyCode != null)?.CurrencyCode ?? "PHP";
         var symbol = currency == "PHP" ? "₱" : "$";
 
-        var safehouseCards = string.Join("", safehouseGroups.Select(s =>
+        // Build a lookup: donationId -> (safehouse city, program area)
+        var donationAllocationInfo = allocations
+            .GroupBy(a => a.DonationId)
+            .ToDictionary(
+                g => g.Key,
+                g =>
+                {
+                    var city = g
+                        .Where(a => a.SafehouseId != null && safehouses.ContainsKey(a.SafehouseId.Value))
+                        .Select(a => safehouses[a.SafehouseId!.Value].City)
+                        .Where(c => !string.IsNullOrEmpty(c))
+                        .Distinct()
+                        .FirstOrDefault() ?? "—";
+                    var area = g
+                        .Select(a => a.ProgramArea)
+                        .Where(p => !string.IsNullOrEmpty(p))
+                        .Distinct()
+                        .FirstOrDefault() ?? "—";
+                    return (city, area);
+                });
+
+        // Donations table rows
+        var tableRows = new System.Text.StringBuilder();
+        foreach (var d in donations)
         {
-            var areaList = string.Join(" &bull; ", s.Areas);
-            var amtStr = s.Allocated > 0 ? $"<p style='margin:6px 0 0;color:#0ea5e9;font-weight:700;font-size:14px;'>{symbol}{s.Allocated:N0} allocated</p>" : "";
-            return $@"
-              <td style='width:50%;padding:6px;vertical-align:top;'>
-                <div style='border:1px solid #e2e8f0;border-radius:10px;overflow:hidden;background:#fff;'>
-                  <img src='{s.ImgUrl}' alt='{s.City} safehouse'
-                       width='100%' style='display:block;width:100%;height:140px;object-fit:cover;' />
-                  <div style='padding:12px;'>
-                    <p style='margin:0;font-weight:700;color:#0f172a;font-size:14px;'>{s.City} Safehouse</p>
-                    <p style='margin:4px 0 0;color:#64748b;font-size:12px;'>{areaList}</p>
-                    {amtStr}
-                  </div>
-                </div>
-              </td>";
-        }));
+            var value = d.Amount ?? d.EstimatedValue;
+            var valueStr = value.HasValue ? $"{symbol}{value.Value:N0}" : "—";
 
-        var summaryItems = new System.Text.StringBuilder();
-        if (monetary > 0)
-            summaryItems.Append($"<li style='margin-bottom:6px;'><strong style='color:#0f172a;'>{symbol}{monetary:N0}</strong> in direct financial support</li>");
-        if (hours > 0)
-            summaryItems.Append($"<li style='margin-bottom:6px;'><strong style='color:#0f172a;'>{(int)Math.Ceiling(hours)}</strong> hours of skilled time donated</li>");
-        if (items > 0)
-            summaryItems.Append($"<li style='margin-bottom:6px;'><strong style='color:#0f172a;'>{(int)Math.Ceiling(items)}</strong> in-kind items provided</li>");
+            var (sh, area) = donationAllocationInfo.TryGetValue(d.DonationId, out var info)
+                ? info
+                : ("—", "—");
 
-        var safehouseSection = safehouseCards.Length > 0 ? $@"
-          <h2 style='font-size:16px;font-weight:700;color:#0f172a;margin:32px 0 12px;'>Where your giving went</h2>
-          <table width='100%' cellpadding='0' cellspacing='0'>
-            <tr>{safehouseCards}</tr>
-          </table>" : "";
+            tableRows.Append($@"
+            <tr>
+              <td style='padding:10px 12px;border-bottom:1px solid #f1f5f9;color:#334155;font-size:14px;white-space:nowrap;'>{d.DonationDate:MMM d, yyyy}</td>
+              <td style='padding:10px 12px;border-bottom:1px solid #f1f5f9;color:#0f172a;font-size:14px;font-weight:600;text-align:right;white-space:nowrap;'>{valueStr}</td>
+              <td style='padding:10px 12px;border-bottom:1px solid #f1f5f9;color:#64748b;font-size:14px;'>{sh}</td>
+              <td style='padding:10px 12px;border-bottom:1px solid #f1f5f9;color:#334155;font-size:14px;'>{area}</td>
+            </tr>");
+        }
+
+        var heroImageUrl = $"{frontendUrl}/homepage/1.jpg";
+        var sinceStr = supporter.FirstDonationDate.HasValue
+            ? supporter.FirstDonationDate.Value.ToString("MMMM yyyy")
+            : "you joined";
 
         return $@"<!DOCTYPE html>
 <html lang='en'>
@@ -153,9 +137,17 @@ public class ImpactEmailService
 
         <!-- Header -->
         <tr>
-          <td style='background:#0ea5e9;border-radius:12px 12px 0 0;padding:32px 40px;text-align:center;'>
+          <td style='background:#0ea5e9;border-radius:12px 12px 0 0;padding:24px 40px;text-align:center;'>
             <h1 style='margin:0;color:#fff;font-size:24px;font-weight:700;'>Your Impact at Safira</h1>
             <p style='margin:8px 0 0;color:#e0f2fe;font-size:14px;'>A personal recap for {firstName}</p>
+          </td>
+        </tr>
+
+        <!-- Hero image -->
+        <tr>
+          <td style='line-height:0;'>
+            <img src='{heroImageUrl}' alt='Safira'
+                 width='600' style='display:block;width:100%;max-width:600px;height:220px;object-fit:cover;' />
           </td>
         </tr>
 
@@ -163,19 +155,28 @@ public class ImpactEmailService
         <tr>
           <td style='background:#fff;padding:40px;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 12px 12px;'>
 
-            <p style='margin:0 0 20px;color:#334155;font-size:15px;line-height:1.6;'>
+            <p style='margin:0 0 28px;color:#334155;font-size:15px;line-height:1.6;'>
               Hi {firstName},<br/><br/>
               We wanted to take a moment to say <strong>thank you</strong> — and to show you exactly
               what your generosity has made possible for the girls in our care.
+              Below is a summary of your {donations.Count} gift{(donations.Count != 1 ? "s" : "")} since {sinceStr}.
             </p>
 
-            <h2 style='font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px;'>Your giving at a glance</h2>
-            <ul style='margin:0 0 24px;padding-left:20px;color:#334155;font-size:15px;line-height:1.8;'>
-              {summaryItems}
-              <li style='margin-bottom:6px;'><strong style='color:#0f172a;'>{donations.Count}</strong> total gift{(donations.Count != 1 ? "s" : "")} since {(supporter.FirstDonationDate.HasValue ? supporter.FirstDonationDate.Value.ToString("MMMM yyyy") : "you joined")}</li>
-            </ul>
-
-            {safehouseSection}
+            <!-- Donations table -->
+            <h2 style='font-size:16px;font-weight:700;color:#0f172a;margin:0 0 12px;'>Your donation history</h2>
+            <table width='100%' cellpadding='0' cellspacing='0' style='border-collapse:collapse;border:1px solid #e2e8f0;border-radius:8px;overflow:hidden;'>
+              <thead>
+                <tr style='background:#f8fafc;'>
+                  <th style='padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e2e8f0;'>Date</th>
+                  <th style='padding:10px 12px;text-align:right;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e2e8f0;'>Amount</th>
+                  <th style='padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e2e8f0;'>Safehouse</th>
+                  <th style='padding:10px 12px;text-align:left;font-size:12px;font-weight:600;color:#64748b;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e2e8f0;'>Program Area</th>
+                </tr>
+              </thead>
+              <tbody>
+                {tableRows}
+              </tbody>
+            </table>
 
             <p style='margin:32px 0 0;color:#334155;font-size:15px;line-height:1.6;'>
               Every peso, every hour, every item you've given has gone directly to safe housing,
