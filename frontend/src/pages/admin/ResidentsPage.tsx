@@ -900,7 +900,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
 
     return (
       <div>
-        <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center justify-between gap-2 mb-1.5">
           <p className="text-xs font-semibold text-slate-600">{label}</p>
           {passing !== undefined && (
             <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${passing ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -908,7 +908,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             </span>
           )}
         </div>
-        {summary && <p className="text-xs text-slate-400 mb-2">{summary}</p>}
+        {summary && <p className="text-xs text-slate-400 mb-3">{summary}</p>}
         <div className="inline-flex border border-slate-100 rounded-lg overflow-hidden">
           {dots.map((dot, i) => (
             <div key={i} className={`flex flex-col items-center gap-0.5 px-2 py-1 ${i > 0 ? 'border-l border-slate-100' : ''}`}>
@@ -937,7 +937,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Family Reunification') {
       return (
         <div className="pt-3 border-t border-slate-100">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6">
           {recentVisits.length > 0 && (
             <DotRow
               label="Family Cooperation"
@@ -983,7 +983,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Foster Care') {
       return (
         <div className="pt-3 border-t border-slate-100">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6">
           {recentHealth.length > 0 && (
             <DotRow
               label="Psych Checkups"
@@ -1093,7 +1093,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
 
       return (
         <div className="pt-3 border-t border-slate-100">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6">
           {recentEducation.length > 0 && (
             <DotRow
               label="Attendance"
@@ -1180,7 +1180,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     <div className="rounded-xl border border-slate-200 overflow-hidden mb-5">
       <div className="flex">
         <div className={`w-1.5 shrink-0 ${bgColor}`} />
-        <div className="flex-1 px-4 py-4 space-y-4">
+        <div className="flex-1 px-5 py-5 space-y-5">
           {/* Top row — status / type / length of stay */}
           <div className="flex items-start justify-between">
             <div>
