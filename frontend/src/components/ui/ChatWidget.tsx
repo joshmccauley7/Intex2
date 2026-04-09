@@ -399,7 +399,7 @@ export default function ChatWidget() {
         onClick={() => setIsOpen(prev => !prev)}
         aria-label="Open AI Helper"
         className={[
-          'fixed bottom-5 left-5 z-50',
+          'fixed bottom-5 left-5 z-[200]',
           'flex items-center gap-1.5 rounded-full px-3.5 py-2 shadow-lg',
           'bg-safira-blue text-white',
           'hover:bg-safira-blue-dark active:scale-95 transition-all duration-150',
@@ -413,7 +413,7 @@ export default function ChatWidget() {
       {/* ── Chat panel ──────────────────────────────────────────────────── */}
       {isOpen && (
       <div
-        className="fixed z-50 flex flex-col rounded-2xl shadow-2xl border bg-[var(--page-bg)] border-slate-200 dark:border-slate-700"
+        className="fixed z-[200] flex flex-col rounded-2xl shadow-2xl border bg-[var(--page-bg)] border-slate-200 dark:border-slate-700"
         style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
         onPointerMove={onPanelPointerMove}
         onPointerUp={onPanelPointerUp}

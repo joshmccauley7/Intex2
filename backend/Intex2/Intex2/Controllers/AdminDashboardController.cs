@@ -14,6 +14,9 @@ public class AdminDashboardController : ControllerBase
         _db = db;
     }
 
+    private static string N(string? raw) =>
+        (raw ?? "Unknown").Replace("Lighthouse", "Safira", StringComparison.OrdinalIgnoreCase);
+
     // ── Detail endpoint ───────────────────────────────────────────────────────
 
     [HttpGet("detail")]
@@ -357,13 +360,14 @@ public class AdminDashboardController : ControllerBase
                 var newAdmInPeriod = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.DateOfAdmission >= periodStart);
 
                 // By safe house bar chart
-                var bySafehouse = await _db.Residents
+                var bySafehouseRaw = await _db.Residents
                     .Where(r => r.CaseStatus == "Active")
                     .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, s) => s.Name)
                     .GroupBy(name => name)
                     .Select(g => new { name = g.Key ?? "Unknown", value = g.Count() })
                     .OrderByDescending(x => x.value)
                     .ToListAsync();
+                var bySafehouse = bySafehouseRaw.Select(x => new { name = N(x.name), x.value }).ToList();
 
                 // Risk distribution pie
                 var riskSeries = new[]
@@ -382,7 +386,7 @@ public class AdminDashboardController : ControllerBase
                         (r, s) => new {
                             ResidentId   = r.ResidentId,
                             r.InternalCode,
-                            Safehouse    = s.Name,
+                            Safehouse    = N(s.Name),
                             r.CurrentRiskLevel,
                             r.CaseStatus,
                             r.DateOfAdmission,
@@ -568,7 +572,7 @@ public class AdminDashboardController : ControllerBase
                 var residentHouseMap = await _db.Residents
                     .Where(r => r.SafehouseId != null)
                     .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId,
-                          (r, s) => new { r.ResidentId, HouseName = s.Name ?? "Unknown" })
+                          (r, s) => new { r.ResidentId, HouseName = N(s.Name) })
                     .ToListAsync();
 
                 var healthBySafehouseRaw = healthScoresByResident
@@ -608,7 +612,7 @@ public class AdminDashboardController : ControllerBase
                     .ToListAsync();
 
                 var shLookup = await _db.Safehouses
-                    .ToDictionaryAsync(s => s.SafehouseId, s => s.Name ?? "Unknown");
+                    .ToDictionaryAsync(s => s.SafehouseId, s => N(s.Name));
 
                 var items = rawHealthItems.Select(h => new {
                     h.ResidentId, h.ResidentCode, h.RecordDate,
@@ -789,13 +793,14 @@ public class AdminDashboardController : ControllerBase
                     new { name = "Low",    value = lowCount,  color = "#16a34a" },
                 };
 
-                var bySafehouse = await _db.Residents
+                var bySafehouseRaw2 = await _db.Residents
                     .Where(r => r.CaseStatus == "Active")
                     .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, s) => s.Name)
                     .GroupBy(name => name)
                     .Select(g => new { name = g.Key ?? "Unknown", value = g.Count() })
                     .OrderByDescending(x => x.value)
                     .ToListAsync();
+                var bySafehouse = bySafehouseRaw2.Select(x => new { name = N(x.name), x.value }).ToList();
 
                 var items = await _db.Residents
                     .Where(r => r.CaseStatus == "Active")
@@ -803,7 +808,7 @@ public class AdminDashboardController : ControllerBase
                     .ThenBy(r => r.InternalCode)
                     .Skip(skip).Take(pageSize)
                     .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId,
-                        (r, s) => new { ResidentId = r.ResidentId, r.InternalCode, Safehouse = s.Name, RiskLevel = r.CurrentRiskLevel, r.CaseStatus })
+                        (r, s) => new { ResidentId = r.ResidentId, r.InternalCode, Safehouse = N(s.Name), RiskLevel = r.CurrentRiskLevel, r.CaseStatus })
                     .ToListAsync();
 
                 var kpis = new object[]
@@ -848,13 +853,14 @@ public class AdminDashboardController : ControllerBase
                 };
 
                 // By safe house distribution
-                var bySafehouse = await _db.Residents
+                var bySafehouseRaw3 = await _db.Residents
                     .Where(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == level)
                     .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, s) => s.Name)
                     .GroupBy(name => name)
                     .Select(g => new { name = g.Key ?? "Unknown", value = g.Count() })
                     .OrderByDescending(x => x.value)
                     .ToListAsync();
+                var bySafehouse = bySafehouseRaw3.Select(x => new { name = N(x.name), x.value }).ToList();
 
                 var sharePct = allActive > 0 ? Math.Round(100.0 * total / allActive, 1) : 0.0;
 
@@ -863,7 +869,7 @@ public class AdminDashboardController : ControllerBase
                     .OrderBy(r => r.InternalCode)
                     .Skip(skip).Take(pageSize)
                     .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId,
-                        (r, s) => new { ResidentId = r.ResidentId, r.InternalCode, Safehouse = s.Name, r.CurrentRiskLevel, r.CaseStatus })
+                        (r, s) => new { ResidentId = r.ResidentId, r.InternalCode, Safehouse = N(s.Name), r.CurrentRiskLevel, r.CaseStatus })
                     .ToListAsync();
 
                 var kpis = new object[]
