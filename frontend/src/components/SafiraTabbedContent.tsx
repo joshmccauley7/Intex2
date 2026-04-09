@@ -13,6 +13,7 @@ const sectionByLang: Record<HomeLang, {
   accent: string
   heading: string
   body: string
+  cta?: { text: string; href: string }
 }[]> = {
   en: [
   {
@@ -46,6 +47,7 @@ const sectionByLang: Record<HomeLang, {
     accent: "#dc2626",
     heading: "Your gift changes a life.",
     body: "Every donation to Safira goes directly toward shelter, meals, education, and care for the girls we serve. We believe donors deserve full transparency — that's why our platform gives you access to your giving history, real impact data, and the stories behind the numbers.",
+    cta: { text: "Donate Now", href: "/donate" },
   },
   ],
   pt: [
@@ -80,6 +82,7 @@ const sectionByLang: Record<HomeLang, {
       accent: "#dc2626",
       heading: "Sua doacao muda uma vida.",
       body: "Cada doacao para a Safira vai diretamente para abrigo, alimentacao, educacao e cuidado das meninas atendidas.",
+      cta: { text: "Doar agora", href: "/donate" },
     },
   ],
   fil: [
@@ -114,11 +117,12 @@ const sectionByLang: Record<HomeLang, {
       accent: "#dc2626",
       heading: "Ang iyong tulong ay nagbabago ng buhay.",
       body: "Bawat donasyon sa Safira ay direktang napupunta sa tirahan, pagkain, edukasyon, at pangangalaga para sa mga batang aming sinusuportahan.",
+      cta: { text: "Mag-donate ngayon", href: "/donate" },
     },
   ],
 };
 
-function SectionCard({ label, image, imageAlt, accent, heading, body }: (typeof sectionByLang)["en"][0]) {
+function SectionCard({ label, image, imageAlt, accent, heading, body, cta }: (typeof sectionByLang)["en"][0]) {
   const [hovered, setHovered] = useState(false);
 
   return (
@@ -218,6 +222,30 @@ function SectionCard({ label, image, imageAlt, accent, heading, body }: (typeof 
         >
           {body}
         </p>
+        {cta && (
+          <a
+            href={cta.href}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              marginTop: "1.25rem",
+              padding: "0.75rem 1.5rem",
+              borderRadius: "8px",
+              background: "#2563eb",
+              color: "#fff",
+              fontFamily: "'Sora', 'DM Sans', sans-serif",
+              fontSize: "0.875rem",
+              fontWeight: "600",
+              textDecoration: "none",
+              transition: "background 0.15s",
+              boxShadow: "0 1px 4px rgba(0,0,0,0.15)",
+            }}
+            onMouseEnter={e => (e.currentTarget.style.background = "#1d4ed8")}
+            onMouseLeave={e => (e.currentTarget.style.background = "#2563eb")}
+          >
+            {cta.text}
+          </a>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
-import { useState, useRef, useEffect } from 'react';
-import type { FormEvent } from 'react';
+import { useState, useRef, useEffect, Fragment } from 'react';
+import type { FormEvent, ReactNode } from 'react';
 import { MessageSquare, X, Send, Loader2, Bot, ChevronLeft, Pencil } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../api';
@@ -121,6 +121,80 @@ const CATEGORY_PROMPTS: Record<'resident' | 'donor' | 'social', Prompt[]> = {
     },
   ],
 };
+
+// ─── Simple markdown renderer ─────────────────────────────────────────────────
+// Handles **bold**, bullet lines (• or -), and blank-line paragraph breaks.
+
+function renderMarkdown(text: string): ReactNode {
+  const paragraphs = text.split(/\n{2,}/);          // split on blank lines
+
+  return paragraphs.map((para, pi) => {
+    const lines = para.split('\n');
+    const isList = lines.every(l => /^[•\-\*] /.test(l.trim()) || l.trim() === '');
+
+    if (isList) {
+      return (
+        <ul key={pi} className="list-none space-y-1 my-1">
+          {lines.filter(l => l.trim()).map((line, li) => (
+            <li key={li} className="flex gap-1.5">
+              <span className="shrink-0 mt-0.5">•</span>
+              <span>{inlineBold(line.replace(/^[•\-\*]\s*/, ''))}</span>
+            </li>
+          ))}
+        </ul>
+      );
+    }
+
+    return (
+      <p key={pi} className={pi > 0 ? 'mt-2' : ''}>
+        {lines.map((line, li) => (
+          <Fragment key={li}>
+            {inlineBold(line)}
+            {li < lines.length - 1 && <br />}
+          </Fragment>
+        ))}
+      </p>
+    );
+  });
+}
+
+/** Convert **text** to <strong> inline */
+function inlineBold(text: string): ReactNode {
+  const parts = text.split(/\*\*(.*?)\*\*/g);
+  return parts.map((part, i) =>
+    i % 2 === 1 ? <strong key={i} className="font-semibold">{part}</strong> : part
+  );
+}
+
+// ─── Collapsible long responses ──────────────────────────────────────────────
+// Responses longer than this many characters get a "Show more" button.
+const COLLAPSE_THRESHOLD = 600;
+
+function CollapsibleMessage({ content }: { content: string }) {
+  const [expanded, setExpanded] = useState(false);
+  const isLong = content.length > COLLAPSE_THRESHOLD;
+
+  if (!isLong) {
+    return <>{renderMarkdown(content)}</>;
+  }
+
+  return (
+    <div>
+      <div className={`relative${expanded ? '' : ' max-h-48 overflow-hidden'}`}>
+        {renderMarkdown(content)}
+        {!expanded && (
+          <div className="absolute bottom-0 inset-x-0 h-14 bg-gradient-to-t from-slate-100 dark:from-slate-800 to-transparent pointer-events-none" />
+        )}
+      </div>
+      <button
+        onClick={() => setExpanded(e => !e)}
+        className="mt-2 text-xs font-semibold text-safira-blue hover:text-safira-blue-dark transition-colors"
+      >
+        {expanded ? '↑ Show less' : '↓ Show more'}
+      </button>
+    </div>
+  );
+}
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
@@ -325,13 +399,15 @@ export default function ChatWidget() {
                 <div key={i} className={['flex', msg.role === 'user' ? 'justify-end' : 'justify-start'].join(' ')}>
                   <div
                     className={[
-                      'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed whitespace-pre-wrap',
+                      'max-w-[85%] rounded-2xl px-3.5 py-2.5 text-sm leading-relaxed',
                       msg.role === 'user'
-                        ? 'bg-safira-blue text-white rounded-br-sm'
+                        ? 'bg-safira-blue text-white rounded-br-sm whitespace-pre-wrap'
                         : 'bg-slate-100 dark:bg-slate-800 text-[var(--page-fg)] rounded-bl-sm',
                     ].join(' ')}
                   >
-                    {msg.content}
+                    {msg.role === 'user'
+                      ? msg.content
+                      : <CollapsibleMessage content={msg.content} />}
                   </div>
                 </div>
               ))}

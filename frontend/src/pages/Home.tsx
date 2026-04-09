@@ -562,7 +562,15 @@ export default function HomePage() {
       <SafiraTabbedContent homeLang={lang} />
 
       {/* ── FAQ ── */}
-      <div style={{ background: '#f7f3ec' }}>
+      <div className="flex justify-center">
+        <hr style={{
+          width: '50%',
+          border: 'none',
+          borderTop: '1px solid #c9c2b4',
+          margin: '0',
+        }} />
+      </div>
+      <div style={{ background: '#ffffff' }}>
         <FAQAccordion copy={copy} />
       </div>
 

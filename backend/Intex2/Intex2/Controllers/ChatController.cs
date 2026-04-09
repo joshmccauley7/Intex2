@@ -69,7 +69,16 @@ public class ChatController : ControllerBase
                 ? await GatherDomainContext(key, request.Message)
                 : await GatherContext(request.Message);
 
-            var systemPrompt = BuildSystemPrompt(contextData);
+            // Pass date range hint to system prompt when the user asked about a specific period
+            string? dateRangeNote = null;
+            if (key == null)
+            {
+                var (drFrom, drTo) = ParseDateRange(request.Message);
+                if (drFrom.HasValue)
+                    dateRangeNote = $"{drFrom:MMMM d, yyyy} – {(drTo ?? DateOnly.FromDateTime(DateTime.UtcNow)):MMMM d, yyyy}";
+            }
+
+            var systemPrompt = BuildSystemPrompt(contextData, dateRangeNote);
             var response = await CallClaude(systemPrompt, request.Message, request.History);
             return Ok(new { response });
         }
@@ -385,6 +394,12 @@ public class ChatController : ControllerBase
         var lower = message.ToLowerInvariant();
         var parts = new List<string>();
 
+        // ── Extract date range from the user's question ───────────────────────
+        // Handles: "last September 2025", "this month", "Q3 2025", "last year", etc.
+        var (dateFrom, dateTo) = ParseDateRange(message);
+        var hasDateFilter      = dateFrom.HasValue || dateTo.HasValue;
+        var effectiveTo        = dateTo ?? DateOnly.FromDateTime(DateTime.UtcNow);
+
         // ── Specific resident lookup (e.g. "LS-0002", "resident #5", "ID 12") ──
         // Check for a case control number pattern like LS-0002 or SH-0010
         var caseCodeMatch = Regex.Match(message, @"\b([A-Z]{2,4}-\d{3,6})\b", RegexOptions.IgnoreCase);
@@ -435,7 +450,12 @@ public class ChatController : ControllerBase
             if (!caseCodeMatch.Success && !idMatch.Success &&
                 !lower.Contains("30") && !lower.Contains("transition") &&
                 !lower.Contains("falling through") && !lower.Contains("attention"))
-                parts.Add(await GetResidentSummary());
+            {
+                if (hasDateFilter)
+                    parts.Add(await GetResidentsByDateRange(dateFrom!.Value, effectiveTo));
+                else
+                    parts.Add(await GetResidentSummary());
+            }
         }
 
         // Lapsed donor queries
@@ -528,7 +548,10 @@ public class ChatController : ControllerBase
             lower.Contains("amount") || lower.Contains("recurring") ||
             lower.Contains("campaign"))
         {
-            parts.Add(await GetDonationSummary());
+            if (hasDateFilter)
+                parts.Add(await GetDonationsByDateRange(dateFrom!.Value, effectiveTo));
+            else
+                parts.Add(await GetDonationSummary());
         }
 
         // Safehouse / facility queries
@@ -546,7 +569,10 @@ public class ChatController : ControllerBase
             lower.Contains("caption") || lower.Contains("calendar") ||
             lower.Contains("tone") || lower.Contains("trauma-informed"))
         {
-            parts.Add(await GetSocialMediaContext());
+            if (hasDateFilter)
+                parts.Add(await GetSocialMediaByDateRange(dateFrom!.Value, effectiveTo));
+            else
+                parts.Add(await GetSocialMediaContext());
         }
 
         // Home visitation queries
@@ -564,12 +590,17 @@ public class ChatController : ControllerBase
 
                 if (specificResident != null)
                     parts.Add(await GetResidentVisitations(specificResident.ResidentId));
+                else if (hasDateFilter)
+                    parts.Add(await GetVisitationsByDateRange(dateFrom!.Value, effectiveTo));
                 else
                     parts.Add(await GetVisitationSummary());
             }
             else
             {
-                parts.Add(await GetVisitationSummary());
+                if (hasDateFilter)
+                    parts.Add(await GetVisitationsByDateRange(dateFrom!.Value, effectiveTo));
+                else
+                    parts.Add(await GetVisitationSummary());
             }
         }
 
@@ -581,7 +612,21 @@ public class ChatController : ControllerBase
             lower.Contains("update") || lower.Contains("today") ||
             lower.Contains("board") || lower.Contains("quarter"))
         {
-            parts.Add(await GetGeneralOverview());
+            if (hasDateFilter && parts.Count == 0)
+            {
+                // Date range given but no specific entity matched — pull a broad
+                // date-filtered cross-table snapshot.
+                parts.Add(await GetResidentsByDateRange(dateFrom!.Value, effectiveTo));
+                parts.Add(await GetDonationsByDateRange(dateFrom!.Value, effectiveTo));
+                parts.Add(await GetVisitationsByDateRange(dateFrom!.Value, effectiveTo));
+            }
+            else if (!hasDateFilter)
+            {
+                // No date filter — use the standard general overview
+                parts.Add(await GetGeneralOverview());
+            }
+            // If hasDateFilter && parts.Count > 0, the relevant date-filtered data
+            // was already added above — don't mix in the non-filtered overview.
         }
 
         return string.Join("\n\n", parts);
@@ -1592,10 +1637,318 @@ public class ChatController : ControllerBase
         return sb.ToString();
     }
 
+    // ─── Date range parsing ───────────────────────────────────────────────────
+    // Extracts a DateOnly range from natural language: "last September",
+    // "this month", "Q3 2025", "September 2025", "last year", etc.
+    // Returns (null, null) when no date expression is found.
+
+    private static (DateOnly? from, DateOnly? to) ParseDateRange(string message)
+    {
+        var lower = message.ToLowerInvariant();
+        var now   = DateTime.UtcNow;
+        var today = DateOnly.FromDateTime(now);
+
+        if (Regex.IsMatch(lower, @"\bthis month\b"))
+            return (new DateOnly(today.Year, today.Month, 1), today);
+
+        if (Regex.IsMatch(lower, @"\blast month\b"))
+        {
+            var lm = today.AddMonths(-1);
+            return (new DateOnly(lm.Year, lm.Month, 1),
+                    new DateOnly(lm.Year, lm.Month, DateTime.DaysInMonth(lm.Year, lm.Month)));
+        }
+
+        if (Regex.IsMatch(lower, @"\bthis year\b|\bcurrent year\b"))
+            return (new DateOnly(today.Year, 1, 1), today);
+
+        if (Regex.IsMatch(lower, @"\blast year\b"))
+            return (new DateOnly(today.Year - 1, 1, 1), new DateOnly(today.Year - 1, 12, 31));
+
+        if (Regex.IsMatch(lower, @"\blast week\b"))
+        {
+            var wStart = today.AddDays(-(int)now.DayOfWeek - 7);
+            return (wStart, wStart.AddDays(6));
+        }
+
+        if (Regex.IsMatch(lower, @"\bthis week\b"))
+            return (today.AddDays(-(int)now.DayOfWeek), today);
+
+        // "Q3 2025" / "Q1 of 2024"
+        var qMatch = Regex.Match(lower, @"\bq([1-4])\s*(?:of\s*|,?\s*)?(\d{4})?\b");
+        if (qMatch.Success)
+        {
+            var q  = int.Parse(qMatch.Groups[1].Value);
+            var yr = qMatch.Groups[2].Success ? int.Parse(qMatch.Groups[2].Value) : today.Year;
+            var sm = (q - 1) * 3 + 1;
+            var em = sm + 2;
+            return (new DateOnly(yr, sm, 1), new DateOnly(yr, em, DateTime.DaysInMonth(yr, em)));
+        }
+
+        // Month name dictionary
+        var monthMap = new Dictionary<string, int>
+        {
+            ["january"]=1,["february"]=2,["march"]=3,["april"]=4,["may"]=5,["june"]=6,
+            ["july"]=7,["august"]=8,["september"]=9,["october"]=10,["november"]=11,["december"]=12,
+            ["jan"]=1,["feb"]=2,["mar"]=3,["apr"]=4,["jun"]=6,["jul"]=7,["aug"]=8,
+            ["sep"]=9,["sept"]=9,["oct"]=10,["nov"]=11,["dec"]=12
+        };
+        const string Mp = @"january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|jun|jul|aug|sep|sept|oct|nov|dec";
+
+        // "September 2025" / "sep 2025"
+        var myMatch = Regex.Match(lower, $@"\b({Mp})\s+(\d{{4}})\b");
+        if (myMatch.Success && monthMap.TryGetValue(myMatch.Groups[1].Value, out var m1))
+        {
+            var yr = int.Parse(myMatch.Groups[2].Value);
+            return (new DateOnly(yr, m1, 1), new DateOnly(yr, m1, DateTime.DaysInMonth(yr, m1)));
+        }
+
+        // "last September" (no year — pick most recent past occurrence)
+        var lmMatch = Regex.Match(lower, $@"\blast\s+({Mp})\b");
+        if (lmMatch.Success && monthMap.TryGetValue(lmMatch.Groups[1].Value, out var m2))
+        {
+            var yr = today.Month > m2 ? today.Year : today.Year - 1;
+            return (new DateOnly(yr, m2, 1), new DateOnly(yr, m2, DateTime.DaysInMonth(yr, m2)));
+        }
+
+        // "in September" / "during September"
+        var inMatch = Regex.Match(lower, $@"\b(?:in|during)\s+({Mp})\b");
+        if (inMatch.Success && monthMap.TryGetValue(inMatch.Groups[1].Value, out var m3))
+        {
+            var yr = today.Month >= m3 ? today.Year : today.Year - 1;
+            return (new DateOnly(yr, m3, 1), new DateOnly(yr, m3, DateTime.DaysInMonth(yr, m3)));
+        }
+
+        return (null, null);
+    }
+
+    // ── Residents who were present (active at the safehouse) during a date range ─
+    // A resident was "present" in a period if:
+    //   DateOfAdmission <= periodEnd  AND  (DateClosed >= periodStart OR DateClosed is null)
+    // This correctly handles: residents admitted before the period who were still there,
+    // residents admitted during the period, and residents who left during the period.
+    private async Task<string> GetResidentsByDateRange(DateOnly from, DateOnly to)
+    {
+        // Pull residents present during the period
+        var residents = await _db.Residents
+            .Where(r =>
+                r.DateOfAdmission != null &&
+                r.DateOfAdmission <= to &&
+                (r.DateClosed == null || r.DateClosed >= from))
+            .OrderBy(r => r.DateOfAdmission)
+            .Select(r => new
+            {
+                r.CaseControlNo, r.InternalCode, r.ResidentId,
+                r.DateOfAdmission, r.DateClosed, r.CaseStatus,
+                r.ReintegrationStatus, r.AssignedSocialWorker, r.CaseCategory
+            })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"=== RESIDENTS PRESENT: {from:MMMM d, yyyy} – {to:MMMM d, yyyy} ===");
+        sb.AppendLine($"Total residents present during this period: {residents.Count}");
+
+        if (!residents.Any())
+        {
+            sb.AppendLine("No residents were on record during this period.");
+            var total = await _db.Residents.CountAsync();
+            sb.AppendLine($"(Total residents in the database across all time: {total})");
+        }
+        else
+        {
+            // Bucket residents: admitted during period vs already present
+            var newAdmissions = residents.Where(r => r.DateOfAdmission >= from).ToList();
+            var alreadyPresent = residents.Where(r => r.DateOfAdmission < from).ToList();
+            var discharged = residents.Where(r => r.DateClosed.HasValue && r.DateClosed >= from && r.DateClosed <= to).ToList();
+
+            if (newAdmissions.Any())
+            {
+                sb.AppendLine($"\nNew admissions during this period ({newAdmissions.Count}):");
+                foreach (var r in newAdmissions)
+                {
+                    var label = r.CaseControlNo ?? r.InternalCode ?? $"Resident {r.ResidentId}";
+                    sb.AppendLine($"  - {label} | Admitted: {r.DateOfAdmission} | Status: {r.CaseStatus ?? "N/A"} | Category: {r.CaseCategory ?? "N/A"} | Worker: {r.AssignedSocialWorker ?? "N/A"}");
+                }
+            }
+
+            if (alreadyPresent.Any())
+            {
+                sb.AppendLine($"\nAlready in care at the start of this period ({alreadyPresent.Count}):");
+                foreach (var r in alreadyPresent)
+                {
+                    var label = r.CaseControlNo ?? r.InternalCode ?? $"Resident {r.ResidentId}";
+                    sb.AppendLine($"  - {label} | Admitted: {r.DateOfAdmission} | Status: {r.CaseStatus ?? "N/A"} | Reintegration: {r.ReintegrationStatus ?? "N/A"} | Worker: {r.AssignedSocialWorker ?? "N/A"}");
+                }
+            }
+
+            if (discharged.Any())
+            {
+                sb.AppendLine($"\nDischarged/closed during this period ({discharged.Count}):");
+                foreach (var r in discharged)
+                {
+                    var label = r.CaseControlNo ?? r.InternalCode ?? $"Resident {r.ResidentId}";
+                    sb.AppendLine($"  - {label} | Closed: {r.DateClosed} | Status: {r.CaseStatus ?? "N/A"} | Reintegration: {r.ReintegrationStatus ?? "N/A"}");
+                }
+            }
+
+            // Also pull activity records (visits, sessions, conferences) during this period
+            var residentIds = residents.Select(r => r.ResidentId).ToList();
+
+            var visits = await _db.HomeVisitations
+                .Where(v => residentIds.Contains(v.ResidentId) && v.VisitDate >= from && v.VisitDate <= to)
+                .CountAsync();
+            var sessions = await _db.ProcessRecordings
+                .Where(p => residentIds.Contains(p.ResidentId) && p.SessionDate >= from && p.SessionDate <= to)
+                .CountAsync();
+            var conferences = await _db.CaseConferences
+                .Where(c => residentIds.Contains(c.ResidentId) && c.ConferenceDate >= from && c.ConferenceDate <= to)
+                .CountAsync();
+            var concerns = await _db.HomeVisitations
+                .CountAsync(v => residentIds.Contains(v.ResidentId) && v.VisitDate >= from && v.VisitDate <= to && v.SafetyConcernsNoted == true);
+
+            sb.AppendLine($"\nActivity during this period:");
+            sb.AppendLine($"  Home visits: {visits}");
+            sb.AppendLine($"  Counselling sessions: {sessions}");
+            sb.AppendLine($"  Case conferences: {conferences}");
+            sb.AppendLine($"  Safety concerns flagged: {concerns}");
+        }
+        return sb.ToString();
+    }
+
+    // ── Donations within a specific date range ────────────────────────────────
+    private async Task<string> GetDonationsByDateRange(DateOnly from, DateOnly to)
+    {
+        var donations = await _db.Donations
+            .Include(d => d.Supporter)
+            .Where(d => d.DonationDate >= from && d.DonationDate <= to)
+            .OrderBy(d => d.DonationDate)
+            .Select(d => new
+            {
+                d.Supporter.DisplayName, d.Amount, d.DonationDate, d.DonationType, d.IsRecurring
+            })
+            .ToListAsync();
+
+        var totalAmount = donations.Where(d => d.Amount.HasValue).Sum(d => d.Amount!.Value);
+        var sb = new StringBuilder();
+        sb.AppendLine($"=== DONATIONS: {from:MMMM d, yyyy} – {to:MMMM d, yyyy} ===");
+        sb.AppendLine($"Total donations in this period: {donations.Count}");
+        sb.AppendLine($"Total cash raised: ${totalAmount:N2}");
+
+        if (!donations.Any())
+        {
+            sb.AppendLine("No donations were recorded during this period.");
+        }
+        else
+        {
+            var byType = donations.GroupBy(d => d.DonationType)
+                                  .Select(g => $"{g.Key ?? "Unknown"}: {g.Count()}");
+            sb.AppendLine($"By type: {string.Join(", ", byType)}");
+            sb.AppendLine("Donations:");
+            foreach (var d in donations.Take(30))
+            {
+                var amount    = d.Amount.HasValue ? $"${d.Amount:N2}" : "In-kind";
+                var recurring = d.IsRecurring ? " (recurring)" : "";
+                sb.AppendLine($"  - {d.DonationDate} | {d.DisplayName}: {amount} — {d.DonationType}{recurring}");
+            }
+            if (donations.Count > 30)
+                sb.AppendLine($"  ...and {donations.Count - 30} more donations.");
+        }
+        return sb.ToString();
+    }
+
+    // ── Home visitations within a specific date range ─────────────────────────
+    private async Task<string> GetVisitationsByDateRange(DateOnly from, DateOnly to)
+    {
+        var visits = await _db.HomeVisitations
+            .Where(v => v.VisitDate >= from && v.VisitDate <= to)
+            .OrderBy(v => v.VisitDate)
+            .Select(v => new
+            {
+                v.ResidentId, v.VisitDate, v.SocialWorker, v.VisitType,
+                v.VisitOutcome, v.SafetyConcernsNoted, v.FollowUpNeeded,
+                v.FollowUpNotes, v.Observations
+            })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"=== HOME VISITATIONS: {from:MMMM d, yyyy} – {to:MMMM d, yyyy} ===");
+        sb.AppendLine($"Total visitations in this period: {visits.Count}");
+
+        if (!visits.Any())
+        {
+            sb.AppendLine("No home visitations were recorded during this period.");
+        }
+        else
+        {
+            sb.AppendLine($"Safety concerns flagged: {visits.Count(v => v.SafetyConcernsNoted == true)}");
+            sb.AppendLine($"Follow-ups required: {visits.Count(v => v.FollowUpNeeded == true)}");
+            sb.AppendLine("Visits:");
+            foreach (var v in visits.Take(20))
+            {
+                var flags = new List<string>();
+                if (v.SafetyConcernsNoted == true) flags.Add("⚠ Safety concern");
+                if (v.FollowUpNeeded == true) flags.Add("Follow-up needed");
+                var flagStr = flags.Any() ? $" | {string.Join(", ", flags)}" : "";
+                sb.AppendLine($"  - {v.VisitDate} | Resident ID {v.ResidentId} | {v.VisitType ?? "N/A"} | Worker: {v.SocialWorker ?? "N/A"} | Outcome: {v.VisitOutcome ?? "N/A"}{flagStr}");
+                if (!string.IsNullOrWhiteSpace(v.Observations))
+                    sb.AppendLine($"    Observations: {v.Observations}");
+            }
+            if (visits.Count > 20) sb.AppendLine($"  ...and {visits.Count - 20} more visits.");
+        }
+        return sb.ToString();
+    }
+
+    // ── Social media posts within a specific date range ───────────────────────
+    private async Task<string> GetSocialMediaByDateRange(DateOnly from, DateOnly to)
+    {
+        var fromDt = from.ToDateTime(TimeOnly.MinValue);
+        var toDt   = to.ToDateTime(TimeOnly.MaxValue);
+
+        var posts = await _db.SocialMediaPosts
+            .Where(p => p.CreatedAt >= fromDt && p.CreatedAt <= toDt)
+            .OrderByDescending(p => p.EngagementRate)
+            .Select(p => new
+            {
+                p.Platform, p.PostType, p.ContentTopic,
+                p.EngagementRate, p.Likes, p.Shares, p.Reach,
+                p.SentimentTone, p.CreatedAt, p.Caption
+            })
+            .ToListAsync();
+
+        var sb = new StringBuilder();
+        sb.AppendLine($"=== SOCIAL MEDIA POSTS: {from:MMMM d, yyyy} – {to:MMMM d, yyyy} ===");
+        sb.AppendLine($"Total posts in this period: {posts.Count}");
+
+        if (!posts.Any())
+        {
+            sb.AppendLine("No social media posts were recorded during this period.");
+        }
+        else
+        {
+            var avgEng = posts.Average(p => p.EngagementRate);
+            var totalReach = posts.Sum(p => p.Reach ?? 0);
+            sb.AppendLine($"Average engagement rate: {avgEng:P1} | Total reach: {totalReach:N0}");
+            var byPlatform = posts.GroupBy(p => p.Platform).Select(g => $"{g.Key}: {g.Count()}");
+            sb.AppendLine($"By platform: {string.Join(", ", byPlatform)}");
+            sb.AppendLine("Posts (sorted by engagement):");
+            foreach (var p in posts.Take(10))
+            {
+                sb.AppendLine($"  - {p.CreatedAt:MMM d, yyyy} | {p.Platform} | {p.PostType} | Topic: {p.ContentTopic ?? "N/A"} | Engagement: {p.EngagementRate:P1} | Reach: {p.Reach:N0} | Tone: {p.SentimentTone ?? "N/A"}");
+                if (!string.IsNullOrWhiteSpace(p.Caption))
+                    sb.AppendLine($"    \"{p.Caption[..Math.Min(100, p.Caption.Length)]}\"");
+            }
+            if (posts.Count > 10) sb.AppendLine($"  ...and {posts.Count - 10} more posts.");
+        }
+        return sb.ToString();
+    }
+
     // ─── Prompt construction ──────────────────────────────────────────────────
 
-    private static string BuildSystemPrompt(string contextData)
+    private static string BuildSystemPrompt(string contextData, string? dateRangeNote = null)
     {
+        var dateNote = dateRangeNote != null
+            ? $"\n            NOTE: The admin asked about a specific time period ({dateRangeNote}). The data below is already filtered to that range."
+            : string.Empty;
+
         return $"""
             You are a helpful, compassionate AI assistant for the administrators of a nonprofit
             organization that supports survivors of abuse and vulnerable children.
@@ -1608,7 +1961,9 @@ public class ChatController : ControllerBase
             - Protect participant privacy — never reconstruct or guess individuals' identities.
             - When relevant, suggest practical next steps the admin could take.
             - If the data doesn't answer the question, say so clearly.
-            - Today's date: {DateTime.UtcNow:MMMM d, yyyy}
+            - When giving lists of people, SUMMARIZE rather than listing every individual when there are more than 5.
+              Group by status, flag the highest priority cases, and offer totals rather than exhaustive lists.
+            - Today's date: {DateTime.UtcNow:MMMM d, yyyy}{dateNote}
 
             LIVE DATABASE SNAPSHOT:
             {contextData}
