@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api'
-import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users, ChevronDown, X, Info, Home, ShieldAlert, CheckCircle } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, ChevronDown, X, ShieldAlert, CheckCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 interface ResidentRow {
@@ -939,17 +939,6 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     )
   }
 
-  // ── Stat block helper (for Adoption — volume as big numbers) ────────────────
-  function StatBlock({ label, value, sub }: { label: string; value: string | number; sub: string }) {
-    return (
-      <div>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{label}</p>
-        <p className="text-2xl font-bold text-[#0f172a]">{value}</p>
-        <p className="text-xs text-slate-400">{sub}</p>
-      </div>
-    )
-  }
-
   // ── Per-type indicators ─────────────────────────────────────────────────────
   const isActive = resident.caseStatus === 'Active'
   function renderIndicators() {
@@ -1444,13 +1433,6 @@ const RISK_COLOR: Record<string, string> = {
   High: 'bg-orange-100 text-orange-700 border-orange-200',
   Medium: 'bg-yellow-100 text-yellow-700 border-yellow-200',
   Low: 'bg-green-100 text-green-700 border-green-200',
-}
-
-const RISK_BG: Record<string, string> = {
-  Critical: 'bg-red-500',
-  High: 'bg-orange-400',
-  Medium: 'bg-yellow-400',
-  Low: 'bg-green-500',
 }
 
 function RiskJourney({ initial, current }: { initial: string | null; current: string | null }) {
