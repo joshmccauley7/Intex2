@@ -353,59 +353,64 @@ public class AdminDashboardController : ControllerBase
             // ── Active Residents ──────────────────────────────────────────────
             case "residents":
             {
-                var periodStart  = periodStartGlobal;
-                var total        = await _db.Residents.CountAsync(r => r.CaseStatus == "Active");
-                var highRisk     = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "High");
-                var medRisk      = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.CurrentRiskLevel == "Medium");
-                var newAdmInPeriod = await _db.Residents.CountAsync(r => r.CaseStatus == "Active" && r.DateOfAdmission >= periodStart);
+                // Scope: all residents with a reintegration plan (excludes "None"/null type)
+                var withPlan   = _db.Residents.Where(r => r.ReintegrationType != null && r.ReintegrationType != "None");
+                var totalPlan  = await withPlan.CountAsync();
+                var completed  = await withPlan.CountAsync(r => r.ReintegrationStatus == "Completed");
+                var inProgress = await withPlan.CountAsync(r => r.ReintegrationStatus == "In Progress");
+                var onHold     = await withPlan.CountAsync(r => r.ReintegrationStatus == "On Hold");
+                var notStarted = await withPlan.CountAsync(r => r.ReintegrationStatus == "Not Started");
+                var successRate = totalPlan > 0 ? Math.Round(100.0 * completed / totalPlan, 1) : 0.0;
 
-                // By safe house bar chart
-                var bySafehouseRaw = await _db.Residents
-                    .Where(r => r.CaseStatus == "Active")
+                // Completions by safe house
+                var byHouseRaw = await withPlan
+                    .Where(r => r.ReintegrationStatus == "Completed")
                     .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, s) => s.Name)
                     .GroupBy(name => name)
                     .Select(g => new { name = g.Key ?? "Unknown", value = g.Count() })
                     .OrderByDescending(x => x.value)
                     .ToListAsync();
-                var bySafehouse = bySafehouseRaw.Select(x => new { name = N(x.name), x.value }).ToList();
+                var byHouse = byHouseRaw.Select(x => new { name = N(x.name), x.value }).ToList();
 
-                // Risk distribution pie
-                var riskSeries = new[]
+                // Reintegration status breakdown
+                var statusSeries = new[]
                 {
-                    new { name = "High",   value = highRisk,              color = "#dc2626" },
-                    new { name = "Medium", value = medRisk,               color = "#d97706" },
-                    new { name = "Low",    value = total - highRisk - medRisk, color = "#16a34a" },
+                    new { name = "Completed",   value = completed,  color = "#16a34a" },
+                    new { name = "In Progress", value = inProgress, color = "#2563eb" },
+                    new { name = "On Hold",     value = onHold,     color = "#d97706" },
+                    new { name = "Not Started", value = notStarted, color = "#94a3b8" },
                 };
 
-                var items = await _db.Residents
-                    .Where(r => r.CaseStatus == "Active")
-                    .OrderBy(r => r.CurrentRiskLevel == "High" ? 0 : r.CurrentRiskLevel == "Medium" ? 1 : 2)
+                var items = await withPlan
+                    .OrderBy(r => r.ReintegrationStatus == "Completed"   ? 0
+                               : r.ReintegrationStatus == "In Progress"  ? 1
+                               : r.ReintegrationStatus == "On Hold"      ? 2 : 3)
                     .ThenBy(r => r.InternalCode)
                     .Skip(skip).Take(pageSize)
                     .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId,
                         (r, s) => new {
-                            ResidentId   = r.ResidentId,
+                            ResidentId          = r.ResidentId,
                             r.InternalCode,
-                            Safehouse    = N(s.Name),
-                            r.CurrentRiskLevel,
-                            r.CaseStatus,
+                            Safehouse           = N(s.Name),
+                            r.ReintegrationType,
+                            r.ReintegrationStatus,
                             r.DateOfAdmission,
                         })
                     .ToListAsync();
 
                 var kpis = new object[]
                 {
-                    new { label = "Active Residents",             value = total.ToString("N0") },
-                    new { label = "High Risk",                    value = highRisk.ToString("N0") },
-                    new { label = "Medium Risk",                  value = medRisk.ToString("N0") },
-                    new { label = $"New Admissions ({periodLabel})", value = newAdmInPeriod.ToString("N0") },
+                    new { label = "Success Rate",  value = $"{successRate}%" },
+                    new { label = "Completed",     value = completed.ToString("N0") },
+                    new { label = "In Progress",   value = inProgress.ToString("N0") },
+                    new { label = "On Hold / Not Started", value = (onHold + notStarted).ToString("N0") },
                 };
                 var charts = new object[]
                 {
-                    new { id = "by-safehouse", type = "verticalBar", title = "Residents by Safe House", series = bySafehouse, primary = true, sort = "desc", showValueLabels = true, filterKey = "safehouse" },
-                    new { id = "risk-distrib", type = "stackedBar",  title = "Risk Distribution",        series = riskSeries,  compact = true, filterKey = "currentRiskLevel" },
+                    new { id = "by-safehouse",  type = "verticalBar", title = "Completions by Safe House", series = byHouse,      primary = true, sort = "desc", showValueLabels = true, filterKey = "safehouse" },
+                    new { id = "status-distrib", type = "stackedBar", title = "Status Breakdown",          series = statusSeries, compact = true, filterKey = "reintegrationStatus" },
                 };
-                return Ok(new { kpis, charts, items, totalCount = total });
+                return Ok(new { kpis, charts, items, totalCount = totalPlan });
             }
 
             // ── Active Safe Houses ────────────────────────────────────────────

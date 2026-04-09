@@ -97,13 +97,14 @@ interface SectionConfig {
 
 const MODAL_CONFIG: Record<string, SectionConfig> = {
   residents: {
-    title: 'Active Residents',
+    title: 'Reintegration Outcomes',
     linkTo: '/admin/residents', linkLabel: 'View all residents',
     columns: [
-      { key: 'internalCode',     label: 'Code' },
-      { key: 'safehouse',        label: 'Safe House' },
-      { key: 'currentRiskLevel', label: 'Risk' },
-      { key: 'dateOfAdmission',  label: 'Admitted' },
+      { key: 'internalCode',        label: 'Code' },
+      { key: 'safehouse',           label: 'Safe House' },
+      { key: 'reintegrationType',   label: 'Type' },
+      { key: 'reintegrationStatus', label: 'Status' },
+      { key: 'dateOfAdmission',     label: 'Admitted' },
     ],
   },
   safehouses: {
