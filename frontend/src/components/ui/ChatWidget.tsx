@@ -126,12 +126,65 @@ const CATEGORY_PROMPTS: Record<'resident' | 'donor' | 'social', Prompt[]> = {
 // Handles **bold**, bullet lines (• or -), and blank-line paragraph breaks.
 
 function renderMarkdown(text: string): ReactNode {
-  const paragraphs = text.split(/\n{2,}/);          // split on blank lines
+  const paragraphs = text.split(/\n{2,}/);
 
   return paragraphs.map((para, pi) => {
-    const lines = para.split('\n');
-    const isList = lines.every(l => /^[•\-\*] /.test(l.trim()) || l.trim() === '');
+    const lines = para.split('\n').filter((_, i, arr) =>
+      // keep separator lines only for table detection, strip them from output
+      true || i < arr.length
+    );
 
+    // ── Heading (## or ###) ──────────────────────────────────────────────────
+    const headingMatch = para.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const cls = level === 1
+        ? 'text-base font-bold mt-3 mb-1 text-[var(--page-fg)]'
+        : level === 2
+          ? 'text-sm font-bold mt-2 mb-0.5 text-[var(--page-fg)]'
+          : 'text-sm font-semibold mt-1 text-[var(--page-fg)]';
+      return <p key={pi} className={cls}>{inlineBold(headingMatch[2])}</p>;
+    }
+
+    // ── Markdown table ───────────────────────────────────────────────────────
+    const tableLines = lines.filter(l => l.trim().startsWith('|'));
+    if (tableLines.length >= 2) {
+      const parseRow = (row: string) =>
+        row.split('|').map(c => c.trim()).filter((_, i, a) => i > 0 && i < a.length - 1);
+      const isSeparator = (row: string) => /^\|[\s\-:|]+\|/.test(row);
+      const dataRows = tableLines.filter(l => !isSeparator(l));
+      const [header, ...body] = dataRows;
+      const headers = parseRow(header);
+      return (
+        <div key={pi} className="overflow-x-auto my-2 rounded-lg border border-slate-200 dark:border-slate-700">
+          <table className="text-xs w-full border-collapse">
+            <thead>
+              <tr className="bg-slate-100 dark:bg-slate-800">
+                {headers.map((h, i) => (
+                  <th key={i} className="px-2 py-1.5 text-left font-semibold text-[var(--page-fg)] border-b border-slate-200 dark:border-slate-700 whitespace-nowrap">
+                    {inlineBold(h)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {body.map((row, ri) => (
+                <tr key={ri} className={ri % 2 === 0 ? '' : 'bg-slate-50 dark:bg-slate-900/40'}>
+                  {parseRow(row).map((cell, ci) => (
+                    <td key={ci} className="px-2 py-1.5 text-[var(--page-fg)] border-b border-slate-100 dark:border-slate-800 last:border-b-0">
+                      {inlineBold(cell)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+    }
+
+    // ── Bullet list ──────────────────────────────────────────────────────────
+    const isList = lines.every(l => /^[•\-\*] /.test(l.trim()) || l.trim() === '');
     if (isList) {
       return (
         <ul key={pi} className="list-none space-y-1 my-1">
@@ -145,6 +198,7 @@ function renderMarkdown(text: string): ReactNode {
       );
     }
 
+    // ── Paragraph ────────────────────────────────────────────────────────────
     return (
       <p key={pi} className={pi > 0 ? 'mt-2' : ''}>
         {lines.map((line, li) => (
