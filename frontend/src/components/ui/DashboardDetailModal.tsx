@@ -81,6 +81,43 @@ const phpShort = new Intl.NumberFormat('en-PH', {
   style: 'currency', currency: 'PHP', notation: 'compact', maximumFractionDigits: 1,
 })
 
+// ── Shared custom tooltip ─────────────────────────────────────────────────────
+
+function ChartTooltip({ active, payload, label, chart, isPie }: {
+  active?: boolean
+  payload?: { value: number; name: string }[]
+  label?: string
+  chart: ChartData
+  isPie?: boolean
+}) {
+  if (!active || !payload?.length) return null
+  const raw = payload[0].value
+  const name = isPie ? payload[0].name : label
+  const isPhp = (chart.valuePrefix ?? '').includes('₱')
+  const formatted = isPhp
+    ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(raw)
+    : `${chart.valuePrefix ?? ''}${raw.toLocaleString()}${chart.valueSuffix ?? ''}`
+  return (
+    <div style={{
+      background: '#fff',
+      border: '1px solid #e2e8f0',
+      borderRadius: 8,
+      padding: '7px 11px',
+      boxShadow: '0 8px 24px rgba(0,0,0,0.12)',
+      fontSize: 12,
+      pointerEvents: 'none',
+      maxWidth: 240,
+    }}>
+      {name && (
+        <div style={{ fontWeight: 600, color: '#64748b', marginBottom: 3, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+          {name}
+        </div>
+      )}
+      <div style={{ fontWeight: 700, color: '#0f172a', fontSize: 15 }}>{formatted}</div>
+    </div>
+  )
+}
+
 // ── Chart panels ──────────────────────────────────────────────────────────────
 
 function PiePanel({ chart, isPrimary, onSliceClick, activeValue }: {
@@ -117,12 +154,7 @@ function PiePanel({ chart, isPrimary, onSliceClick, activeValue }: {
               />
             ))}
           </Pie>
-          <Tooltip
-            formatter={(value: number) => [
-              `${chart.valuePrefix ?? ''}${value.toLocaleString()}${chart.valueSuffix ?? ''}`,
-              '',
-            ]}
-          />
+          <Tooltip content={(props: any) => <ChartTooltip {...props} chart={chart} isPie />} />
           <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: chart.compact ? 10 : 11 }} />
         </PieChart>
       </ResponsiveContainer>
@@ -183,14 +215,7 @@ function BarPanel({ chart, isPrimary, onSliceClick, activeValue }: {
               name.length > 18 ? `${name.slice(0, 17)}…` : name
             }
           />
-          <Tooltip
-            formatter={(value: number) => [
-              isPhp
-                ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2 }).format(value)
-                : `${chart.valuePrefix ?? ''}${value.toLocaleString()}${chart.valueSuffix ?? ''}`,
-              '',
-            ]}
-          />
+          <Tooltip content={(props: any) => <ChartTooltip {...props} chart={chart} />} />
           {chart.xDomain && (
             <ReferenceLine x={chart.xDomain[1]} stroke="#e2e8f0" strokeDasharray="3 3" />
           )}
@@ -238,14 +263,7 @@ function LinePanel({ chart, isPrimary }: { chart: ChartData; isPrimary: boolean 
           <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
           <XAxis dataKey="name" tick={{ fontSize: 10 }} />
           <YAxis tick={{ fontSize: 10 }} tickFormatter={fmt} domain={domain} />
-          <Tooltip
-            formatter={(value: number) => [
-              isPhp
-                ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 0 }).format(value)
-                : `${chart.valuePrefix ?? ''}${value.toLocaleString()}${chart.valueSuffix ?? ''}`,
-              chart.title,
-            ]}
-          />
+          <Tooltip content={(props: any) => <ChartTooltip {...props} chart={chart} />} />
           <Line
             type="monotone"
             dataKey="value"
@@ -462,14 +480,7 @@ function VerticalBarPanel({ chart, isPrimary, onSliceClick, activeValue }: {
               label={{ value: `${chart.threshold}`, fill: '#d97706', fontSize: 9, position: 'right' }}
             />
           )}
-          <Tooltip
-            formatter={(value: number) => [
-              isPhp
-                ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP', minimumFractionDigits: 2 }).format(value)
-                : `${chart.valuePrefix ?? ''}${value.toLocaleString()}${chart.valueSuffix ?? ''}`,
-              '',
-            ]}
-          />
+          <Tooltip content={(props: any) => <ChartTooltip {...props} chart={chart} />} />
           <Bar
             dataKey="value"
             radius={[3, 3, 0, 0]}
@@ -757,7 +768,7 @@ export function DashboardDetailModal({
 
           {/* Charts */}
           {!loading && validCharts.length > 0 && (
-            <div className="px-6 pt-4 pb-4 border-b border-slate-100 flex flex-col gap-4">
+            <div className="px-6 pt-4 pb-4 border-b border-slate-100 flex flex-col gap-4 select-none">
               {/* Primary chart — full width (only when explicitly marked) */}
               {primaryChart && (
                 <ChartPanel key={`${primaryChart.id}-${period ?? 'all'}`} chart={primaryChart} isPrimary={true} onChartClick={handleChartClick} activeFilterKey={chartFilter?.key} activeFilterValue={chartFilter?.value} />

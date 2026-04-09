@@ -91,6 +91,7 @@ public class SupportersController : ControllerBase
                 x.s.SupporterType,
                 x.s.Status,
                 x.s.Region,
+                x.s.LastContactedAt,
                 x.p.RiskLevel,
                 x.p.ChurnProbability,
                 x.p.ScoredAt,
@@ -112,6 +113,7 @@ public class SupportersController : ControllerBase
                 x.SupporterType,
                 x.Status,
                 x.Region,
+                x.LastContactedAt,
                 x.RiskLevel,
                 x.ChurnProbability,
                 x.ScoredAt,
@@ -235,7 +237,15 @@ public class SupportersController : ControllerBase
         try
         {
             await _emailService.SendImpactRecapAsync(id);
-            return Ok(new { message = "Impact recap email sent." });
+
+            var supporter = await _db.Supporters.FindAsync(id);
+            if (supporter != null)
+            {
+                supporter.LastContactedAt = DateTime.UtcNow;
+                await _db.SaveChangesAsync();
+            }
+
+            return Ok(new { message = "Impact recap email sent.", lastContactedAt = DateTime.UtcNow });
         }
         catch (InvalidOperationException ex)
         {

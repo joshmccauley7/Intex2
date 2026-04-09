@@ -20,6 +20,7 @@ interface OutreachEntry {
   supporterType: string
   status: string
   region: string | null
+  lastContactedAt: string | null
   riskLevel: string
   churnProbability: number
   scoredAt: string | null
@@ -147,7 +148,6 @@ export default function DonorsPage() {
   const [queueError, setQueueError] = useState<string | null>(null)
   const [queueLoaded, setQueueLoaded] = useState(false)
   const [queueEmailSending, setQueueEmailSending] = useState<number | null>(null)
-  const [queueEmailSent, setQueueEmailSent] = useState<Set<number>>(new Set())
   const [queueEmailErrors, setQueueEmailErrors] = useState<Record<number, string>>({})
 
   const loadQueue = () => {
@@ -163,8 +163,9 @@ export default function DonorsPage() {
     setQueueEmailSending(id)
     setQueueEmailErrors((prev) => { const n = { ...prev }; delete n[id]; return n })
     try {
-      await apiFetch(`/api/supporters/${id}/send-impact-email`, { method: 'POST' })
-      setQueueEmailSent((prev) => new Set(prev).add(id))
+      const res = await apiFetch(`/api/supporters/${id}/send-impact-email`, { method: 'POST' }) as { lastContactedAt?: string }
+      const contactedAt = res?.lastContactedAt ?? new Date().toISOString()
+      setQueue((prev) => prev.map((e) => e.supporterId === id ? { ...e, lastContactedAt: contactedAt } : e))
     } catch (e: unknown) {
       const msg = e instanceof Error ? e.message : 'Failed to send'
       setQueueEmailErrors((prev) => ({ ...prev, [id]: msg }))
@@ -369,7 +370,7 @@ export default function DonorsPage() {
               <CheckCircle size={18} className="text-emerald-500 shrink-0" />
               <div>
                 <p className="text-xs text-slate-500 font-medium">Emailed</p>
-                <p className="text-xl font-bold text-[#0f172a]">{queueEmailSent.size}</p>
+                <p className="text-xl font-bold text-[#0f172a]">{queue.filter((e) => e.lastContactedAt && new Date(e.lastContactedAt).toDateString() === new Date().toDateString()).length}</p>
               </div>
             </div>
           </div>
@@ -387,12 +388,13 @@ export default function DonorsPage() {
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Days Since Last Gift</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Gifts</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Recurring</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Contacted</th>
                     <th className="px-4 py-3" />
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {queue.map((entry) => {
-                    const sent = queueEmailSent.has(entry.supporterId)
+                    const sent = !!entry.lastContactedAt && new Date(entry.lastContactedAt).toDateString() === new Date().toDateString()
                     const sending = queueEmailSending === entry.supporterId
                     const emailErr = queueEmailErrors[entry.supporterId]
                     return (
@@ -418,6 +420,11 @@ export default function DonorsPage() {
                             ? <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600"><RefreshCw size={11} /> Yes</span>
                             : <span className="text-xs text-slate-400">No</span>}
                         </td>
+                        <td className="px-4 py-3">
+                          {entry.lastContactedAt
+                            ? <span className="text-xs text-slate-600">{new Date(entry.lastContactedAt).toLocaleDateString()}</span>
+                            : <span className="text-xs text-slate-400">Never</span>}
+                        </td>
                         <td className="px-4 py-3 text-right">
                           <div className="flex flex-col items-end gap-1">
                             <button
@@ -436,7 +443,7 @@ export default function DonorsPage() {
                     )
                   })}
                   {queue.length === 0 && (
-                    <tr><td colSpan={6} className="px-4 py-10 text-center text-slate-400 text-sm">No donors in the outreach queue.</td></tr>
+                    <tr><td colSpan={7} className="px-4 py-10 text-center text-slate-400 text-sm">No donors in the outreach queue.</td></tr>
                   )}
                 </tbody>
               </table>

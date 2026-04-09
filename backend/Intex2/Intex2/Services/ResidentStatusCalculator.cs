@@ -27,11 +27,20 @@ public class ResidentStatusCalculator
         var idSet = residentIds.ToHashSet();
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
 
-        var riskLevels = await _db.Residents
+        var residentMeta = await _db.Residents
             .AsNoTracking()
             .Where(r => idSet.Contains(r.ResidentId))
-            .Select(r => new { r.ResidentId, r.CurrentRiskLevel })
-            .ToDictionaryAsync(x => x.ResidentId, x => x.CurrentRiskLevel, cancellationToken);
+            .Select(r => new { r.ResidentId, r.CurrentRiskLevel, r.ReintegrationType, r.ReintegrationStatus })
+            .ToDictionaryAsync(x => x.ResidentId, x => x, cancellationToken);
+
+        var unresolvedHighIncidentIds = (await _db.IncidentReports
+            .AsNoTracking()
+            .Where(i => i.ResidentId != null && idSet.Contains(i.ResidentId.Value)
+                && i.Resolved != true
+                && (i.Severity == "High" || i.Severity == "Critical"))
+            .Select(i => i.ResidentId!.Value)
+            .ToListAsync(cancellationToken))
+            .ToHashSet();
 
         var healthByResident = await LatestPerResidentAsync(
             _db.HealthWellbeingRecords.AsNoTracking().Where(h => h.ResidentId != null && idSet.Contains(h.ResidentId.Value)),
@@ -57,20 +66,43 @@ public class ResidentStatusCalculator
             v => v.VisitDate,
             cancellationToken);
 
+        // All visit/session dates per resident — used for adoption trend computation
+        var allVisitDatesByResident = (await _db.HomeVisitations.AsNoTracking()
+            .Where(v => v.ResidentId != null && idSet.Contains(v.ResidentId.Value) && v.VisitDate != null)
+            .Select(v => new { ResidentId = v.ResidentId!.Value, v.VisitDate })
+            .ToListAsync(cancellationToken))
+            .GroupBy(v => v.ResidentId)
+            .ToDictionary(g => g.Key, g => g.Select(v => v.VisitDate!.Value).ToList());
+
+        var allSessionDatesByResident = (await _db.ProcessRecordings.AsNoTracking()
+            .Where(p => idSet.Contains(p.ResidentId) && p.SessionDate != null)
+            .Select(p => new { p.ResidentId, p.SessionDate })
+            .ToListAsync(cancellationToken))
+            .GroupBy(s => s.ResidentId)
+            .ToDictionary(g => g.Key, g => g.Select(s => s.SessionDate!.Value).ToList());
+
         foreach (var id in residentIds)
         {
-            riskLevels.TryGetValue(id, out var currentRisk);
+            residentMeta.TryGetValue(id, out var meta);
+            var currentRisk = meta?.CurrentRiskLevel;
+            var reintegrationType = meta?.ReintegrationType;
+            var reintegrationStatus = meta?.ReintegrationStatus;
+
             healthByResident.TryGetValue(id, out var health);
             educationByResident.TryGetValue(id, out var education);
             sessionByResident.TryGetValue(id, out var session);
             visitByResident.TryGetValue(id, out var visit);
 
+            var visitDates = allVisitDatesByResident.GetValueOrDefault(id) ?? new List<DateOnly>();
+            var sessionDates = allSessionDatesByResident.GetValueOrDefault(id) ?? new List<DateOnly>();
+
             var healthLevel = ComputeHealth(health, today);
             var educationLevel = ComputeEducation(education, today);
             var counselingLevel = ComputeCounseling(session, today);
             var riskLevel = ComputeRisk(currentRisk, visit, today);
+            var reintegrationProgress = ComputeReintegrationProgress(reintegrationType, reintegrationStatus, currentRisk, unresolvedHighIncidentIds.Contains(id), health, visit, session, education, healthLevel, educationLevel, counselingLevel, today, visitDates, sessionDates);
 
-            result[id] = new ResidentStatusIndicatorsDto(healthLevel, educationLevel, counselingLevel, riskLevel);
+            result[id] = new ResidentStatusIndicatorsDto(healthLevel, educationLevel, counselingLevel, riskLevel, reintegrationProgress);
         }
 
         return result;
@@ -101,6 +133,12 @@ public class ResidentStatusCalculator
     {
         if (recordDate == null) return true;
         return today.DayNumber - recordDate.Value.DayNumber > StalenessDays;
+    }
+
+    private static bool IsStale(DateOnly? recordDate, DateOnly today, int maxDays)
+    {
+        if (recordDate == null) return true;
+        return today.DayNumber - recordDate.Value.DayNumber > maxDays;
     }
 
     /// <summary>Scores in Safira data are ~2.5–3.5 on a ~1–5 style scale.</summary>
@@ -216,4 +254,99 @@ public class ResidentStatusCalculator
         "yellow" => "red",
         _ => "red",
     };
+
+    /// <summary>
+    /// Green = both type-specific metrics progressing, Yellow = one, Red = neither.
+    /// Overrides: Critical risk → at least yellow; unresolved High/Critical incident → at least yellow; On Hold → cap at yellow.
+    /// </summary>
+    private static string ComputeReintegrationProgress(
+        string? reintegrationType,
+        string? reintegrationStatus,
+        string? currentRiskLevel,
+        bool hasUnresolvedHighIncident,
+        HealthWellbeingRecord? health,
+        HomeVisitation? visit,
+        ProcessRecording? session,
+        EducationRecord? education,
+        string healthLevel,
+        string educationLevel,
+        string counselingLevel,
+        DateOnly today,
+        IReadOnlyList<DateOnly> allVisitDates,
+        IReadOnlyList<DateOnly> allSessionDates)
+    {
+        var type = reintegrationType?.Trim().ToLowerInvariant() ?? "";
+
+        bool m1, m2;
+
+        switch (type)
+        {
+            case "family reunification":
+            case "family_reunification":
+                // M1: latest visit has cooperative or highly cooperative family cooperation
+                var coop = visit?.FamilyCooperationLevel?.Trim().ToLowerInvariant() ?? "";
+                m1 = !IsStale(visit?.VisitDate, today)
+                     && (coop == "cooperative" || coop == "highly cooperative");
+                // M2: recent social worker contact (concern flags don't block progress)
+                m2 = session != null && !IsStale(session.SessionDate, today);
+                break;
+
+            case "foster care":
+            case "foster_care":
+                // M1: health record within 6 months — ongoing health monitoring
+                m1 = health != null && !IsStale(health.RecordDate, today, 540);
+                // M2: recent social worker contact
+                m2 = session != null && !IsStale(session.SessionDate, today);
+                break;
+
+            case "adoption":
+            case "adoption (domestic)":
+            case "adoption (inter-country)":
+                // Anchor to resident's last activity so the window matches what the modal displays
+                var allActivityDates = allVisitDates.Concat(allSessionDates).ToList();
+                var adoptionAnchor = allActivityDates.Count > 0 ? allActivityDates.Max() : today;
+                var adoptionRecentStart = adoptionAnchor.AddDays(-90);
+                var adoptionPriorStart  = adoptionAnchor.AddDays(-180);
+                var visitsRecent   = allVisitDates.Count(d => d >= adoptionRecentStart);
+                var visitsPrior    = allVisitDates.Count(d => d >= adoptionPriorStart && d < adoptionRecentStart);
+                var sessionsRecent = allSessionDates.Count(d => d >= adoptionRecentStart);
+                var sessionsPrior  = allSessionDates.Count(d => d >= adoptionPriorStart && d < adoptionRecentStart);
+                // M1: family visits not declining — activity exists and not down from prior period
+                m1 = visitsRecent > 0 && (visitsPrior == 0 || visitsRecent >= visitsPrior);
+                // M2: sessions not declining
+                m2 = sessionsRecent > 0 && (sessionsPrior == 0 || sessionsRecent >= sessionsPrior);
+                break;
+
+            case "independent living":
+            case "independent_living":
+                // M1: education record within 6 months and not failing
+                m1 = education != null && !IsStale(education.RecordDate, today, 540) && educationLevel != "red";
+                // M2: recent social worker contact
+                m2 = session != null && !IsStale(session.SessionDate, today);
+                break;
+
+            default:
+                // Fallback: health record within 6 months + recent social worker contact
+                m1 = health != null && !IsStale(health.RecordDate, today, 540);
+                m2 = session != null && !IsStale(session.SessionDate, today);
+                break;
+        }
+
+        var result = (m1 && m2) ? "green" : (m1 || m2) ? "yellow" : "red";
+
+        // Override: Critical risk → at least yellow
+        var risk = currentRiskLevel?.Trim().ToLowerInvariant() ?? "";
+        if (risk == "critical" && result == "green")
+            result = "yellow";
+
+        // Override: unresolved High/Critical incident → bump one level worse
+        if (hasUnresolvedHighIncident)
+            result = BumpRiskWorse(result);
+
+        // Override: On Hold → cap at yellow
+        if ((reintegrationStatus?.Trim().ToLowerInvariant() ?? "") == "on hold" && result == "green")
+            result = "yellow";
+
+        return result;
+    }
 }

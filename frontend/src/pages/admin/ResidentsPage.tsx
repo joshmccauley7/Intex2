@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
-import { useSearchParams } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { apiFetch } from '../../api'
-import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users, ChevronDown, X } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, ChevronDown, X, ShieldAlert, CheckCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 interface ResidentRow {
@@ -11,10 +11,16 @@ interface ResidentRow {
   caseCategory: string | null
   caseStatus: string | null
   safehouseId: number | null
+  safehouseCity: string | null
+  safehouseRegion: string | null
   assignedSocialWorker: string | null
   presentAge: string | null
   reintegrationStatus: string | null
+  reintegrationType: string | null
+  currentRiskLevel: string | null
   dateOfAdmission: string | null
+  reintegrationProgress?: string | null
+  statusIndicators?: { health: string; education: string; counseling: string; risk: string } | null
 }
 
 interface ResidentDetail {
@@ -112,14 +118,25 @@ interface EducationEvent {
   completionStatus: string | null
 }
 
-type LifecycleEvent = HealthEvent | SessionEvent | VisitationEvent | EducationEvent
-
 interface InterventionPlan {
   planCategory: string | null
   planDescription: string | null
   targetValue: number | null
   targetDate: string | null
   status: string | null
+}
+
+interface IncidentEvent {
+  incidentId: number
+  incidentDate: string | null
+  incidentType: string | null
+  severity: string | null
+  description: string | null
+  responseTaken: string | null
+  resolved: boolean | null
+  resolutionDate: string | null
+  reportedBy: string | null
+  followUpRequired: boolean | null
 }
 
 interface LifecycleData {
@@ -129,6 +146,7 @@ interface LifecycleData {
   visitations: VisitationEvent[]
   education: EducationEvent[]
   interventionPlans: InterventionPlan[]
+  incidents: IncidentEvent[]
 }
 
 const SAFEHOUSES = [1,2,3,4,5,6,7,8,9].map(i => ({ id: i, name: `Lighthouse Safehouse ${i}` }))
@@ -278,6 +296,7 @@ const blankForm = (): Partial<ResidentDetail> => ({
 
 export default function ResidentsPage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const [residents, setResidents] = useState<ResidentRow[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -434,12 +453,14 @@ export default function ResidentsPage() {
                 <thead>
                   <tr className="border-b border-slate-200 bg-slate-50">
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Internal Code</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Safehouse</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide w-40">Safehouse</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Social Worker</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Age</th>
-                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Category</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration Type</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Reintegration Status</th>
+                    <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Progress</th>
                     <th className="text-left px-4 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
                   </tr>
                 </thead>
@@ -447,7 +468,6 @@ export default function ResidentsPage() {
                   {paginated.map((r) => (
                     <tr key={r.residentId} onClick={() => openDetail(r.residentId)} className="hover:bg-slate-50 transition-colors cursor-pointer">
                       <td className="px-4 py-3 font-medium text-[#0f172a]">{r.internalCode ?? '—'}</td>
-                      <td className="px-4 py-3 text-slate-600">{r.caseCategory ?? '—'}</td>
                       <td className="px-4 py-3">
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${STATUS_BADGE[r.caseStatus ?? ''] ?? 'bg-slate-100 text-slate-500'}`}>
                           {r.caseStatus ?? '—'}
@@ -456,7 +476,18 @@ export default function ResidentsPage() {
                       <td className="px-4 py-3 text-slate-600">{safehouseName(r.safehouseId)}</td>
                       <td className="px-4 py-3 text-slate-600">{r.assignedSocialWorker ?? '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{r.presentAge ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.caseCategory ?? '—'}</td>
+                      <td className="px-4 py-3 text-slate-600">{r.reintegrationType && r.reintegrationType !== 'None' ? r.reintegrationType : '—'}</td>
                       <td className="px-4 py-3 text-slate-600">{r.reintegrationStatus ?? '—'}</td>
+                      <td className="px-4 py-3">
+                        {r.caseStatus === 'Active' ? (
+                          <div className={`w-3 h-3 rounded-full ${
+                            r.reintegrationProgress === 'green' ? 'bg-emerald-500' :
+                            r.reintegrationProgress === 'red' ? 'bg-red-500' :
+                            'bg-yellow-400'
+                          }`} title={`Reintegration progress: ${r.reintegrationProgress ?? 'unknown'}`} />
+                        ) : <span className="text-slate-300">—</span>}
+                      </td>
                       <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
                           <button onClick={() => openDetail(r.residentId)} className="p-1.5 text-slate-400 hover:text-safira-blue transition-colors" title="View"><Eye size={15} /></button>
@@ -467,7 +498,7 @@ export default function ResidentsPage() {
                     </tr>
                   ))}
                   {residents.length === 0 && (
-                    <tr><td colSpan={9} className="px-4 py-8 text-center text-slate-400">No residents found.</td></tr>
+                    <tr><td colSpan={10} className="px-4 py-8 text-center text-slate-400">No residents found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -504,29 +535,40 @@ export default function ResidentsPage() {
                   {selectedResident.caseStatus}
                 </span>
               )}
-              {selectedResident.currentRiskLevel && (
-                <span className={`px-2 py-0.5 rounded-full text-xs font-medium border ${RISK_COLOR[selectedResident.currentRiskLevel] ?? 'bg-slate-100 text-slate-500 border-slate-200'}`}>
-                  {selectedResident.currentRiskLevel} Risk
-                </span>
-              )}
             </div>
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-slate-200 mb-5 -mx-6 px-6">
-            {(['progress', 'profile'] as const).map((tab) => (
+          <div className="flex items-center justify-between border-b border-slate-200 mb-5 -mx-6 px-6">
+            <div className="flex">
+              {(['progress', 'profile'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setDetailTab(tab)}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+                    detailTab === tab
+                      ? 'border-safira-blue text-safira-blue'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab === 'progress' ? 'Progress' : 'Profile'}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 pb-2">
               <button
-                key={tab}
-                onClick={() => setDetailTab(tab)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-                  detailTab === tab
-                    ? 'border-safira-blue text-safira-blue'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
+                onClick={() => navigate(`/admin/process-recordings?residentId=${selectedResident.residentId}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               >
-                {tab === 'progress' ? 'Progress' : 'Profile'}
+                Process Recordings <ArrowRight size={12} />
               </button>
-            ))}
+              <button
+                onClick={() => navigate(`/admin/home-visitations?residentId=${selectedResident.residentId}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Home Visitations <ArrowRight size={12} />
+              </button>
+            </div>
           </div>
 
           {/* Progress tab */}
@@ -534,14 +576,16 @@ export default function ResidentsPage() {
             <>
               {lifecycle ? (
                 <>
-                  <ReintegrationCard resident={selectedResident} lifecycle={lifecycle} />
                   <RiskJourney
                     initial={lifecycle.riskJourney.initial}
                     current={lifecycle.riskJourney.current}
                   />
+                  <SectionHeading>Reintegration</SectionHeading>
+                  <ReintegrationCard resident={selectedResident} lifecycle={lifecycle} />
                   <SectionHeading>Goal Progress</SectionHeading>
                   <ProgressSnapshot resident={selectedResident} lifecycle={lifecycle} />
-                  <ResidentTimeline lifecycle={lifecycle} />
+                  <SectionHeading>Incident Reports</SectionHeading>
+                  <IncidentSection incidents={lifecycle.incidents} />
                 </>
               ) : (
                 <p className="text-sm text-slate-400">Loading progress data…</p>
@@ -645,7 +689,7 @@ export default function ResidentsPage() {
             </>
           )}
 
-          <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
+          <div className="flex gap-3 justify-end pt-4 mt-2 border-t border-slate-200">
             <button onClick={() => setEditResident(selectedResident)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Edit</button>
             <button onClick={() => { setSelectedResident(null); setLifecycle(null) }} className="px-4 py-2 text-sm font-medium text-white bg-safira-blue hover:bg-safira-blue-dark rounded-lg transition-colors">Close</button>
           </div>
@@ -719,8 +763,17 @@ function GoalChart({
                 <XAxis dataKey="date" tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} />
                 <YAxis domain={[0, yMax]} tick={{ fontSize: 11, fill: '#94a3b8' }} tickLine={false} axisLine={false} tickFormatter={v => `${v}${yLabel}`} width={40} />
                 <Tooltip
-                  formatter={(v: number) => [`${v}${yLabel}`, dataKey]}
-                  contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                  content={({ active, payload, label }) => {
+                    if (!active || !payload?.length) return null
+                    const val = payload.find(p => p.dataKey === 'value' || String(p.dataKey).startsWith('seg_'))?.value
+                    if (val == null) return null
+                    return (
+                      <div style={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0', background: 'white', padding: '8px 12px' }}>
+                        <p style={{ color: '#94a3b8', marginBottom: 4 }}>{label}</p>
+                        <p style={{ fontWeight: 600 }}>{dataKey}: {val}{yLabel}</p>
+                      </div>
+                    )
+                  }}
                 />
                 {target != null && (
                   <ReferenceLine y={target} stroke="#64748b" strokeDasharray="4 3" label={{ value: 'Goal', fontSize: 11, fill: '#64748b', position: 'insideTopRight' }} />
@@ -764,61 +817,147 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   const recentHealth = lifecycle.health.slice(-DOTS)
   const recentEducation = lifecycle.education.slice(-DOTS)
 
-  const cooperativeCount = recentVisits.filter(v => v.familyCooperationLevel === 'Cooperative').length
+  const cooperativeCount = recentVisits.filter(v => v.familyCooperationLevel === 'Cooperative' || v.familyCooperationLevel === 'Highly Cooperative').length
   const progressCount = recentSessions.filter(s => s.progressNoted).length
   const psychCount = recentHealth.filter(h => h.psychologicalCheckupDone).length
   const goodAttendanceCount = recentEducation.filter(e => (e.attendanceRate ?? 0) >= 0.8).length
 
-  const RISK_RANK: Record<string, number> = { Low: 1, Medium: 2, High: 3, Critical: 4 }
-  const initialRisk = RISK_RANK[resident.initialRiskLevel ?? ''] ?? 0
-  const currentRisk = RISK_RANK[resident.currentRiskLevel ?? ''] ?? 0
-  const riskDelta = initialRisk - currentRisk // positive = improved
 
-  // ── Dot row helper ──────────────────────────────────────────────────────────
-  function DotRow({ label, count, total, totalLabel, dots }: {
-    label: string; count: number; total: number; totalLabel: string; dots: React.ReactNode[]
-  }) {
-    return (
-      <div>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</p>
-        <p className="text-xs text-slate-500 mb-2">
-          <span className="font-semibold text-[#0f172a]">{count}/{dots.length}</span> recent
-          <span className="text-slate-300 mx-1">·</span>
-          <span className="font-semibold text-[#0f172a]">{total}</span> {totalLabel}
-        </p>
-        <div className="flex gap-1.5">{dots}</div>
-      </div>
+  // ── Progress failure reasons ────────────────────────────────────────────────
+  const STALE_DAYS = 90
+  const isStale = (dateStr: string | null | undefined, days = STALE_DAYS) => {
+    if (!dateStr) return true
+    return (Date.now() - new Date(dateStr).getTime()) / 86_400_000 > days
+  }
+  const latestVisit = lifecycle.visitations.at(-1)
+  const latestSession = lifecycle.sessions.at(-1)
+  const latestHealth = lifecycle.health.at(-1)
+  const latestEducation = lifecycle.education.at(-1)
+
+  function getProgressIssues(): string[] {
+    if (resident.caseStatus !== 'Active') return []
+    const issues: string[] = []
+    const type = reType.toLowerCase()
+
+    if (type === 'family reunification') {
+      const coop = latestVisit?.familyCooperationLevel ?? ''
+      if (isStale(latestVisit?.date)) {
+        issues.push('No home visits in the last 90 days')
+      } else if (coop !== 'Cooperative' && coop !== 'Highly Cooperative') {
+        issues.push(`Latest home visit shows ${coop || 'unknown'} family cooperation`)
+      }
+      if (isStale(latestSession?.date)) issues.push('No recent counseling sessions in the last 90 days')
+    } else if (type === 'foster care') {
+      if (isStale(latestHealth?.date, 540)) issues.push('Health records are out of date (last recorded > 18 months ago)')
+      if (isStale(latestSession?.date)) issues.push('No recent counseling sessions in the last 90 days')
+    } else if (type.startsWith('adoption')) {
+      const allDates = [...lifecycle.visitations.map(v => v.date), ...lifecycle.sessions.map(s => s.date)].filter(Boolean).sort()
+      const anchor = allDates.at(-1) ? new Date(allDates.at(-1)!) : new Date()
+      const DAY_MS = 86_400_000
+      const recentStartStr = new Date(anchor.getTime() - 90 * DAY_MS).toISOString().split('T')[0]
+      const priorStartStr  = new Date(anchor.getTime() - 180 * DAY_MS).toISOString().split('T')[0]
+      const visitsRecent   = lifecycle.visitations.filter(v => v.date >= recentStartStr).length
+      const visitsPrior    = lifecycle.visitations.filter(v => v.date >= priorStartStr && v.date < recentStartStr).length
+      const sessionsRecent = lifecycle.sessions.filter(s => s.date >= recentStartStr).length
+      const sessionsPrior  = lifecycle.sessions.filter(s => s.date >= priorStartStr && s.date < recentStartStr).length
+      const m1 = visitsRecent > 0 && (visitsPrior === 0 || visitsRecent >= visitsPrior)
+      const m2 = sessionsRecent > 0 && (sessionsPrior === 0 || sessionsRecent >= sessionsPrior)
+      if (!m1) {
+        if (visitsRecent === 0) issues.push('No home visits in the last 90 days')
+        else issues.push(`Home visits down ${Math.round((1 - visitsRecent / visitsPrior) * 100)}% compared to the prior 90 days`)
+      }
+      if (!m2) {
+        if (sessionsRecent === 0) issues.push('No counseling sessions in the last 90 days')
+        else issues.push(`Counseling sessions down ${Math.round((1 - sessionsRecent / sessionsPrior) * 100)}% compared to the prior 90 days`)
+      }
+    } else if (type === 'independent living') {
+      const att = latestEducation?.attendanceRate ?? null
+      const enrollStatus = latestEducation?.enrollmentStatus?.toLowerCase() ?? ''
+      const completionStatus = latestEducation?.completionStatus?.toLowerCase() ?? ''
+      if (isStale(latestEducation?.date, 540)) {
+        issues.push('Education records are out of date (last recorded > 18 months ago)')
+      } else if (att !== null && att < 0.5) {
+        issues.push(`Attendance rate is low (${Math.round(att * 100)}%)`)
+      } else if (enrollStatus.includes('drop') || enrollStatus.includes('withdraw')) {
+        issues.push(`Enrollment status: ${latestEducation!.enrollmentStatus}`)
+      } else if (completionStatus.includes('fail') || completionStatus.includes('terminated')) {
+        issues.push(`Completion status: ${latestEducation!.completionStatus}`)
+      }
+      if (isStale(latestSession?.date)) issues.push('No recent social worker contact in the last 90 days')
+    } else {
+      if (isStale(latestHealth?.date, 540)) issues.push('Health records are out of date (last recorded > 18 months ago)')
+      if (isStale(latestSession?.date)) issues.push('No recent counseling sessions in the last 90 days')
+    }
+
+    // Overrides — apply regardless of type
+    const riskLevel = resident.currentRiskLevel?.toLowerCase() ?? ''
+    if (riskLevel === 'critical' && issues.length === 0)
+      issues.push('Risk level is Critical')
+    const hasHighIncident = lifecycle.incidents.some(i =>
+      !i.resolved && (i.severity?.toLowerCase() === 'high' || i.severity?.toLowerCase() === 'critical')
     )
+    if (hasHighIncident)
+      issues.push('Has an unresolved high-severity incident')
+    if (resident.reintegrationStatus === 'On Hold' && issues.length === 0)
+      issues.push('Reintegration is on hold')
+
+    return issues
   }
 
-  // ── Stat block helper (for Adoption — volume as big numbers) ────────────────
-  function StatBlock({ label, value, sub }: { label: string; value: string | number; sub: string }) {
+  const progressIssues = getProgressIssues()
+
+  // ── Dot row helper ──────────────────────────────────────────────────────────
+  function DotRow({ label, dots, dates, passing, summary }: {
+    label: string; dots: React.ReactNode[]; dates?: (string | null)[]; passing?: boolean; summary?: string
+  }) {
+    const fmtMmYy = (d: string | null) => {
+      if (!d) return ''
+      const dt = new Date(d)
+      return `${String(dt.getMonth() + 1).padStart(2, '0')}/${String(dt.getFullYear()).slice(-2)}`
+    }
+
     return (
       <div>
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{label}</p>
-        <p className="text-2xl font-bold text-[#0f172a]">{value}</p>
-        <p className="text-xs text-slate-400">{sub}</p>
+        <div className="flex items-center justify-between gap-2 mb-1.5">
+          <p className="text-xs font-semibold text-slate-600">{label}</p>
+          {passing !== undefined && (
+            <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${passing ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+              {passing ? '✓ On track' : '⚠ Needs attention'}
+            </span>
+          )}
+        </div>
+        {summary && <p className="text-xs text-slate-400 mb-3">{summary}</p>}
+        <div className="inline-flex border border-slate-100 rounded-lg overflow-hidden">
+          {dots.map((dot, i) => (
+            <div key={i} className={`flex flex-col items-center gap-0.5 px-2 py-1 ${i > 0 ? 'border-l border-slate-100' : ''}`}>
+              <div className="scale-75">{dot}</div>
+              <span className="text-[9px] text-slate-400 leading-none">{dates?.[i] ? fmtMmYy(dates[i]!) : '—'}</span>
+            </div>
+          ))}
+        </div>
       </div>
     )
   }
 
   // ── Per-type indicators ─────────────────────────────────────────────────────
+  const isActive = resident.caseStatus === 'Active'
   function renderIndicators() {
     if (reType === 'Family Reunification') {
       return (
-        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+        <div className="pt-3 border-t border-slate-100">
+        <div className="grid grid-cols-2 gap-6">
           {recentVisits.length > 0 && (
             <DotRow
               label="Family Cooperation"
-              count={cooperativeCount}
-              total={totalVisits}
-              totalLabel="total visits"
+              passing={isActive ? (!isStale(latestVisit?.date) && cooperativeCount >= 3) : undefined}
+              summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
+              dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
               dots={[
                 ...recentVisits.map((v, i) => (
                   <div key={i} title={v.familyCooperationLevel ?? 'Unknown'}
                     className={`w-4 h-4 rounded-full ${
-                      v.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-500' :
-                      v.familyCooperationLevel === 'Non-Cooperative' ? 'bg-red-400' : 'bg-yellow-400'
+                      v.familyCooperationLevel === 'Highly Cooperative' || v.familyCooperationLevel === 'Cooperative'
+                        ? 'bg-emerald-500' : 'bg-slate-200'
                     }`} />
                 )),
                 ...Array.from({ length: DOTS - recentVisits.length }).map((_, i) => (
@@ -830,9 +969,9 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              count={progressCount}
-              total={totalSessions}
-              totalLabel="total sessions"
+              passing={isActive ? (!isStale(latestSession?.date) && progressCount >= 3) : undefined}
+              summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
+              dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
                 ...recentSessions.map((s, i) => (
                   <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
@@ -845,18 +984,20 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             />
           )}
         </div>
+        </div>
       )
     }
 
     if (reType === 'Foster Care') {
       return (
-        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+        <div className="pt-3 border-t border-slate-100">
+        <div className="grid grid-cols-2 gap-6">
           {recentHealth.length > 0 && (
             <DotRow
               label="Psych Checkups"
-              count={psychCount}
-              total={recentHealth.length}
-              totalLabel="recent records"
+              passing={isActive ? (latestHealth != null && !isStale(latestHealth.date, 540) && psychCount >= 3) : undefined}
+              summary={`${psychCount} of ${recentHealth.length} most recent records had a psych checkup`}
+              dates={[...recentHealth.map(h => h.date), ...Array(Math.max(0, DOTS - recentHealth.length)).fill(null)]}
               dots={[
                 ...recentHealth.map((h, i) => (
                   <div key={i} title={h.psychologicalCheckupDone ? 'Done' : 'Not done'}
@@ -871,9 +1012,9 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              count={progressCount}
-              total={totalSessions}
-              totalLabel="total sessions"
+              passing={isActive ? (!isStale(latestSession?.date) && progressCount >= 3) : undefined}
+              summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
+              dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
                 ...recentSessions.map((s, i) => (
                   <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
@@ -886,33 +1027,93 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             />
           )}
         </div>
+        </div>
       )
     }
 
     if (reType === 'Adoption (Domestic)' || reType === 'Adoption (Inter-Country)') {
+      const allDates = [...lifecycle.visitations.map(v => v.date), ...lifecycle.sessions.map(s => s.date)].filter(Boolean).sort()
+      const anchor = allDates.at(-1) ? new Date(allDates.at(-1)!) : new Date()
+      const recentStart = new Date(anchor.getTime() - 90 * 86_400_000).toISOString().split('T')[0]
+      const priorStart  = new Date(anchor.getTime() - 180 * 86_400_000).toISOString().split('T')[0]
+
+      const visitsRecent = lifecycle.visitations.filter(v => v.date >= recentStart).length
+      const visitsPrior  = lifecycle.visitations.filter(v => v.date >= priorStart && v.date < recentStart).length
+      const sessionsRecent = lifecycle.sessions.filter(s => s.date >= recentStart).length
+      const sessionsPrior  = lifecycle.sessions.filter(s => s.date >= priorStart && s.date < recentStart).length
+
+      const monthTrend = (current: number, prev: number) => {
+        if (prev === 0 && current === 0) return <span className="text-xs text-slate-400">No activity in the last 12 months</span>
+        if (prev === 0) return <span className="text-xs text-emerald-600">↑ {current} recent (no prior activity)</span>
+        const pct = Math.round(((current - prev) / prev) * 100)
+        if (pct > 0) return <span className="text-xs text-emerald-600">↑ {pct}% over the last 90 days</span>
+        if (pct < 0) return <span className="text-xs text-red-500">↓ {Math.abs(pct)}% over the last 90 days</span>
+        return <span className="text-xs text-slate-400">→ No change over the last 90 days</span>
+      }
+
       return (
-        <div className="grid grid-cols-2 gap-6 pt-3 border-t border-slate-100">
-          <StatBlock label="Home Visits" value={totalVisits} sub="total conducted" />
-          <StatBlock label="Counseling Sessions" value={totalSessions} sub="total attended" />
+        <div className="pt-3 border-t border-slate-100">
+          <div className="grid grid-cols-2 gap-6">
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-xs font-semibold text-slate-600">Home Visits</p>
+                <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${(visitsRecent > 0 && (visitsPrior === 0 || visitsRecent >= visitsPrior)) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {(visitsRecent > 0 && (visitsPrior === 0 || visitsRecent >= visitsPrior)) ? '✓ On track' : '⚠ Needs attention'}
+                </span>
+              </div>
+              <p className="text-2xl font-bold text-[#0f172a]">{totalVisits}</p>
+              <p className="text-xs text-slate-400 mb-1">total conducted</p>
+              {monthTrend(visitsRecent, visitsPrior)}
+            </div>
+            <div>
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className="text-xs font-semibold text-slate-600">Counseling Sessions</p>
+                <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${(sessionsRecent > 0 && (sessionsPrior === 0 || sessionsRecent >= sessionsPrior)) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {(sessionsRecent > 0 && (sessionsPrior === 0 || sessionsRecent >= sessionsPrior)) ? '✓ On track' : '⚠ Needs attention'}
+                </span>
+              </div>
+              <p className="text-2xl font-bold text-[#0f172a]">{totalSessions}</p>
+              <p className="text-xs text-slate-400 mb-1">total attended</p>
+              {monthTrend(sessionsRecent, sessionsPrior)}
+            </div>
+          </div>
         </div>
       )
     }
 
     if (reType === 'Independent Living') {
+      const ilAllDates = [...lifecycle.sessions.map(s => s.date), ...lifecycle.visitations.map(v => v.date)].filter(Boolean).sort()
+      const ilAnchor = ilAllDates.at(-1) ? new Date(ilAllDates.at(-1)!) : new Date()
+      const ilRecentStart = new Date(ilAnchor.getTime() - 90 * 86_400_000).toISOString().split('T')[0]
+      const ilPriorStart  = new Date(ilAnchor.getTime() - 180 * 86_400_000).toISOString().split('T')[0]
+
+      const sessionsRecent = lifecycle.sessions.filter(s => s.date >= ilRecentStart).length
+      const sessionsPrior  = lifecycle.sessions.filter(s => s.date >= ilPriorStart && s.date < ilRecentStart).length
+
+      const ilTrend = () => {
+        if (sessionsPrior === 0 && sessionsRecent === 0) return <span className="text-xs text-slate-400">No session activity</span>
+        if (sessionsPrior === 0) return <span className="text-xs text-emerald-600">↑ {sessionsRecent} recent (no prior activity)</span>
+        const pct = Math.round(((sessionsRecent - sessionsPrior) / sessionsPrior) * 100)
+        if (pct > 0) return <span className="text-xs text-emerald-600">↑ {pct}% over the last 90 days</span>
+        if (pct < 0) return <span className="text-xs text-red-500">↓ {Math.abs(pct)}% over the last 90 days</span>
+        return <span className="text-xs text-slate-400">→ No change over the last 90 days</span>
+      }
+
       return (
-        <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+        <div className="pt-3 border-t border-slate-100">
+        <div className="grid grid-cols-2 gap-6">
           {recentEducation.length > 0 && (
             <DotRow
-              label="Attendance"
-              count={goodAttendanceCount}
-              total={recentEducation.length}
-              totalLabel="recent records"
+              label="Education Attendance"
+              passing={isActive ? (latestEducation != null && !isStale(latestEducation.date, 540) && (latestEducation.attendanceRate ?? 0) >= 0.8) : undefined}
+              summary={`${goodAttendanceCount} of ${recentEducation.length} most recent records ≥80% attendance`}
+              dates={[...recentEducation.map(e => e.date), ...Array(Math.max(0, DOTS - recentEducation.length)).fill(null)]}
               dots={[
                 ...recentEducation.map((e, i) => {
                   const rate = e.attendanceRate ?? 0
                   return (
                     <div key={i} title={`${Math.round(rate * 100)}% attendance`}
-                      className={`w-4 h-4 rounded-full ${rate >= 0.8 ? 'bg-emerald-500' : rate >= 0.6 ? 'bg-yellow-400' : 'bg-red-400'}`} />
+                      className={`w-4 h-4 rounded-full ${rate >= 0.8 ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                   )
                 }),
                 ...Array.from({ length: DOTS - recentEducation.length }).map((_, i) => (
@@ -922,29 +1123,39 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             />
           )}
           <div>
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Session Engagement</p>
-            <p className="text-2xl font-bold text-[#0f172a]">{totalSessions}</p>
-            <p className="text-xs text-slate-400">sessions · {totalVisits} home visits</p>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <p className="text-xs font-semibold text-slate-600">Social Worker Contact</p>
+              {isActive && (
+                <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${!isStale(latestSession?.date) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {!isStale(latestSession?.date) ? '✓ On track' : '⚠ Needs attention'}
+                </span>
+              )}
+            </div>
+            <p className="text-2xl font-bold text-[#0f172a]">{totalSessions + totalVisits}</p>
+            <p className="text-xs text-slate-400 mb-1">{totalSessions} sessions · {totalVisits} home visits</p>
+            {ilTrend()}
           </div>
+        </div>
         </div>
       )
     }
 
     // Fallback — generic
     return (recentVisits.length > 0 || recentSessions.length > 0) ? (
-      <div className="grid grid-cols-2 gap-4 pt-3 border-t border-slate-100">
+      <div className="pt-3 border-t border-slate-100">
+      <div className="grid grid-cols-2 gap-4">
         {recentVisits.length > 0 && (
           <DotRow
             label="Family Cooperation"
-            count={cooperativeCount}
-            total={totalVisits}
-            totalLabel="total visits"
+            passing={isActive ? (!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')) : undefined}
+            summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
+            dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
             dots={[
               ...recentVisits.map((v, i) => (
                 <div key={i} title={v.familyCooperationLevel ?? 'Unknown'}
                   className={`w-4 h-4 rounded-full ${
-                    v.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-500' :
-                    v.familyCooperationLevel === 'Non-Cooperative' ? 'bg-red-400' : 'bg-yellow-400'
+                    v.familyCooperationLevel === 'Cooperative' || v.familyCooperationLevel === 'Highly Cooperative'
+                      ? 'bg-emerald-500' : 'bg-slate-200'
                   }`} />
               )),
               ...Array.from({ length: DOTS - recentVisits.length }).map((_, i) => (
@@ -956,9 +1167,9 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         {recentSessions.length > 0 && (
           <DotRow
             label="Counseling Progress"
-            count={progressCount}
-            total={totalSessions}
-            totalLabel="total sessions"
+            passing={isActive ? !isStale(latestSession?.date) : undefined}
+            summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
+            dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
             dots={[
               ...recentSessions.map((s, i) => (
                 <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
@@ -971,6 +1182,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           />
         )}
       </div>
+      </div>
     ) : null
   }
 
@@ -978,11 +1190,11 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     <div className="rounded-xl border border-slate-200 overflow-hidden mb-5">
       <div className="flex">
         <div className={`w-1.5 shrink-0 ${bgColor}`} />
-        <div className="flex-1 px-4 py-4 space-y-4">
+        <div className="flex-1 px-5 py-5 space-y-5">
           {/* Top row — status / type / length of stay */}
           <div className="flex items-start justify-between">
             <div>
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Reintegration</p>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Status</p>
               <p className={`text-lg font-bold ${textColor}`}>{status}</p>
             </div>
             <div className="text-right">
@@ -1002,6 +1214,19 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           </div>
 
           {renderIndicators()}
+          {progressIssues.length > 0 && (
+            <div className="pt-3 border-t border-slate-100 space-y-1">
+              <p className="text-xs font-semibold text-slate-700 mb-1">
+                Progress was marked {progressIssues.length === 1 ? 'yellow' : 'red'} due to:
+              </p>
+              {progressIssues.map((issue, i) => (
+                <p key={i} className="flex items-start gap-1.5 text-xs text-slate-600">
+                  <AlertTriangle size={12} className="mt-0.5 shrink-0 text-amber-500" />
+                  {issue}
+                </p>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -1038,7 +1263,7 @@ function GoalBar({ current, target, max }: { current: number; target: number; ma
   )
 }
 
-function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: ResidentDetail; lifecycle: LifecycleData }) {
+function ProgressSnapshot({ resident, lifecycle }: { resident: ResidentDetail; lifecycle: LifecycleData }) {
   const [openChart, setOpenChart] = useState<string | null>(null)
 
   const latestHealth    = lifecycle.health.at(-1) ?? null
@@ -1049,8 +1274,30 @@ function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: Reside
   const avgHealthScore  = latestHealth ? avgHealth(latestHealth) : null
   const prevHealthScore = prevHealth ? avgHealth(prevHealth) : null
 
+  const computeSafetyScore = (asOf: Date) => {
+    const riskBase: Record<string, number> = { low: 5, medium: 3.5, high: 2, critical: 1 }
+    const base = riskBase[resident.currentRiskLevel?.toLowerCase() ?? ''] ?? 3
+    const asOfStr = asOf.toISOString().split('T')[0]
+    const activeUnresolved = lifecycle.incidents.filter(i => {
+      if (!i.incidentDate || i.incidentDate > asOfStr) return false
+      if (i.resolved && i.resolutionDate && i.resolutionDate <= asOfStr) return false
+      return true
+    })
+    const deduction = activeUnresolved.reduce((sum, i) => {
+      const s = i.severity?.toLowerCase() ?? ''
+      return sum + (s === 'high' ? 1.0 : s === 'medium' ? 0.5 : 0.25)
+    }, 0)
+    return Math.max(1, Math.min(5, base - deduction))
+  }
+
+  const safetyScore = computeSafetyScore(new Date())
+  const prevSafetyScore = computeSafetyScore(new Date(Date.now() - 30 * 86_400_000))
+  const riskBase: Record<string, number> = { low: 5, medium: 3.5, high: 2, critical: 1 }
+  const admissionSafetyScore = riskBase[resident.initialRiskLevel?.toLowerCase() ?? ''] ?? 3
+
   const currentFor = (category: string | null): number | null => {
     if (category === 'Education') return latestEducation?.attendanceRate ?? null
+    if (category === 'Safety') return safetyScore
     return avgHealthScore
   }
 
@@ -1059,12 +1306,20 @@ function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: Reside
       const a = latestEducation?.attendanceRate, b = prevEducation?.attendanceRate
       return a != null && b != null ? (a - b) * 100 : null
     }
+    if (category === 'Safety') return safetyScore - prevSafetyScore
     return avgHealthScore != null && prevHealthScore != null ? avgHealthScore - prevHealthScore : null
   }
 
   const sparkValuesFor = (category: string | null): number[] => {
     if (category === 'Education')
       return lifecycle.education.map(e => e.attendanceRate != null ? Number(e.attendanceRate) * 100 : null).filter((v): v is number => v != null)
+    if (category === 'Safety') {
+      const incidentScores = lifecycle.incidents
+        .filter(i => i.incidentDate != null)
+        .sort((a, b) => a.incidentDate!.localeCompare(b.incidentDate!))
+        .map(i => computeSafetyScore(new Date(i.incidentDate!)))
+      return [admissionSafetyScore, ...incidentScores, safetyScore]
+    }
     return lifecycle.health.map(e => avgHealth(e)).filter((v): v is number => v != null)
   }
 
@@ -1077,6 +1332,17 @@ function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: Reside
   const chartDataFor = (category: string | null) => {
     if (category === 'Education')
       return lifecycle.education.map(e => ({ date: fmtMonthYear(e.date), value: e.attendanceRate != null ? Math.round(Number(e.attendanceRate) * 100) : null })).filter(d => d.value != null) as { date: string; value: number }[]
+    if (category === 'Safety') {
+      const incidentPoints = lifecycle.incidents
+        .filter(i => i.incidentDate != null)
+        .sort((a, b) => a.incidentDate!.localeCompare(b.incidentDate!))
+        .map(i => ({ date: fmtMonthYear(i.incidentDate), value: computeSafetyScore(new Date(i.incidentDate!)) }))
+      return [
+        { date: fmtMonthYear(resident.dateOfAdmission) || 'Admission', value: admissionSafetyScore },
+        ...incidentPoints,
+        { date: 'Now', value: safetyScore },
+      ]
+    }
     return lifecycle.health.map(e => ({ date: fmtMonthYear(e.date), value: avgHealth(e) != null ? parseFloat(avgHealth(e)!.toFixed(2)) : null })).filter(d => d.value != null) as { date: string; value: number }[]
   }
 
@@ -1105,29 +1371,27 @@ function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: Reside
                 <span className="text-sm font-semibold text-[#0f172a]">{plan.planCategory}</span>
                 {delta != null && <TrendBadge delta={delta} unit={isEducation ? '%' : ''} />}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="text-xs text-slate-500">
-                  {currentLabel != null && targetLabel != null ? (
-                    <span>
-                      <span className="font-semibold text-[#0f172a]">{currentLabel}</span>
-                      <span className="text-slate-400"> / {targetLabel} goal</span>
-                    </span>
-                  ) : '—'}
-                </div>
-                {sparkValuesFor(plan.planCategory).length >= 2 && (
-                  <button
-                    onClick={() => setOpenChart(openChart === plan.planCategory ? null : plan.planCategory)}
-                    className="opacity-60 hover:opacity-100 transition-opacity"
-                    title="View history"
-                  >
-                    <Sparkline values={sparkValuesFor(plan.planCategory)} />
-                  </button>
-                )}
-              </div>
+              {sparkValuesFor(plan.planCategory).length >= 2 && (
+                <button
+                  onClick={() => setOpenChart(openChart === plan.planCategory ? null : plan.planCategory)}
+                  className="opacity-60 hover:opacity-100 transition-opacity"
+                  title="View history"
+                >
+                  <Sparkline values={sparkValuesFor(plan.planCategory)} />
+                </button>
+              )}
             </div>
             {current != null && target != null ? (
               <>
-                <GoalBar current={current} target={Number(target)} max={max} />
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <GoalBar current={current} target={Number(target)} max={max} />
+                  </div>
+                  <div className="text-xs text-slate-500 text-right shrink-0" style={{ minWidth: '7rem' }}>
+                    <span className="font-semibold text-[#0f172a]">{currentLabel}</span>
+                    <span className="text-slate-400"> / {targetLabel} goal</span>
+                  </div>
+                </div>
                 <p className={`text-xs mt-1.5 font-medium ${met ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {met ? '✓ Goal met' : toGoLabel}
                 </p>
@@ -1171,58 +1435,34 @@ const RISK_COLOR: Record<string, string> = {
   Low: 'bg-green-100 text-green-700 border-green-200',
 }
 
-const RISK_BG: Record<string, string> = {
-  Critical: 'bg-red-500',
-  High: 'bg-orange-400',
-  Medium: 'bg-yellow-400',
-  Low: 'bg-green-500',
-}
-
 function RiskJourney({ initial, current }: { initial: string | null; current: string | null }) {
   if (!initial && !current) return null
   const improved = initial && current ? RISK_RANK[current] < RISK_RANK[initial] : false
   const worsened = initial && current ? RISK_RANK[current] > RISK_RANK[initial] : false
 
   const trendLabel = improved ? 'Improving' : worsened ? 'Escalated' : 'Unchanged'
-  const trendColor = improved ? 'text-green-600' : worsened ? 'text-red-500' : 'text-slate-400'
-  const trendArrowColor = improved ? 'text-green-500' : worsened ? 'text-red-400' : 'text-slate-300'
+
+
+  const delta = Math.abs((RISK_RANK[current ?? ''] ?? 0) - (RISK_RANK[initial ?? ''] ?? 0))
 
   return (
     <div className="mb-5">
       <SectionHeading>Risk Journey</SectionHeading>
-      <div className="rounded-xl border border-slate-200 overflow-hidden">
-        <div className="flex">
-          {/* At admission */}
-          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-slate-50 border-r border-slate-200">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">At Admission</p>
-            <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[initial ?? ''] ?? 'bg-slate-300'}`} />
-            <p className={`text-lg font-bold ${RISK_COLOR[initial ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{initial ?? '—'}</p>
-          </div>
-
-          {/* Center */}
-          <div className="flex flex-col items-center justify-center px-6 bg-white">
-            <ArrowRight size={20} className="text-slate-300" />
-          </div>
-
-          {/* Current */}
-          <div className="flex-1 flex flex-col items-center py-4 px-3 bg-slate-50 border-l border-slate-200">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Current</p>
-            <div className={`w-3 h-3 rounded-full mb-2 ${RISK_BG[current ?? ''] ?? 'bg-slate-300'}`} />
-            <p className={`text-lg font-bold ${RISK_COLOR[current ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{current ?? '—'}</p>
-          </div>
+      <div className="flex items-center gap-3 px-4 py-3 rounded-xl border border-slate-200 bg-white">
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Admission</span>
+          <span className={`text-sm font-bold ml-1 ${RISK_COLOR[initial ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{initial ?? '—'}</span>
         </div>
-
-        {/* Trend badge */}
-        {(improved || worsened) && (() => {
-          const delta = Math.abs((RISK_RANK[current ?? ''] ?? 0) - (RISK_RANK[initial ?? ''] ?? 0))
-          return (
-            <div className={`flex justify-center py-2 border-t border-slate-100 ${improved ? 'bg-emerald-50' : 'bg-red-50'}`}>
-              <span className={`text-xs font-semibold ${improved ? 'text-emerald-700' : 'text-red-600'}`}>
-                {improved ? '↑' : '↓'} {trendLabel} · {delta} level{delta > 1 ? 's' : ''}
-              </span>
-            </div>
-          )
-        })()}
+        <ArrowRight size={14} className="text-slate-300 shrink-0" />
+        <div className="flex items-center gap-1.5">
+          <span className="text-xs text-slate-400 uppercase tracking-wide font-semibold">Current</span>
+          <span className={`text-sm font-bold ml-1 ${RISK_COLOR[current ?? '']?.split(' ')[1] ?? 'text-slate-500'}`}>{current ?? '—'}</span>
+        </div>
+        {(improved || worsened) && (
+          <span className={`ml-auto text-xs font-semibold ${improved ? 'text-emerald-600' : 'text-red-500'}`}>
+            {improved ? '↑' : '↓'} {trendLabel} · {delta} level{delta > 1 ? 's' : ''}
+          </span>
+        )}
       </div>
     </div>
   )
@@ -1236,18 +1476,6 @@ function fmtShortDate(d: string | null) {
   return dt.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-function scoreBar(value: number | null) {
-  if (value == null) return null
-  const pct = Math.round((value / 5) * 100)
-  return (
-    <div className="flex items-center gap-1.5">
-      <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-        <div className="h-full bg-safira-blue rounded-full" style={{ width: `${pct}%` }} />
-      </div>
-      <span className="text-xs text-slate-500 w-6 text-right">{value.toFixed(1)}</span>
-    </div>
-  )
-}
 
 function avgHealth(ev: HealthEvent): number | null {
   const vals = [ev.generalHealthScore, ev.nutritionScore, ev.sleepQualityScore, ev.energyLevelScore].filter((v): v is number => v != null)
@@ -1259,196 +1487,9 @@ function TrendBadge({ delta, unit = '' }: { delta: number; unit?: string }) {
   const up = delta > 0
   const label = `${up ? '+' : ''}${unit === '%' ? Math.round(delta) : delta.toFixed(1)}${unit}`
   return (
-    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded ${up ? 'bg-emerald-50 text-emerald-600' : 'bg-red-50 text-red-500'}`}>
+    <span className={`text-xs font-semibold ${up ? 'text-emerald-600' : 'text-red-500'}`}>
       {up ? '↑' : '↓'} {label}
     </span>
-  )
-}
-
-function ResidentTimeline({ lifecycle }: { lifecycle: LifecycleData }) {
-  const latest = <T,>(arr: T[]) => arr.at(-1) ?? null
-
-  const latestHealth    = latest(lifecycle.health)
-  const latestSession   = latest(lifecycle.sessions)
-  const latestVisit     = latest(lifecycle.visitations)
-  const latestEducation = latest(lifecycle.education)
-
-  const events: LifecycleEvent[] = [latestHealth, latestSession, latestVisit, latestEducation]
-    .filter((e): e is LifecycleEvent => e !== null)
-
-  if (events.length === 0) return null
-
-  const TYPE_META = {
-    health: { label: 'Health Check', color: 'bg-emerald-500', light: 'bg-emerald-50 border-emerald-100', icon: <Heart size={12} className="text-emerald-600" /> },
-    session: { label: 'Counseling Session', color: 'bg-purple-500', light: 'bg-purple-50 border-purple-100', icon: <Users size={12} className="text-purple-600" /> },
-    visitation: { label: 'Home Visit', color: 'bg-blue-500', light: 'bg-blue-50 border-blue-100', icon: <AlertTriangle size={12} className="text-blue-600" /> },
-    education: { label: 'Education Record', color: 'bg-yellow-500', light: 'bg-yellow-50 border-yellow-100', icon: <GraduationCap size={12} className="text-yellow-600" /> },
-  }
-
-  const [expanded, setExpanded] = useState<Set<number>>(new Set())
-  const toggle = (i: number) =>
-    setExpanded(prev => { const s = new Set(prev); s.has(i) ? s.delete(i) : s.add(i); return s })
-
-  return (
-    <div className="mt-6">
-      <SectionHeading>Most Recent Activity</SectionHeading>
-      <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
-        {events.map((ev, i) => {
-          const meta = TYPE_META[ev.type]
-          const open = expanded.has(i)
-
-          return (
-            <div key={i}>
-              <button
-                onClick={() => toggle(i)}
-                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
-              >
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${meta.color}`} />
-                  {meta.icon}
-                  <span className="text-sm font-medium text-slate-700">{meta.label}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className="text-xs text-slate-400">{fmtShortDate(ev.date)}</span>
-                  <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />
-                </div>
-              </button>
-
-              {open && (
-                <div className="px-4 pb-3 pt-1 bg-slate-50 border-t border-slate-100">
-                  {ev.type === 'health' && (
-                    <div className="space-y-1">
-                      <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
-                        <div><span className="text-xs text-slate-400">Health</span>{scoreBar(ev.generalHealthScore)}</div>
-                        <div><span className="text-xs text-slate-400">Nutrition</span>{scoreBar(ev.nutritionScore)}</div>
-                        <div><span className="text-xs text-slate-400">Sleep</span>{scoreBar(ev.sleepQualityScore)}</div>
-                        <div><span className="text-xs text-slate-400">Energy</span>{scoreBar(ev.energyLevelScore)}</div>
-                      </div>
-                      <div className="flex gap-2 mt-1 flex-wrap">
-                        {[
-                          [ev.medicalCheckupDone, 'Medical'],
-                          [ev.dentalCheckupDone, 'Dental'],
-                          [ev.psychologicalCheckupDone, 'Psych'],
-                        ].map(([done, label]) => (
-                          <span
-                            key={label as string}
-                            className={`text-xs px-1.5 py-0.5 rounded font-medium ${done ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}
-                          >
-                            {done ? '✓' : '✗'} {label}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {ev.type === 'session' && (
-                    <div className="text-xs space-y-2">
-                      <div className="grid grid-cols-3 gap-2">
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Type</p>
-                          <p className="font-medium text-slate-700">{ev.sessionType ?? '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Social Worker</p>
-                          <p className="font-medium text-slate-700">{ev.socialWorker ?? '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Duration</p>
-                          <p className="font-medium text-slate-700">{ev.sessionDurationMinutes ? `${ev.sessionDurationMinutes} min` : '—'}</p>
-                        </div>
-                      </div>
-                      {ev.emotionalStateObserved && ev.emotionalStateEnd && (
-                        <div>
-                          <p className="text-slate-400 mb-1">Emotional State</p>
-                          <div className="flex items-center gap-2">
-                            <span className="px-2 py-0.5 bg-slate-100 rounded text-slate-600 font-medium">{ev.emotionalStateObserved}</span>
-                            <ArrowRight size={12} className="text-slate-300 shrink-0" />
-                            <span className="px-2 py-0.5 bg-purple-100 rounded text-purple-700 font-medium">{ev.emotionalStateEnd}</span>
-                          </div>
-                        </div>
-                      )}
-                      <div className="flex gap-2 pt-0.5">
-                        <span className={`px-2 py-0.5 rounded font-medium ${ev.progressNoted ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-400'}`}>
-                          {ev.progressNoted ? '✓ Progress noted' : 'No progress noted'}
-                        </span>
-                        <span className={`px-2 py-0.5 rounded font-medium ${ev.concernsFlagged ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-400'}`}>
-                          {ev.concernsFlagged ? '⚠ Concerns flagged' : 'No concerns'}
-                        </span>
-                      </div>
-                      {ev.interventionsApplied && (
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Interventions</p>
-                          <p className="text-slate-600">{ev.interventionsApplied}</p>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {ev.type === 'visitation' && (
-                    <div className="text-xs space-y-2">
-                      <div className="grid grid-cols-2 gap-2">
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Visit Type</p>
-                          <p className="font-medium text-slate-700">{ev.visitType ?? '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Location</p>
-                          <p className="font-medium text-slate-700">{ev.locationVisited ?? '—'}</p>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Family Cooperation</p>
-                          <span className={`inline-block px-2 py-0.5 rounded font-medium ${
-                            ev.familyCooperationLevel === 'Cooperative' ? 'bg-emerald-100 text-emerald-700' :
-                            ev.familyCooperationLevel === 'Non-Cooperative' ? 'bg-red-100 text-red-600' :
-                            'bg-slate-100 text-slate-500'
-                          }`}>{ev.familyCooperationLevel ?? '—'}</span>
-                        </div>
-                        <div>
-                          <p className="text-slate-400 mb-0.5">Outcome</p>
-                          <p className="font-medium text-slate-700">{ev.visitOutcome ?? '—'}</p>
-                        </div>
-                      </div>
-                      {ev.safetyConcernsNoted && (
-                        <div className="flex items-center gap-1.5 text-orange-600 font-medium bg-orange-50 rounded px-2 py-1">
-                          <span>⚠</span><span>Safety concerns noted</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {ev.type === 'education' && (
-                    <div className="text-xs text-slate-600 space-y-0.5">
-                      <div className="flex gap-3 flex-wrap">
-                        {ev.enrollmentStatus && <span className={`font-medium ${ev.enrollmentStatus === 'Enrolled' ? 'text-emerald-600' : 'text-slate-500'}`}>{ev.enrollmentStatus}</span>}
-                        {ev.completionStatus && <span className="text-slate-400">{ev.completionStatus}</span>}
-                      </div>
-                      {ev.attendanceRate != null && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-slate-400 w-20">Attendance</span>
-                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-yellow-400 rounded-full" style={{ width: `${Math.round(ev.attendanceRate * 100)}%` }} />
-                          </div>
-                          <span className="text-slate-500 w-8 text-right">{Math.round(ev.attendanceRate * 100)}%</span>
-                        </div>
-                      )}
-                      {ev.progressPercent != null && (
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-slate-400 w-20">Progress</span>
-                          <div className="flex-1 h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                            <div className="h-full bg-yellow-500 rounded-full" style={{ width: `${Math.round(ev.progressPercent)}%` }} />
-                          </div>
-                          <span className="text-slate-500 w-8 text-right">{Math.round(ev.progressPercent)}%</span>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )
-        })}
-      </div>
-    </div>
   )
 }
 
@@ -1831,5 +1872,90 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
         </div>
       </form>
     </Modal>
+  )
+}
+
+const SEVERITY_DOT: Record<string, string> = {
+  High:   'bg-red-500',
+  Medium: 'bg-yellow-400',
+  Low:    'bg-slate-300',
+}
+
+function IncidentSection({ incidents }: { incidents: IncidentEvent[] }) {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const toggle = (id: number) =>
+    setExpanded(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+
+  if (incidents.length === 0) {
+    return <p className="text-sm text-slate-400 mb-4">No incident reports on record.</p>
+  }
+
+  const openCount = incidents.filter(i => !i.resolved).length
+
+  return (
+    <div className="mb-4">
+      {openCount > 0 && (
+        <div className="flex items-center gap-2 mb-3 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          <ShieldAlert size={14} />
+          {openCount} unresolved incident{openCount > 1 ? 's' : ''} requiring attention
+        </div>
+      )}
+      <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+        {incidents.map((inc) => {
+          const isOpen = expanded.has(inc.incidentId)
+          const severityDot = SEVERITY_DOT[inc.severity ?? ''] ?? 'bg-slate-300'
+          return (
+            <div key={inc.incidentId}>
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                onClick={() => toggle(inc.incidentId)}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-2.5 h-2.5 rounded-full shrink-0 ${severityDot}`} title={inc.severity ?? 'Unknown'} />
+                  <span className="text-sm font-medium text-slate-700">{inc.incidentType ?? 'Incident'}</span>
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  {inc.followUpRequired && (
+                    <span className="flex items-center gap-1 text-xs font-medium text-orange-500">
+                      <AlertTriangle size={13} />
+                      Follow-up required
+                    </span>
+                  )}
+                  <span className="text-xs text-slate-400">{inc.incidentDate ?? '—'}</span>
+                  {inc.resolved
+                    ? <CheckCircle size={14} className="text-emerald-500" />
+                    : <ShieldAlert size={14} className="text-red-400" />}
+                  <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+              {isOpen && (
+                <div className="px-4 pb-4 pt-1 bg-slate-50 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-0.5">Description</p>
+                    <p className="text-slate-700">{inc.description ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-0.5">Response Taken</p>
+                    <p className="text-slate-700">{inc.responseTaken ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-0.5">Reported By</p>
+                    <p className="text-slate-700">{inc.reportedBy ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-0.5">Status</p>
+                    <p className="text-slate-700">
+                      {inc.resolved
+                        ? `Resolved${inc.resolutionDate ? ` on ${inc.resolutionDate}` : ''}`
+                        : 'Open'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }

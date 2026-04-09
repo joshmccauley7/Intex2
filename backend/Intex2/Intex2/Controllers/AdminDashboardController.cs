@@ -123,7 +123,7 @@ public class AdminDashboardController : ControllerBase
                 };
 
                 // Paginated action list: sorted by last donation (most recent first)
-                var items = await _db.Supporters
+                var rawDonorItems = await _db.Supporters
                     .Where(s => s.Status == "Active")
                     .OrderByDescending(s => s.Donations.Max(d => (DateOnly?)d.DonationDate))
                     .Skip(skip).Take(pageSize)
@@ -138,6 +138,15 @@ public class AdminDashboardController : ControllerBase
                     })
                     .ToListAsync();
 
+                var items = rawDonorItems.Select(s => new {
+                    s.SupporterId, s.DisplayName, s.Status, s.Country,
+                    s.LastDonation, s.TotalDonated, s.GiftCount,
+                    GiftFrequencyBucket = s.GiftCount == 1 ? "1 gift"
+                        : s.GiftCount is >= 2 and <= 4 ? "2–4 gifts"
+                        : s.GiftCount is >= 5 and <= 9 ? "5–9 gifts"
+                        : "10+ gifts",
+                }).ToList<object>();
+
                 var kpis = new object[]
                 {
                     new { label = "Active Donors",              value = total.ToString("N0") },
@@ -148,8 +157,8 @@ public class AdminDashboardController : ControllerBase
                 var charts = new object[]
                 {
                     new { id = "country",       type = "bar",   title = $"Giving by Country ({periodLabel}, PHP)", series = countrySeries,       valuePrefix = "₱", primary = true, sort = "desc", filterKey = "country" },
-                    new { id = "concentration", type = "donut", title = $"Donor Concentration ({periodLabel})",    series = concentrationSeries, compact = true },
-                    new { id = "cadence",       type = "bar",   title = $"Gift Frequency ({periodLabel})",          series = cadenceSeries,       compact = true },
+                    new { id = "concentration", type = "donut", title = $"Donor Concentration ({periodLabel})",    series = concentrationSeries, compact = true, filterKey = "displayName" },
+                    new { id = "cadence",       type = "bar",   title = $"Gift Frequency ({periodLabel})",          series = cadenceSeries,       compact = true, filterKey = "giftFrequencyBucket" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -333,7 +342,7 @@ public class AdminDashboardController : ControllerBase
                 var charts = new object[]
                 {
                     new { id = "prob-distrib", type = "verticalBar", title = "Churn Probability Distribution", series = probSeries,        valueSuffix = "", showValueLabels = true, filterKey = "churnBucket" },
-                    new { id = "risk-distrib", type = "stackedBar",  title = "All Risk Tiers",                  series = riskDistribSeries },
+                    new { id = "risk-distrib", type = "stackedBar",  title = "All Risk Tiers",                  series = riskDistribSeries, filterKey = "riskLevel" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -580,7 +589,7 @@ public class AdminDashboardController : ControllerBase
                     .ToArray();
 
                 // Action list: records in period, sorted by lowest general health first
-                var items = await _db.HealthWellbeingRecords
+                var rawHealthItems = await _db.HealthWellbeingRecords
                     .Where(h => h.RecordDate != null && h.RecordDate >= periodStart)
                     .OrderBy(h => h.GeneralHealthScore ?? 99)
                     .ThenByDescending(h => h.RecordDate)
@@ -589,6 +598,7 @@ public class AdminDashboardController : ControllerBase
                         (h, r) => new {
                             ResidentId    = r.ResidentId,
                             ResidentCode  = r.InternalCode,
+                            SafehouseId   = r.SafehouseId,
                             h.RecordDate,
                             GeneralHealth = h.GeneralHealthScore,
                             Nutrition     = h.NutritionScore,
@@ -596,6 +606,15 @@ public class AdminDashboardController : ControllerBase
                             Energy        = h.EnergyLevelScore,
                         })
                     .ToListAsync();
+
+                var shLookup = await _db.Safehouses
+                    .ToDictionaryAsync(s => s.SafehouseId, s => s.Name ?? "Unknown");
+
+                var items = rawHealthItems.Select(h => new {
+                    h.ResidentId, h.ResidentCode, h.RecordDate,
+                    h.GeneralHealth, h.Nutrition, h.Sleep, h.Energy,
+                    Safehouse = h.SafehouseId != null && shLookup.TryGetValue(h.SafehouseId.Value, out var shN) ? shN : "Unknown",
+                }).ToList<object>();
 
                 var kpis = new object[]
                 {
@@ -610,7 +629,7 @@ public class AdminDashboardController : ControllerBase
                 {
                     // No primary=true → both render side-by-side
                     new { id = "avg-scores",   type = "statList",    title = "Avg Health Scores",       series = avgScoresSeries,   valueSuffix = "/5" },
-                    new { id = "by-safehouse", type = "verticalBar", title = "Avg Health by Safe House", series = healthBySafehouse, valueSuffix = "/5", yDomain = new[] { 2, 5 }, threshold = 3.0, sort = "asc" },
+                    new { id = "by-safehouse", type = "verticalBar", title = "Avg Health by Safe House", series = healthBySafehouse, valueSuffix = "/5", yDomain = new[] { 2, 5 }, threshold = 3.0, sort = "asc", filterKey = "safehouse" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -735,6 +754,7 @@ public class AdminDashboardController : ControllerBase
                             p.SessionDate,
                             p.SocialWorker,
                             p.SessionDurationMinutes,
+                            CurrentRiskLevel       = r.CurrentRiskLevel,
                         })
                     .ToListAsync();
 
@@ -749,7 +769,7 @@ public class AdminDashboardController : ControllerBase
                 {
                     // No primary=true → side-by-side
                     new { id = "by-type", type = "statList",   title = "Sessions by Type",              series = byTypeSeries,  filterKey = "sessionType" },
-                    new { id = "by-risk", type = "stackedBar", title = "Sessions by Resident Risk Tier", series = sessionsByRisk },
+                    new { id = "by-risk", type = "stackedBar", title = "Sessions by Resident Risk Tier", series = sessionsByRisk, filterKey = "currentRiskLevel" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
@@ -873,11 +893,11 @@ public class AdminDashboardController : ControllerBase
                     .CountAsync(s => s.Status == "Active" && s.Donations.Count(d => d.DonationDate >= twelveMonthsAgo) >= 2);
                 var repeatRate    = activeDonors > 0 ? Math.Round(100.0 * repeatIn12mo / activeDonors, 1) : 0.0;
 
-                // Retention split donut
+                // Retention split donut — series names must match items' statusLabel for click-to-filter
                 var retentionSeries = new object[]
                 {
-                    new { name = $"Retained ({periodLabel})", value = total,  color = "#16a34a" },
-                    new { name = "Lapsed",                     value = lapsed, color = "#dc2626" },
+                    new { name = "Retained", value = total,  color = "#16a34a" },
+                    new { name = "Lapsed",   value = lapsed, color = "#dc2626" },
                 };
 
                 // Gift frequency within selected period for retained donors
@@ -908,7 +928,7 @@ public class AdminDashboardController : ControllerBase
                 }).ToArray();
 
                 // Action list: retained within period, sorted by period value desc
-                var items = await _db.Supporters
+                var rawOkrItems = await _db.Supporters
                     .Where(s => s.Status == "Active" && s.Donations.Any(d => d.DonationDate >= periodStart))
                     .OrderByDescending(s => s.Donations
                         .Where(d => d.DonationDate >= periodStart && d.Amount != null)
@@ -927,6 +947,15 @@ public class AdminDashboardController : ControllerBase
                     })
                     .ToListAsync();
 
+                var items = rawOkrItems.Select(s => new {
+                    s.SupporterId, s.DisplayName, s.Country, s.LastDonation,
+                    s.GiftCount12mo, s.TotalDonated12mo,
+                    StatusLabel = "Retained",   // matches retentionSeries name for click-to-filter
+                    GiftFrequencyBucket = s.GiftCount12mo == 1 ? "1 gift"
+                        : s.GiftCount12mo is >= 2 and <= 3 ? "2–3 gifts"
+                        : "4+ gifts",
+                }).ToList<object>();
+
                 var kpis = new object[]
                 {
                     new { label = "Retained Donors",    value = total.ToString("N0") },
@@ -937,8 +966,8 @@ public class AdminDashboardController : ControllerBase
                 var charts = new object[]
                 {
                     new { id = "trend",     type = "line",  title = $"Active Donors per Month ({periodLabel})", series = trendSeries,     primary = true },
-                    new { id = "retention", type = "donut", title = "Retention Split",                 series = retentionSeries, compact = true },
-                    new { id = "frequency", type = "bar",   title = $"Gift Frequency ({periodLabel})", series = frequencySeries, compact = true },
+                    new { id = "retention", type = "donut", title = $"Retention Split ({periodLabel})", series = retentionSeries, compact = true, filterKey = "statusLabel" },
+                    new { id = "frequency", type = "bar",   title = $"Gift Frequency ({periodLabel})", series = frequencySeries, compact = true, filterKey = "giftFrequencyBucket" },
                 };
                 return Ok(new { kpis, charts, items, totalCount = total });
             }
