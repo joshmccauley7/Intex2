@@ -159,61 +159,18 @@ interface AccordionItemProps {
 
 function AccordionItem({ question, answer, isOpen, onToggle }: AccordionItemProps) {
   return (
-    <div style={{ borderBottom: '1px solid #c9c2b4', overflow: 'hidden' }}>
+    <div className="border-b border-[#c9c2b4] dark:border-slate-700 overflow-hidden">
       <button
         onClick={onToggle}
-        style={{
-          width: '100%',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'space-between',
-          gap: '1rem',
-          padding: '1.25rem 0',
-          background: 'none',
-          border: 'none',
-          cursor: 'pointer',
-          textAlign: 'left',
-          fontFamily: "'DM Sans', sans-serif",
-          fontSize: '1rem',
-          fontWeight: isOpen ? '600' : '400',
-          color: isOpen ? '#1a1a18' : '#3d3d38',
-          transition: 'color 0.2s',
-        }}
+        className={`w-full flex items-center justify-between gap-4 py-5 bg-transparent border-none cursor-pointer text-left transition-colors duration-200 font-sans text-base ${isOpen ? 'font-semibold text-slate-900 dark:text-white' : 'font-normal text-slate-700 dark:text-slate-300'}`}
+        style={{ fontFamily: "'DM Sans', sans-serif" }}
       >
         <span>{question}</span>
         <span
-          style={{
-            flexShrink: 0,
-            width: '22px',
-            height: '22px',
-            borderRadius: '50%',
-            border: `1.5px solid ${isOpen ? '#1a1a18' : '#b0ad9e'}`,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            transition: 'border-color 0.2s, transform 0.3s',
-            transform: isOpen ? 'rotate(45deg)' : 'rotate(0deg)',
-            position: 'relative',
-          }}
+          className={`shrink-0 w-[22px] h-[22px] rounded-full flex items-center justify-center relative transition-transform duration-300 ${isOpen ? 'border border-slate-900 dark:border-white rotate-45' : 'border border-[#b0ad9e] dark:border-slate-500 rotate-0'}`}
         >
-          <span
-            style={{
-              position: 'absolute',
-              width: '10px',
-              height: '1.5px',
-              background: isOpen ? '#1a1a18' : '#b0ad9e',
-              transition: 'background 0.2s',
-            }}
-          />
-          <span
-            style={{
-              position: 'absolute',
-              width: '1.5px',
-              height: '10px',
-              background: isOpen ? '#1a1a18' : '#b0ad9e',
-              transition: 'background 0.2s',
-            }}
-          />
+          <span className={`absolute w-[10px] h-[1.5px] transition-colors duration-200 ${isOpen ? 'bg-slate-900 dark:bg-white' : 'bg-[#b0ad9e] dark:bg-slate-500'}`} />
+          <span className={`absolute w-[1.5px] h-[10px] transition-colors duration-200 ${isOpen ? 'bg-slate-900 dark:bg-white' : 'bg-[#b0ad9e] dark:bg-slate-500'}`} />
         </span>
       </button>
       <div
@@ -225,14 +182,8 @@ function AccordionItem({ question, answer, isOpen, onToggle }: AccordionItemProp
       >
         <div style={{ overflow: 'hidden' }}>
           <p
-            style={{
-              padding: '0 2rem 1.25rem 0',
-              margin: 0,
-              fontFamily: "'DM Sans', sans-serif",
-              fontSize: '0.9375rem',
-              lineHeight: '1.75',
-              color: '#6b6b63',
-            }}
+            className="text-slate-600 dark:text-slate-400 pr-8 pb-5 m-0 leading-relaxed"
+            style={{ fontFamily: "'DM Sans', sans-serif", fontSize: '0.9375rem' }}
           >
             {answer}
           </p>
@@ -252,35 +203,18 @@ function FAQAccordion({ copy }: { copy: (typeof homepageCopy)['en'] }) {
         href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:wght@400;600&display=swap"
         rel="stylesheet"
       />
-      <div
-        style={{
-          maxWidth: '680px',
-          margin: '0 auto',
-          padding: '3rem 1.5rem',
-          fontFamily: "'DM Sans', sans-serif",
-        }}
-      >
-        <div style={{ marginBottom: '2.5rem' }}>
-          <p
-            style={{
-              fontSize: '0.75rem',
-              fontWeight: '600',
-              letterSpacing: '0.12em',
-              textTransform: 'uppercase',
-              color: '#6b6656',
-              marginBottom: '0.5rem',
-            }}
-          >
+      <div className="max-w-[680px] mx-auto px-6 py-12" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+        <div className="mb-10">
+          <p className="text-xs font-semibold tracking-[0.12em] uppercase text-[#6b6656] dark:text-slate-400 mb-2">
             {copy.faqIntro}
           </p>
           <h2
+            className="text-slate-900 dark:text-white m-0"
             style={{
               fontFamily: "'DM Serif Display', serif",
               fontSize: 'clamp(1.75rem, 4vw, 2.5rem)',
               fontWeight: '400',
-              color: '#1a1a18',
               lineHeight: '1.2',
-              margin: 0,
             }}
           >
             {copy.faqTitle1}
@@ -289,7 +223,7 @@ function FAQAccordion({ copy }: { copy: (typeof homepageCopy)['en'] }) {
           </h2>
         </div>
 
-        <div style={{ borderTop: '1px solid #c9c2b4' }}>
+        <div className="border-t border-[#c9c2b4] dark:border-slate-700">
           {copy.faqItems.map((faq, i) => (
             <AccordionItem
               key={i}
@@ -301,20 +235,10 @@ function FAQAccordion({ copy }: { copy: (typeof homepageCopy)['en'] }) {
           ))}
         </div>
 
-        <div
-          style={{
-            marginTop: '2rem',
-            fontSize: '0.875rem',
-            color: '#5f5d53',
-            fontFamily: "'DM Sans', sans-serif",
-            display: 'flex',
-            flexDirection: 'column',
-            gap: '0.35rem',
-          }}
-        >
-          <p style={{ margin: 0, fontWeight: 600, color: '#1a1a18' }}>{copy.faqContactTitle}</p>
-          <p style={{ margin: 0 }}>📞 555-555-5555</p>
-          <p style={{ margin: 0 }}>✉️ safira@email.com</p>
+        <div className="mt-8 text-sm text-slate-500 dark:text-slate-400 flex flex-col gap-1.5" style={{ fontFamily: "'DM Sans', sans-serif" }}>
+          <p className="m-0 font-semibold text-slate-900 dark:text-white">{copy.faqContactTitle}</p>
+          <p className="m-0">📞 555-555-5555</p>
+          <p className="m-0">✉️ safira@email.com</p>
         </div>
       </div>
     </>
@@ -539,7 +463,7 @@ export default function HomePage() {
           {copy.impactStats.map(({ icon: Icon, value, label }) => (
             <div
               key={label}
-              className="group relative flex flex-col items-center rounded-2xl border border-slate-200/90 bg-white px-6 pb-9 pt-10 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-4px_rgba(15,23,42,0.1)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-slate-300 hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.14)]"
+              className="group relative flex flex-col items-center rounded-2xl border border-slate-200/90 dark:border-slate-700 bg-white dark:bg-slate-800 px-6 pb-9 pt-10 text-center shadow-[0_1px_2px_rgba(15,23,42,0.04),0_8px_24px_-4px_rgba(15,23,42,0.1)] dark:shadow-[0_8px_24px_-4px_rgba(0,0,0,0.4)] transition-[transform,box-shadow,border-color] duration-300 hover:-translate-y-1 hover:border-slate-300 dark:hover:border-slate-600 hover:shadow-[0_12px_32px_-8px_rgba(15,23,42,0.14)]"
             >
               <div
                 className="mb-5 flex h-[3.5rem] w-[3.5rem] shrink-0 items-center justify-center rounded-2xl bg-gradient-to-b from-blue-50 to-blue-100/60 text-safira-blue shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] ring-1 ring-blue-200/50"
@@ -563,14 +487,9 @@ export default function HomePage() {
 
       {/* ── FAQ ── */}
       <div className="flex justify-center">
-        <hr style={{
-          width: '50%',
-          border: 'none',
-          borderTop: '1px solid #c9c2b4',
-          margin: '0',
-        }} />
+        <hr className="w-1/2 border-none border-t border-[#c9c2b4] dark:border-slate-700 m-0" />
       </div>
-      <div style={{ background: '#ffffff' }}>
+      <div className="bg-white dark:bg-slate-900">
         <FAQAccordion copy={copy} />
       </div>
 

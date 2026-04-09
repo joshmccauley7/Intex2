@@ -1082,7 +1082,7 @@ public class ChatController : ControllerBase
             .CountAsync(r => r.DateOfAdmission >= thirtyDaysAgo);
 
         var bySafehouse = await _db.Residents
-            .Where(r => r.SafehouseId != null)
+            .Where(r => r.SafehouseId != null && r.CaseStatus == "Active")
             .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, s) => new { s.Name, s.SafehouseId })
             .GroupBy(x => x.Name)
             .Select(g => new { Safehouse = g.Key, Count = g.Count() })
@@ -1246,7 +1246,7 @@ public class ChatController : ControllerBase
 
         foreach (var s in safehouses)
         {
-            var residentCount = await _db.Residents.CountAsync(r => r.SafehouseId == s.SafehouseId);
+            var residentCount = await _db.Residents.CountAsync(r => r.SafehouseId == s.SafehouseId && r.CaseStatus == "Active");
             var occupancyPct = s.CapacityGirls > 0
                 ? $"{(residentCount * 100.0 / s.CapacityGirls):N0}% capacity"
                 : "capacity unknown";
