@@ -278,6 +278,24 @@ public class ResidentsController : ControllerBase
             })
             .ToListAsync();
 
+        var incidents = await _db.IncidentReports
+            .AsNoTracking()
+            .Where(i => i.ResidentId == id)
+            .OrderByDescending(i => i.IncidentDate)
+            .Select(i => new {
+                i.IncidentId,
+                i.IncidentDate,
+                i.IncidentType,
+                i.Severity,
+                i.Description,
+                i.ResponseTaken,
+                i.Resolved,
+                i.ResolutionDate,
+                i.ReportedBy,
+                i.FollowUpRequired
+            })
+            .ToListAsync();
+
         return Ok(new {
             riskJourney = new { initial = resident.InitialRiskLevel, current = resident.CurrentRiskLevel },
             statusIndicators = new { health = si.Health, education = si.Education, counseling = si.Counseling, risk = si.Risk },
@@ -285,7 +303,8 @@ public class ResidentsController : ControllerBase
             sessions,
             visitations,
             education,
-            interventionPlans
+            interventionPlans,
+            incidents
         });
     }
 
