@@ -1792,9 +1792,10 @@ public class ChatController : ControllerBase
 
             // Also pull activity records (visits, sessions, conferences) during this period
             var residentIds = residents.Select(r => r.ResidentId).ToList();
+            var residentIdsNullable = residentIds.Select(id => (int?)id).ToList();
 
             var visits = await _db.HomeVisitations
-                .Where(v => residentIds.Contains(v.ResidentId) && v.VisitDate >= from && v.VisitDate <= to)
+                .Where(v => residentIdsNullable.Contains(v.ResidentId) && v.VisitDate >= from && v.VisitDate <= to)
                 .CountAsync();
             var sessions = await _db.ProcessRecordings
                 .Where(p => residentIds.Contains(p.ResidentId) && p.SessionDate >= from && p.SessionDate <= to)
@@ -1803,7 +1804,7 @@ public class ChatController : ControllerBase
                 .Where(c => residentIds.Contains(c.ResidentId) && c.ConferenceDate >= from && c.ConferenceDate <= to)
                 .CountAsync();
             var concerns = await _db.HomeVisitations
-                .CountAsync(v => residentIds.Contains(v.ResidentId) && v.VisitDate >= from && v.VisitDate <= to && v.SafetyConcernsNoted == true);
+                .CountAsync(v => residentIdsNullable.Contains(v.ResidentId) && v.VisitDate >= from && v.VisitDate <= to && v.SafetyConcernsNoted == true);
 
             sb.AppendLine($"\nActivity during this period:");
             sb.AppendLine($"  Home visits: {visits}");
@@ -1925,7 +1926,7 @@ public class ChatController : ControllerBase
         else
         {
             var avgEng = posts.Average(p => p.EngagementRate);
-            var totalReach = posts.Sum(p => p.Reach ?? 0);
+            var totalReach = posts.Sum(p => p.Reach);
             sb.AppendLine($"Average engagement rate: {avgEng:P1} | Total reach: {totalReach:N0}");
             var byPlatform = posts.GroupBy(p => p.Platform).Select(g => $"{g.Key}: {g.Count()}");
             sb.AppendLine($"By platform: {string.Join(", ", byPlatform)}");
