@@ -209,6 +209,69 @@ export default function ChatWidget() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
 
+  // ── Drag + Resize state ───────────────────────────────────────────────────
+  const MIN_W = 280; const MAX_W = 700;
+  const MIN_H = 300; const MAX_H = 900;
+
+  const [pos,  setPos]  = useState(() => ({
+    x: 20,
+    y: typeof window !== 'undefined' ? Math.max(20, window.innerHeight - 580) : 100,
+  }));
+  const [size, setSize] = useState({ w: 384, h: 560 });
+
+  const dragMode   = useRef<'move' | 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw' | null>(null);
+  const dragStart  = useRef({ mx: 0, my: 0, x: 0, y: 0, w: 0, h: 0 });
+
+  function startInteraction(mode: typeof dragMode.current, e: React.PointerEvent) {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragMode.current  = mode;
+    dragStart.current = { mx: e.clientX, my: e.clientY, x: pos.x, y: pos.y, w: size.w, h: size.h };
+  }
+
+  function onHeaderPointerDown(e: React.PointerEvent<HTMLDivElement>) {
+    if ((e.target as HTMLElement).closest('button')) return;
+    startInteraction('move', e);
+  }
+
+  function onPanelPointerMove(e: React.PointerEvent<HTMLDivElement>) {
+    const mode = dragMode.current;
+    if (!mode) return;
+    const dx = e.clientX - dragStart.current.mx;
+    const dy = e.clientY - dragStart.current.my;
+    const { x: ox, y: oy, w: ow, h: oh } = dragStart.current;
+
+    if (mode === 'move') {
+      setPos({
+        x: Math.max(0, Math.min(window.innerWidth  - size.w, ox + dx)),
+        y: Math.max(0, Math.min(window.innerHeight - 60,     oy + dy)),
+      });
+      return;
+    }
+
+    let newX = ox, newY = oy, newW = ow, newH = oh;
+    if (mode.includes('e')) newW = Math.min(MAX_W, Math.max(MIN_W, ow + dx));
+    if (mode.includes('s')) newH = Math.min(MAX_H, Math.max(MIN_H, oh + dy));
+    if (mode.includes('w')) {
+      newW = Math.min(MAX_W, Math.max(MIN_W, ow - dx));
+      newX = ox + (ow - newW);
+    }
+    if (mode.includes('n')) {
+      newH = Math.min(MAX_H, Math.max(MIN_H, oh - dy));
+      newY = oy + (oh - newH);
+    }
+    setSize({ w: newW, h: newH });
+    setPos({ x: newX, y: newY });
+  }
+
+  function onPanelPointerUp() {
+    dragMode.current = null;
+  }
+
+  // Resize handle style helper
+  const rh = (cursor: string, style: React.CSSProperties): React.CSSProperties => ({
+    position: 'absolute', cursor, zIndex: 10, ...style,
+  });
+
   // ── All hooks before early return ─────────────────────────────────────────
 
   useEffect(() => {
@@ -296,16 +359,27 @@ export default function ChatWidget() {
       {/* ── Chat panel ──────────────────────────────────────────────────── */}
       {isOpen && (
       <div
-        className={[
-          'fixed bottom-5 left-5 z-50 flex flex-col w-80 sm:w-96 h-[560px]',
-          'rounded-2xl shadow-2xl border',
-          'bg-[var(--page-bg)] border-slate-200 dark:border-slate-700',
-          'transition-all duration-200 ease-out origin-bottom-left',
-          'opacity-100 scale-100 translate-y-0',
-        ].join(' ')}
+        className="fixed z-50 flex flex-col rounded-2xl shadow-2xl border bg-[var(--page-bg)] border-slate-200 dark:border-slate-700"
+        style={{ left: pos.x, top: pos.y, width: size.w, height: size.h }}
+        onPointerMove={onPanelPointerMove}
+        onPointerUp={onPanelPointerUp}
+        onPointerLeave={onPanelPointerUp}
       >
-        {/* Header */}
-        <div className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex-shrink-0">
+        {/* Resize handles */}
+        <div style={rh('ns-resize',   { top: 0,    left: 8,  right: 8,  height: 5 })}         onPointerDown={e => startInteraction('n',  e)} />
+        <div style={rh('ns-resize',   { bottom: 0, left: 8,  right: 8,  height: 5 })}         onPointerDown={e => startInteraction('s',  e)} />
+        <div style={rh('ew-resize',   { left: 0,   top: 8,   bottom: 8, width: 5 })}          onPointerDown={e => startInteraction('w',  e)} />
+        <div style={rh('ew-resize',   { right: 0,  top: 8,   bottom: 8, width: 5 })}          onPointerDown={e => startInteraction('e',  e)} />
+        <div style={rh('nwse-resize', { top: 0,    left: 0,  width: 12, height: 12 })}        onPointerDown={e => startInteraction('nw', e)} />
+        <div style={rh('nesw-resize', { top: 0,    right: 0, width: 12, height: 12 })}        onPointerDown={e => startInteraction('ne', e)} />
+        <div style={rh('nesw-resize', { bottom: 0, left: 0,  width: 12, height: 12 })}        onPointerDown={e => startInteraction('sw', e)} />
+        <div style={rh('nwse-resize', { bottom: 0, right: 0, width: 12, height: 12 })}        onPointerDown={e => startInteraction('se', e)} />
+
+        {/* Header — drag handle */}
+        <div
+          className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex-shrink-0 cursor-move select-none"
+          onPointerDown={onHeaderPointerDown}
+        >
           <div className="flex items-center gap-2">
             {category !== null && !inChat && (
               <button
