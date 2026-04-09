@@ -539,20 +539,36 @@ export default function ResidentsPage() {
           </div>
 
           {/* Tabs */}
-          <div className="flex border-b border-slate-200 mb-5 -mx-6 px-6">
-            {(['progress', 'profile'] as const).map((tab) => (
+          <div className="flex items-center justify-between border-b border-slate-200 mb-5 -mx-6 px-6">
+            <div className="flex">
+              {(['progress', 'profile'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  onClick={() => setDetailTab(tab)}
+                  className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
+                    detailTab === tab
+                      ? 'border-safira-blue text-safira-blue'
+                      : 'border-transparent text-slate-500 hover:text-slate-700'
+                  }`}
+                >
+                  {tab === 'progress' ? 'Progress' : 'Profile'}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 pb-2">
               <button
-                key={tab}
-                onClick={() => setDetailTab(tab)}
-                className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors capitalize ${
-                  detailTab === tab
-                    ? 'border-safira-blue text-safira-blue'
-                    : 'border-transparent text-slate-500 hover:text-slate-700'
-                }`}
+                onClick={() => navigate(`/admin/process-recordings?residentId=${selectedResident.residentId}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
               >
-                {tab === 'progress' ? 'Progress' : 'Profile'}
+                Process Recordings <ArrowRight size={12} />
               </button>
-            ))}
+              <button
+                onClick={() => navigate(`/admin/home-visitations?residentId=${selectedResident.residentId}`)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+              >
+                Home Visitations <ArrowRight size={12} />
+              </button>
+            </div>
           </div>
 
           {/* Progress tab */}
@@ -570,21 +586,6 @@ export default function ResidentsPage() {
                   <ProgressSnapshot resident={selectedResident} lifecycle={lifecycle} />
                   <SectionHeading>Incident Reports</SectionHeading>
                   <IncidentSection incidents={lifecycle.incidents} />
-                  <SectionHeading>Quick Navigation</SectionHeading>
-                  <div className="flex gap-3">
-                    <button
-                      onClick={() => navigate(`/admin/process-recordings?residentId=${selectedResident.residentId}`)}
-                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                    >
-                      Counseling Sessions <ArrowRight size={13} />
-                    </button>
-                    <button
-                      onClick={() => navigate(`/admin/home-visitations?residentId=${selectedResident.residentId}`)}
-                      className="flex items-center gap-1.5 px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                    >
-                      Home Visits <ArrowRight size={13} />
-                    </button>
-                  </div>
                 </>
               ) : (
                 <p className="text-sm text-slate-400">Loading progress data…</p>
@@ -688,7 +689,7 @@ export default function ResidentsPage() {
             </>
           )}
 
-          <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
+          <div className="flex gap-3 justify-end pt-4 mt-2 border-t border-slate-200">
             <button onClick={() => setEditResident(selectedResident)} className="px-4 py-2 text-sm font-medium text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors">Edit</button>
             <button onClick={() => { setSelectedResident(null); setLifecycle(null) }} className="px-4 py-2 text-sm font-medium text-white bg-safira-blue hover:bg-safira-blue-dark rounded-lg transition-colors">Close</button>
           </div>
@@ -900,7 +901,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
 
     return (
       <div>
-        <div className="flex items-center justify-between gap-2 mb-1">
+        <div className="flex items-center justify-between gap-2 mb-1.5">
           <p className="text-xs font-semibold text-slate-600">{label}</p>
           {passing !== undefined && (
             <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${passing ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -908,7 +909,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
             </span>
           )}
         </div>
-        {summary && <p className="text-xs text-slate-400 mb-2">{summary}</p>}
+        {summary && <p className="text-xs text-slate-400 mb-3">{summary}</p>}
         <div className="inline-flex border border-slate-100 rounded-lg overflow-hidden">
           {dots.map((dot, i) => (
             <div key={i} className={`flex flex-col items-center gap-0.5 px-2 py-1 ${i > 0 ? 'border-l border-slate-100' : ''}`}>
@@ -933,15 +934,16 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
   }
 
   // ── Per-type indicators ─────────────────────────────────────────────────────
+  const isActive = resident.caseStatus === 'Active'
   function renderIndicators() {
     if (reType === 'Family Reunification') {
       return (
         <div className="pt-3 border-t border-slate-100">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6">
           {recentVisits.length > 0 && (
             <DotRow
               label="Family Cooperation"
-              passing={!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')}
+              passing={isActive ? (!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')) : undefined}
               summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
               dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
               dots={[
@@ -949,7 +951,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
                   <div key={i} title={v.familyCooperationLevel ?? 'Unknown'}
                     className={`w-4 h-4 rounded-full ${
                       v.familyCooperationLevel === 'Highly Cooperative' || v.familyCooperationLevel === 'Cooperative'
-                        ? 'bg-slate-600' : 'bg-slate-200'
+                        ? 'bg-emerald-500' : 'bg-slate-200'
                     }`} />
                 )),
                 ...Array.from({ length: DOTS - recentVisits.length }).map((_, i) => (
@@ -961,13 +963,13 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              passing={!isStale(latestSession?.date)}
+              passing={isActive ? !isStale(latestSession?.date) : undefined}
               summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
               dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
                 ...recentSessions.map((s, i) => (
                   <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
-                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                 )),
                 ...Array.from({ length: DOTS - recentSessions.length }).map((_, i) => (
                   <div key={`e-${i}`} className="w-4 h-4 rounded-full bg-slate-100" />
@@ -983,17 +985,17 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     if (reType === 'Foster Care') {
       return (
         <div className="pt-3 border-t border-slate-100">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6">
           {recentHealth.length > 0 && (
             <DotRow
               label="Psych Checkups"
-              passing={latestHealth != null && !isStale(latestHealth.date, 540)}
-              summary={`${psychCount} of ${recentHealth.length} most recent records had psych checkup`}
+              passing={isActive ? (latestHealth != null && !isStale(latestHealth.date, 540) && psychCount >= 3) : undefined}
+              summary={`${psychCount} of ${recentHealth.length} most recent records had a psych checkup`}
               dates={[...recentHealth.map(h => h.date), ...Array(Math.max(0, DOTS - recentHealth.length)).fill(null)]}
               dots={[
                 ...recentHealth.map((h, i) => (
                   <div key={i} title={h.psychologicalCheckupDone ? 'Done' : 'Not done'}
-                    className={`w-4 h-4 rounded-full ${h.psychologicalCheckupDone ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                    className={`w-4 h-4 rounded-full ${h.psychologicalCheckupDone ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                 )),
                 ...Array.from({ length: DOTS - recentHealth.length }).map((_, i) => (
                   <div key={`e-${i}`} className="w-4 h-4 rounded-full bg-slate-100" />
@@ -1004,13 +1006,13 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           {recentSessions.length > 0 && (
             <DotRow
               label="Counseling Progress"
-              passing={!isStale(latestSession?.date)}
+              passing={isActive ? !isStale(latestSession?.date) : undefined}
               summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
               dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
               dots={[
                 ...recentSessions.map((s, i) => (
                   <div key={i} title={s.progressNoted ? 'Progress noted' : 'No progress'}
-                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                    className={`w-4 h-4 rounded-full ${s.progressNoted ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                 )),
                 ...Array.from({ length: DOTS - recentSessions.length }).map((_, i) => (
                   <div key={`e-${i}`} className="w-4 h-4 rounded-full bg-slate-100" />
@@ -1093,11 +1095,11 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
 
       return (
         <div className="pt-3 border-t border-slate-100">
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-6">
           {recentEducation.length > 0 && (
             <DotRow
               label="Attendance"
-              passing={latestEducation != null && !isStale(latestEducation.date, 540) && (latestEducation.attendanceRate ?? 0) >= 0.5}
+              passing={isActive ? (latestEducation != null && !isStale(latestEducation.date, 540) && (latestEducation.attendanceRate ?? 0) >= 0.5) : undefined}
               summary={`${goodAttendanceCount} of ${recentEducation.length} most recent records ≥80% attendance`}
               dates={[...recentEducation.map(e => e.date), ...Array(Math.max(0, DOTS - recentEducation.length)).fill(null)]}
               dots={[
@@ -1105,7 +1107,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
                   const rate = e.attendanceRate ?? 0
                   return (
                     <div key={i} title={`${Math.round(rate * 100)}% attendance`}
-                      className={`w-4 h-4 rounded-full ${rate >= 0.8 ? 'bg-slate-600' : 'bg-slate-200'}`} />
+                      className={`w-4 h-4 rounded-full ${rate >= 0.8 ? 'bg-emerald-500' : 'bg-slate-200'}`} />
                   )
                 }),
                 ...Array.from({ length: DOTS - recentEducation.length }).map((_, i) => (
@@ -1117,9 +1119,11 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
           <div>
             <div className="flex items-center justify-between gap-2 mb-1">
               <p className="text-xs font-semibold text-slate-600">Social Worker Contact</p>
-              <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${!isStale(latestSession?.date) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                {!isStale(latestSession?.date) ? '✓ On track' : '⚠ Needs attention'}
-              </span>
+              {isActive && (
+                <span className={`shrink-0 text-xs font-semibold px-2 py-0.5 rounded-full ${!isStale(latestSession?.date) ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                  {!isStale(latestSession?.date) ? '✓ On track' : '⚠ Needs attention'}
+                </span>
+              )}
             </div>
             <p className="text-2xl font-bold text-[#0f172a]">{totalSessions + totalVisits}</p>
             <p className="text-xs text-slate-400 mb-1">{totalSessions} sessions · {totalVisits} home visits</p>
@@ -1137,7 +1141,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         {recentVisits.length > 0 && (
           <DotRow
             label="Family Cooperation"
-            passing={!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')}
+            passing={isActive ? (!isStale(latestVisit?.date) && (latestVisit?.familyCooperationLevel === 'Cooperative' || latestVisit?.familyCooperationLevel === 'Highly Cooperative')) : undefined}
             summary={`${cooperativeCount} of ${recentVisits.length} most recent visits cooperative`}
             dates={[...recentVisits.map(v => v.date), ...Array(Math.max(0, DOTS - recentVisits.length)).fill(null)]}
             dots={[
@@ -1145,7 +1149,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
                 <div key={i} title={v.familyCooperationLevel ?? 'Unknown'}
                   className={`w-4 h-4 rounded-full ${
                     v.familyCooperationLevel === 'Cooperative' || v.familyCooperationLevel === 'Highly Cooperative'
-                      ? 'bg-slate-600' : 'bg-slate-200'
+                      ? 'bg-emerald-500' : 'bg-slate-200'
                   }`} />
               )),
               ...Array.from({ length: DOTS - recentVisits.length }).map((_, i) => (
@@ -1157,7 +1161,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
         {recentSessions.length > 0 && (
           <DotRow
             label="Counseling Progress"
-            passing={!isStale(latestSession?.date)}
+            passing={isActive ? !isStale(latestSession?.date) : undefined}
             summary={`${progressCount} of ${recentSessions.length} most recent sessions showed progress`}
             dates={[...recentSessions.map(s => s.date), ...Array(Math.max(0, DOTS - recentSessions.length)).fill(null)]}
             dots={[
@@ -1180,7 +1184,7 @@ function ReintegrationCard({ resident, lifecycle }: { resident: ResidentDetail; 
     <div className="rounded-xl border border-slate-200 overflow-hidden mb-5">
       <div className="flex">
         <div className={`w-1.5 shrink-0 ${bgColor}`} />
-        <div className="flex-1 px-4 py-4 space-y-4">
+        <div className="flex-1 px-5 py-5 space-y-5">
           {/* Top row — status / type / length of stay */}
           <div className="flex items-start justify-between">
             <div>
@@ -1253,7 +1257,7 @@ function GoalBar({ current, target, max }: { current: number; target: number; ma
   )
 }
 
-function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: ResidentDetail; lifecycle: LifecycleData }) {
+function ProgressSnapshot({ resident, lifecycle }: { resident: ResidentDetail; lifecycle: LifecycleData }) {
   const [openChart, setOpenChart] = useState<string | null>(null)
 
   const latestHealth    = lifecycle.health.at(-1) ?? null
@@ -1264,8 +1268,30 @@ function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: Reside
   const avgHealthScore  = latestHealth ? avgHealth(latestHealth) : null
   const prevHealthScore = prevHealth ? avgHealth(prevHealth) : null
 
+  const computeSafetyScore = (asOf: Date) => {
+    const riskBase: Record<string, number> = { low: 5, medium: 3.5, high: 2, critical: 1 }
+    const base = riskBase[resident.currentRiskLevel?.toLowerCase() ?? ''] ?? 3
+    const asOfStr = asOf.toISOString().split('T')[0]
+    const activeUnresolved = lifecycle.incidents.filter(i => {
+      if (!i.incidentDate || i.incidentDate > asOfStr) return false
+      if (i.resolved && i.resolutionDate && i.resolutionDate <= asOfStr) return false
+      return true
+    })
+    const deduction = activeUnresolved.reduce((sum, i) => {
+      const s = i.severity?.toLowerCase() ?? ''
+      return sum + (s === 'high' ? 1.0 : s === 'medium' ? 0.5 : 0.25)
+    }, 0)
+    return Math.max(1, Math.min(5, base - deduction))
+  }
+
+  const safetyScore = computeSafetyScore(new Date())
+  const prevSafetyScore = computeSafetyScore(new Date(Date.now() - 30 * 86_400_000))
+  const riskBase: Record<string, number> = { low: 5, medium: 3.5, high: 2, critical: 1 }
+  const admissionSafetyScore = riskBase[resident.initialRiskLevel?.toLowerCase() ?? ''] ?? 3
+
   const currentFor = (category: string | null): number | null => {
     if (category === 'Education') return latestEducation?.attendanceRate ?? null
+    if (category === 'Safety') return safetyScore
     return avgHealthScore
   }
 
@@ -1274,12 +1300,20 @@ function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: Reside
       const a = latestEducation?.attendanceRate, b = prevEducation?.attendanceRate
       return a != null && b != null ? (a - b) * 100 : null
     }
+    if (category === 'Safety') return safetyScore - prevSafetyScore
     return avgHealthScore != null && prevHealthScore != null ? avgHealthScore - prevHealthScore : null
   }
 
   const sparkValuesFor = (category: string | null): number[] => {
     if (category === 'Education')
       return lifecycle.education.map(e => e.attendanceRate != null ? Number(e.attendanceRate) * 100 : null).filter((v): v is number => v != null)
+    if (category === 'Safety') {
+      const incidentScores = lifecycle.incidents
+        .filter(i => i.incidentDate != null)
+        .sort((a, b) => a.incidentDate!.localeCompare(b.incidentDate!))
+        .map(i => computeSafetyScore(new Date(i.incidentDate!)))
+      return [admissionSafetyScore, ...incidentScores, safetyScore]
+    }
     return lifecycle.health.map(e => avgHealth(e)).filter((v): v is number => v != null)
   }
 
@@ -1292,6 +1326,17 @@ function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: Reside
   const chartDataFor = (category: string | null) => {
     if (category === 'Education')
       return lifecycle.education.map(e => ({ date: fmtMonthYear(e.date), value: e.attendanceRate != null ? Math.round(Number(e.attendanceRate) * 100) : null })).filter(d => d.value != null) as { date: string; value: number }[]
+    if (category === 'Safety') {
+      const incidentPoints = lifecycle.incidents
+        .filter(i => i.incidentDate != null)
+        .sort((a, b) => a.incidentDate!.localeCompare(b.incidentDate!))
+        .map(i => ({ date: fmtMonthYear(i.incidentDate), value: computeSafetyScore(new Date(i.incidentDate!)) }))
+      return [
+        { date: fmtMonthYear(resident.dateOfAdmission) || 'Admission', value: admissionSafetyScore },
+        ...incidentPoints,
+        { date: 'Now', value: safetyScore },
+      ]
+    }
     return lifecycle.health.map(e => ({ date: fmtMonthYear(e.date), value: avgHealth(e) != null ? parseFloat(avgHealth(e)!.toFixed(2)) : null })).filter(d => d.value != null) as { date: string; value: number }[]
   }
 
@@ -1320,29 +1365,27 @@ function ProgressSnapshot({ resident: _resident, lifecycle }: { resident: Reside
                 <span className="text-sm font-semibold text-[#0f172a]">{plan.planCategory}</span>
                 {delta != null && <TrendBadge delta={delta} unit={isEducation ? '%' : ''} />}
               </div>
-              <div className="flex items-center gap-3">
-                <div className="text-xs text-slate-500">
-                  {currentLabel != null && targetLabel != null ? (
-                    <span>
-                      <span className="font-semibold text-[#0f172a]">{currentLabel}</span>
-                      <span className="text-slate-400"> / {targetLabel} goal</span>
-                    </span>
-                  ) : '—'}
-                </div>
-                {sparkValuesFor(plan.planCategory).length >= 2 && (
-                  <button
-                    onClick={() => setOpenChart(openChart === plan.planCategory ? null : plan.planCategory)}
-                    className="opacity-60 hover:opacity-100 transition-opacity"
-                    title="View history"
-                  >
-                    <Sparkline values={sparkValuesFor(plan.planCategory)} />
-                  </button>
-                )}
-              </div>
+              {sparkValuesFor(plan.planCategory).length >= 2 && (
+                <button
+                  onClick={() => setOpenChart(openChart === plan.planCategory ? null : plan.planCategory)}
+                  className="opacity-60 hover:opacity-100 transition-opacity"
+                  title="View history"
+                >
+                  <Sparkline values={sparkValuesFor(plan.planCategory)} />
+                </button>
+              )}
             </div>
             {current != null && target != null ? (
               <>
-                <GoalBar current={current} target={Number(target)} max={max} />
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <GoalBar current={current} target={Number(target)} max={max} />
+                  </div>
+                  <div className="text-xs text-slate-500 text-right shrink-0" style={{ minWidth: '7rem' }}>
+                    <span className="font-semibold text-[#0f172a]">{currentLabel}</span>
+                    <span className="text-slate-400"> / {targetLabel} goal</span>
+                  </div>
+                </div>
                 <p className={`text-xs mt-1.5 font-medium ${met ? 'text-emerald-600' : 'text-slate-400'}`}>
                   {met ? '✓ Goal met' : toGoLabel}
                 </p>

@@ -292,7 +292,7 @@ public class ResidentStatusCalculator
                 var allActivityDates = allVisitDates.Concat(allSessionDates).ToList();
                 var adoptionAnchor = allActivityDates.Count > 0 ? allActivityDates.Max() : today;
                 var adoptionRecentStart = adoptionAnchor.AddDays(-90);
-                var adoptionPriorStart  = adoptionAnchor.AddDays(-540);
+                var adoptionPriorStart  = adoptionAnchor.AddDays(-180);
                 var visitsRecent   = allVisitDates.Count(d => d >= adoptionRecentStart);
                 var visitsPrior    = allVisitDates.Count(d => d >= adoptionPriorStart && d < adoptionRecentStart);
                 var sessionsRecent = allSessionDates.Count(d => d >= adoptionRecentStart);
