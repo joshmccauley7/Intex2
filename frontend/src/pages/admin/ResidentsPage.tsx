@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { apiFetch } from '../../api'
-import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users, ChevronDown, X, Info, Home } from 'lucide-react'
+import { Plus, Eye, Pencil, Trash2, ArrowRight, AlertTriangle, Heart, GraduationCap, Users, ChevronDown, X, Info, Home, ShieldAlert, CheckCircle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 interface ResidentRow {
@@ -128,6 +128,19 @@ interface InterventionPlan {
   status: string | null
 }
 
+interface IncidentEvent {
+  incidentId: number
+  incidentDate: string | null
+  incidentType: string | null
+  severity: string | null
+  description: string | null
+  responseTaken: string | null
+  resolved: boolean | null
+  resolutionDate: string | null
+  reportedBy: string | null
+  followUpRequired: boolean | null
+}
+
 interface LifecycleData {
   riskJourney: { initial: string | null; current: string | null }
   health: HealthEvent[]
@@ -135,6 +148,7 @@ interface LifecycleData {
   visitations: VisitationEvent[]
   education: EducationEvent[]
   interventionPlans: InterventionPlan[]
+  incidents: IncidentEvent[]
 }
 
 const SAFEHOUSES = [1,2,3,4,5,6,7,8,9].map(i => ({ id: i, name: `Lighthouse Safehouse ${i}` }))
@@ -556,6 +570,8 @@ export default function ResidentsPage() {
                   <SectionHeading>Goal Progress</SectionHeading>
                   <ProgressSnapshot resident={selectedResident} lifecycle={lifecycle} />
                   <ResidentTimeline lifecycle={lifecycle} />
+                  <SectionHeading>Incident Reports</SectionHeading>
+                  <IncidentSection incidents={lifecycle.incidents} />
                 </>
               ) : (
                 <p className="text-sm text-slate-400">Loading progress data…</p>
@@ -2051,5 +2067,89 @@ function ResidentFormModal({ existing, onClose, onSaved }: ResidentFormModalProp
         </div>
       </form>
     </Modal>
+  )
+}
+
+const SEVERITY_STYLE: Record<string, string> = {
+  High:   'bg-red-100 text-red-700',
+  Medium: 'bg-yellow-100 text-yellow-700',
+  Low:    'bg-slate-100 text-slate-600',
+}
+
+function IncidentSection({ incidents }: { incidents: IncidentEvent[] }) {
+  const [expanded, setExpanded] = useState<Set<number>>(new Set())
+  const toggle = (id: number) =>
+    setExpanded(prev => { const s = new Set(prev); s.has(id) ? s.delete(id) : s.add(id); return s })
+
+  if (incidents.length === 0) {
+    return <p className="text-sm text-slate-400 mb-4">No incident reports on record.</p>
+  }
+
+  const openCount = incidents.filter(i => !i.resolved).length
+
+  return (
+    <div className="mb-4">
+      {openCount > 0 && (
+        <div className="flex items-center gap-2 mb-3 text-xs font-medium text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+          <ShieldAlert size={14} />
+          {openCount} unresolved incident{openCount > 1 ? 's' : ''} requiring attention
+        </div>
+      )}
+      <div className="rounded-xl border border-slate-200 overflow-hidden divide-y divide-slate-100">
+        {incidents.map((inc) => {
+          const isOpen = expanded.has(inc.incidentId)
+          const severityStyle = SEVERITY_STYLE[inc.severity ?? ''] ?? 'bg-slate-100 text-slate-600'
+          return (
+            <div key={inc.incidentId}>
+              <button
+                className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-50 transition-colors text-left"
+                onClick={() => toggle(inc.incidentId)}
+              >
+                <div className="flex items-center gap-3">
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${severityStyle}`}>
+                    {inc.severity ?? 'Unknown'}
+                  </span>
+                  <span className="text-sm font-medium text-slate-700">{inc.incidentType ?? 'Incident'}</span>
+                  {inc.followUpRequired && (
+                    <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-0.5 rounded-full">Follow-up required</span>
+                  )}
+                </div>
+                <div className="flex items-center gap-3 shrink-0">
+                  <span className="text-xs text-slate-400">{inc.incidentDate ?? '—'}</span>
+                  {inc.resolved
+                    ? <CheckCircle size={14} className="text-emerald-500" />
+                    : <ShieldAlert size={14} className="text-red-400" />}
+                  <ChevronDown size={14} className={`text-slate-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+              </button>
+              {isOpen && (
+                <div className="px-4 pb-4 pt-1 bg-slate-50 grid grid-cols-2 gap-x-8 gap-y-2 text-sm">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-0.5">Description</p>
+                    <p className="text-slate-700">{inc.description ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-0.5">Response Taken</p>
+                    <p className="text-slate-700">{inc.responseTaken ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-0.5">Reported By</p>
+                    <p className="text-slate-700">{inc.reportedBy ?? '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-slate-400 font-semibold mb-0.5">Status</p>
+                    <p className="text-slate-700">
+                      {inc.resolved
+                        ? `Resolved${inc.resolutionDate ? ` on ${inc.resolutionDate}` : ''}`
+                        : 'Open'}
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
   )
 }
