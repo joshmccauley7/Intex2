@@ -149,7 +149,7 @@ interface LifecycleData {
   incidents: IncidentEvent[]
 }
 
-const SAFEHOUSES = [1,2,3,4,5,6,7,8,9].map(i => ({ id: i, name: `Lighthouse Safehouse ${i}` }))
+const SAFEHOUSES = [1,2,3,4,5,6,7,8,9].map(i => ({ id: i, name: `Safira Safehouse ${i}` }))
 const BIRTH_STATUS_OPTIONS = ['Marital', 'Non-Marital']
 const INITIAL_CASE_ASSESSMENT_OPTIONS = [
   'For Adoption',

@@ -291,12 +291,15 @@ public class ChatController : ControllerBase
             .Select(g => new { Status = g.Key, Count = g.Count() })
             .ToDictionaryAsync(g => g.Status, g => g.Count);
 
-        var bySafehouse = await _db.Residents
+        var bySafehouseRaw = await _db.Residents
             .Where(r => r.SafehouseId != null)
             .Join(_db.Safehouses, r => r.SafehouseId, s => s.SafehouseId, (r, s) => s.Name)
             .GroupBy(n => n)
             .Select(g => new { Name = g.Key, Count = g.Count() })
-            .ToDictionaryAsync(g => g.Name, g => g.Count);
+            .ToListAsync();
+        var bySafehouse = bySafehouseRaw.ToDictionary(
+            g => NormalizeSafehouseName(g.Name),
+            g => g.Count);
 
         var cutoff30 = DateOnly.FromDateTime(DateTime.UtcNow.AddDays(-30));
         var recentAdmissions = await _db.Residents.CountAsync(r => r.DateOfAdmission >= cutoff30);
@@ -914,7 +917,7 @@ public class ChatController : ControllerBase
         if (r.SafehouseId.HasValue)
         {
             var sh = await _db.Safehouses.FirstOrDefaultAsync(s => s.SafehouseId == r.SafehouseId);
-            sb.AppendLine($"Safehouse: {sh?.Name ?? $"ID {r.SafehouseId}"} ({sh?.City}, {sh?.Region})");
+            sb.AppendLine($"Safehouse: {NormalizeSafehouseName(sh?.Name ?? $"ID {r.SafehouseId}")} ({sh?.City}, {sh?.Region})");
         }
 
         // Admission
@@ -1118,7 +1121,7 @@ public class ChatController : ControllerBase
         {
             sb.AppendLine("Residents by safehouse:");
             foreach (var s in bySafehouse)
-                sb.AppendLine($"  - {s.Safehouse}: {s.Count}");
+                sb.AppendLine($"  - {NormalizeSafehouseName(s.Safehouse)}: {s.Count}");
         }
 
         if (caseCategoryGroups.Any())
@@ -1230,6 +1233,9 @@ public class ChatController : ControllerBase
         return sb.ToString();
     }
 
+    private static string NormalizeSafehouseName(string? name) =>
+        (name ?? "Unknown").Replace("Lighthouse", "Safira", StringComparison.OrdinalIgnoreCase);
+
     private async Task<string> GetSafehouseSummary()
     {
         var safehouses = await _db.Safehouses.ToListAsync();
@@ -1244,7 +1250,7 @@ public class ChatController : ControllerBase
             var occupancyPct = s.CapacityGirls > 0
                 ? $"{(residentCount * 100.0 / s.CapacityGirls):N0}% capacity"
                 : "capacity unknown";
-            sb.AppendLine($"  - {s.Name} ({s.City}, {s.Region}) — {residentCount}/{s.CapacityGirls} residents [{occupancyPct}] — Status: {s.Status}");
+            sb.AppendLine($"  - {NormalizeSafehouseName(s.Name)} ({s.City}, {s.Region}) — {residentCount}/{s.CapacityGirls} residents [{occupancyPct}] — Status: {s.Status}");
         }
 
         return sb.ToString();
@@ -1524,7 +1530,7 @@ public class ChatController : ControllerBase
         if (bySafehouse.Any())
         {
             sb.AppendLine("Allocations by safehouse:");
-            foreach (var s in bySafehouse) sb.AppendLine($"  - {s.Safehouse}: ${s.Total:N2}");
+            foreach (var s in bySafehouse) sb.AppendLine($"  - {NormalizeSafehouseName(s.Safehouse)}: ${s.Total:N2}");
         }
         return sb.ToString();
     }
@@ -1951,8 +1957,9 @@ public class ChatController : ControllerBase
             : string.Empty;
 
         return $"""
-            You are a helpful, compassionate AI assistant for the administrators of a nonprofit
-            organization that supports survivors of abuse and vulnerable children.
+            You are a helpful, compassionate AI assistant for the administrators of Safira,
+            a nonprofit organization that supports survivors of abuse and vulnerable children.
+            The organization's safehouses are named "Safira Safehouse 1" through "Safira Safehouse 9".
             Your role is to help admins understand their data and suggest useful next steps.
 
             IMPORTANT RULES:
