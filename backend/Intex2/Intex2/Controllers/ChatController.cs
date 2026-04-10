@@ -581,13 +581,20 @@ public class ChatController : ControllerBase
         // Home visitation queries
         if (lower.Contains("visit") || lower.Contains("visitation") ||
             lower.Contains("home visit") || lower.Contains("social worker") ||
-            lower.Contains("follow up") || lower.Contains("pending"))
+            lower.Contains("follow up") || lower.Contains("pending") ||
+            lower.Contains("family cooperation") || lower.Contains("cooperation level") ||
+            lower.Contains("family engagement") || lower.Contains("family members") ||
+            lower.Contains("visit outcome") || lower.Contains("location visited"))
         {
             if (caseCodeMatch.Success || idMatch.Success)
             {
                 Resident? specificResident = null;
                 if (caseCodeMatch.Success)
-                    specificResident = await _db.Residents.FirstOrDefaultAsync(r => r.CaseControlNo == caseCodeMatch.Groups[1].Value.ToUpper());
+                {
+                    var code = caseCodeMatch.Groups[1].Value.ToUpper();
+                    specificResident = await _db.Residents.FirstOrDefaultAsync(r =>
+                        r.CaseControlNo == code || r.InternalCode == code);
+                }
                 else if (idMatch.Success && int.TryParse(idMatch.Groups[1].Value, out var rid))
                     specificResident = await _db.Residents.FirstOrDefaultAsync(r => r.ResidentId == rid);
 
@@ -880,9 +887,10 @@ public class ChatController : ControllerBase
     // ── Look up a specific resident by case control number (e.g. "LS-0002") ────
     private async Task<string> GetSpecificResidentByCode(string caseControlNo)
     {
-        var resident = await _db.Residents.FirstOrDefaultAsync(r => r.CaseControlNo == caseControlNo);
+        var resident = await _db.Residents.FirstOrDefaultAsync(r =>
+            r.CaseControlNo == caseControlNo || r.InternalCode == caseControlNo);
         if (resident == null)
-            return $"=== SPECIFIC RESIDENT LOOKUP ===\nNo resident found with case control number '{caseControlNo}'.";
+            return $"=== SPECIFIC RESIDENT LOOKUP ===\nNo resident found with code '{caseControlNo}'.";
         return await FormatFullResidentRecord(resident);
     }
 
@@ -1060,6 +1068,28 @@ public class ChatController : ControllerBase
                 sb.AppendLine($"  Category: {p.PlanCategory ?? "N/A"} | Status: {p.Status ?? "N/A"} | Target date: {p.TargetDate?.ToString() ?? "N/A"}");
                 if (!string.IsNullOrWhiteSpace(p.PlanDescription)) sb.AppendLine($"    Description: {p.PlanDescription}");
                 if (!string.IsNullOrWhiteSpace(p.ServicesProvided)) sb.AppendLine($"    Services: {p.ServicesProvided}");
+            }
+        }
+
+        // ── Home visitations ───────────────────────────────────────────────────
+        var visitations = await _db.HomeVisitations
+            .Where(v => v.ResidentId == r.ResidentId)
+            .OrderByDescending(v => v.VisitDate)
+            .ToListAsync();
+
+        if (visitations.Any())
+        {
+            sb.AppendLine("\n--- Home Visitations ---");
+            sb.AppendLine($"  Total visits: {visitations.Count}");
+            foreach (var v in visitations)
+            {
+                sb.AppendLine($"  {v.VisitDate} | Type: {v.VisitType ?? "N/A"} | Worker: {v.SocialWorker ?? "N/A"} | Family cooperation: {v.FamilyCooperationLevel ?? "N/A"}");
+                if (!string.IsNullOrWhiteSpace(v.LocationVisited)) sb.AppendLine($"    Location: {v.LocationVisited}");
+                if (!string.IsNullOrWhiteSpace(v.FamilyMembersPresent)) sb.AppendLine($"    Family present: {v.FamilyMembersPresent}");
+                if (!string.IsNullOrWhiteSpace(v.VisitOutcome)) sb.AppendLine($"    Outcome: {v.VisitOutcome}");
+                if (v.SafetyConcernsNoted == true) sb.AppendLine($"    ⚠️ Safety concern noted");
+                if (v.FollowUpNeeded == true) sb.AppendLine($"    Follow-up needed: {v.FollowUpNotes ?? ""}");
+                if (!string.IsNullOrWhiteSpace(v.Observations)) sb.AppendLine($"    Observations: {v.Observations}");
             }
         }
 
@@ -1273,7 +1303,14 @@ public class ChatController : ControllerBase
         var recentVisits = await _db.HomeVisitations
             .OrderByDescending(v => v.VisitDate)
             .Take(5)
-            .Select(v => new { v.VisitDate, v.SocialWorker, v.VisitType, v.VisitOutcome, v.FollowUpNeeded })
+            .Select(v => new { v.VisitDate, v.SocialWorker, v.VisitType, v.VisitOutcome, v.FollowUpNeeded, v.FamilyCooperationLevel })
+            .ToListAsync();
+
+        var cooperationBreakdown = await _db.HomeVisitations
+            .Where(v => v.FamilyCooperationLevel != null)
+            .GroupBy(v => v.FamilyCooperationLevel!)
+            .Select(g => new { Level = g.Key, Count = g.Count() })
+            .OrderByDescending(g => g.Count)
             .ToListAsync();
 
         var sb = new StringBuilder();
@@ -1283,13 +1320,20 @@ public class ChatController : ControllerBase
         sb.AppendLine($"Pending follow-ups: {followUpNeeded}");
         sb.AppendLine($"Visits with safety concerns noted: {safetyConcerns}");
 
+        if (cooperationBreakdown.Any())
+        {
+            sb.AppendLine("Family cooperation level breakdown:");
+            foreach (var c in cooperationBreakdown)
+                sb.AppendLine($"  - {c.Level}: {c.Count} visits");
+        }
+
         if (recentVisits.Any())
         {
             sb.AppendLine("5 most recent visitations:");
             foreach (var v in recentVisits)
             {
                 var followUp = v.FollowUpNeeded == true ? " ⚠ Follow-up needed" : "";
-                sb.AppendLine($"  - {v.VisitDate} | {v.SocialWorker} | {v.VisitType} | Outcome: {v.VisitOutcome}{followUp}");
+                sb.AppendLine($"  - {v.VisitDate} | {v.SocialWorker} | {v.VisitType} | Cooperation: {v.FamilyCooperationLevel ?? "N/A"} | Outcome: {v.VisitOutcome}{followUp}");
             }
         }
 
@@ -1312,6 +1356,8 @@ public class ChatController : ControllerBase
             sb.AppendLine($"  Date: {v.VisitDate} | Type: {v.VisitType} | Worker: {v.SocialWorker}");
             sb.AppendLine($"    Location: {v.LocationVisited ?? "N/A"}");
             sb.AppendLine($"    Purpose: {v.Purpose ?? "N/A"}");
+            sb.AppendLine($"    Family cooperation: {v.FamilyCooperationLevel ?? "N/A"}");
+            sb.AppendLine($"    Family members present: {v.FamilyMembersPresent ?? "N/A"}");
             sb.AppendLine($"    Outcome: {v.VisitOutcome ?? "N/A"}");
             sb.AppendLine($"    Safety concerns: {(v.SafetyConcernsNoted == true ? "Yes" : "No")}");
             sb.AppendLine($"    Follow-up needed: {(v.FollowUpNeeded == true ? "Yes" : "No")}");
