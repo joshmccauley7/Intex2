@@ -357,6 +357,7 @@ export default function DonorsPage() {
       {/* ── Outreach Queue tab ─────────────────────────────────────────────── */}
       {activeTab === 'outreach' && (
         <div>
+          <p className="text-xs text-slate-400 mb-4">Churn risk scores are updated nightly at 2 AM MDT.</p>
           {/* Summary strip */}
           <div className="flex gap-4 mb-6">
             <div className="bg-white rounded-xl border border-slate-200 px-5 py-4 flex items-center gap-3 shadow-sm">
@@ -454,6 +455,8 @@ export default function DonorsPage() {
 
       {/* ── All Donors tab ─────────────────────────────────────────────────── */}
       {activeTab === 'donors' && <>
+
+      <p className="text-xs text-slate-400 mb-4">Churn risk scores are updated nightly at 2 AM MDT.</p>
 
       {/* Filters */}
       <div className="mb-6">
