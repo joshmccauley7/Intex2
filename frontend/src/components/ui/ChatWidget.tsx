@@ -109,11 +109,6 @@ const CATEGORY_PROMPTS: Record<'resident' | 'donor' | 'social', Prompt[]> = {
       message: "We haven't posted in a while — give me 3 post ideas based on our mission and recent activity.",
       promptKey: 'social.post_ideas',           // Tier 4
     },
-    {
-      label: 'Tone check a post',
-      message: 'Check this post for trauma-informed, sensitive language: [paste your draft here]',
-      promptKey: 'social.tone_check',           // Tier 4
-    },
   ],
 };
 
