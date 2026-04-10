@@ -171,6 +171,19 @@ using (var scope = app.Services.CreateScope())
     var identityCtx = scope.ServiceProvider.GetRequiredService<AuthIdentityDbContext>();
     identityCtx.Database.Migrate();
     await AdminSeeder.SeedAsync(scope.ServiceProvider, builder.Configuration);
+
+    // Ensure bug_reports table exists (no EF migration needed — idempotent raw SQL)
+    var appCtx = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    await appCtx.Database.ExecuteSqlRawAsync(@"
+        CREATE TABLE IF NOT EXISTS bug_reports (
+            bug_report_id  SERIAL PRIMARY KEY,
+            submitted_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+            submitted_by   TEXT,
+            page_context   TEXT,
+            description    TEXT NOT NULL,
+            status         TEXT NOT NULL DEFAULT 'Open'
+        );
+    ");
 }
 
 if (app.Environment.IsDevelopment())
@@ -201,13 +214,4 @@ app.Use(async (ctx, next) =>
 
     ctx.Response.Headers["X-Content-Type-Options"] = "nosniff";
     ctx.Response.Headers["X-Frame-Options"] = "DENY";
-    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";
-    ctx.Response.Headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()";
-
-    await next();
-});
-
-app.UseAuthentication();
-app.UseAuthorization();
-app.MapControllers();
-app.Run();
+    ctx.Response.Headers["Referrer-Policy"] = "strict-origin-when-cross-origin";

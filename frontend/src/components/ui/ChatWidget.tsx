@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { MessageSquare, X, Send, Loader2, Bot, ChevronLeft, Pencil } from 'lucide-react';
+import { MessageSquare, X, Send, Loader2, Bot, ChevronLeft, Pencil, HelpCircle, Bug } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../api';
 
@@ -13,7 +13,9 @@ interface Message {
 
 // null = no category chosen yet
 // 'other' = user clicked "Something else" — skip chips, show input directly
-type Category = 'resident' | 'donor' | 'social' | 'other' | null;
+// 'bug'   = bug report flow — guided 2-step: AI asks → user describes → submit
+// 'help'  = how-to questions about the platform
+type Category = 'resident' | 'donor' | 'social' | 'help' | 'bug' | 'other' | null;
 
 interface Prompt {
   label: string;
@@ -26,10 +28,12 @@ interface Prompt {
 // ─── Category definitions ────────────────────────────────────────────────────
 
 const CATEGORIES: { id: Exclude<Category, null>; label: string; emoji: string }[] = [
-  { id: 'resident', label: 'A Resident',    emoji: '🏠' },
-  { id: 'donor',    label: 'Donors',        emoji: '💛' },
-  { id: 'social',   label: 'Social Media',  emoji: '📣' },
-  { id: 'other',    label: 'Something else', emoji: '💬' },
+  { id: 'resident', label: 'A Resident',          emoji: '🏠' },
+  { id: 'donor',    label: 'Donors',              emoji: '💛' },
+  { id: 'social',   label: 'Social Media',        emoji: '📣' },
+  { id: 'help',     label: 'How To / Help',       emoji: '❓' },
+  { id: 'bug',      label: 'I have an app error', emoji: '🐛' },
+  { id: 'other',    label: 'Something else',      emoji: '💬' },
 ];
 
 // ─── Suggested prompts per category ──────────────────────────────────────────
@@ -38,7 +42,7 @@ const CATEGORIES: { id: Exclude<Category, null>; label: string; emoji: string }[
 // Tier 2 → pre-aggregated summary → tiny Claude narration
 // Tier 4 → targeted context → full Claude (creative/draft tasks)
 
-const CATEGORY_PROMPTS: Record<'resident' | 'donor' | 'social', Prompt[]> = {
+const CATEGORY_PROMPTS: Record<'resident' | 'donor' | 'social' | 'help', Prompt[]> = {
   resident: [
     {
       label: '30+ day residents',
@@ -118,6 +122,33 @@ const CATEGORY_PROMPTS: Record<'resident' | 'donor' | 'social', Prompt[]> = {
       label: 'Tone check a post',
       message: 'Check this post for trauma-informed, sensitive language: [paste your draft here]',
       promptKey: 'social.tone_check',           // Tier 4
+    },
+  ],
+  help: [
+    {
+      label: 'How do I use the dashboard?',
+      message: 'Can you explain how the admin dashboard works — what each section shows and how I navigate it?',
+      promptKey: 'help.dashboard',
+    },
+    {
+      label: 'What does "churn risk" mean?',
+      message: 'What is donor churn risk and how is the score calculated? What should I do for high-risk donors?',
+      promptKey: 'help.churn',
+    },
+    {
+      label: 'How do I filter data by date?',
+      message: 'How do I filter the dashboard data by time period (3 months, 6 months, etc.)?',
+      promptKey: 'help.filters',
+    },
+    {
+      label: 'What do resident risk levels mean?',
+      message: 'What do the resident risk levels (High, Medium, Low) mean and how are they calculated?',
+      promptKey: 'help.risk',
+    },
+    {
+      label: 'What admin pages are available?',
+      message: 'What admin pages are available to me and what can I do on each one?',
+      promptKey: 'help.pages',
     },
   ],
 };
@@ -206,6 +237,11 @@ export default function ChatWidget() {
   const [messages, setMessages]   = useState<Message[]>([]);
   const [isPending, setIsPending] = useState(false);
   const [error, setError]         = useState<string | null>(null);
+
+  // Bug-report specific state
+  const [bugStep, setBugStep] = useState<'idle' | 'awaiting_description' | 'submitted'>('idle');
+  const [bugSubmitting, setBugSubmitting] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef       = useRef<HTMLTextAreaElement>(null);
 
@@ -226,11 +262,63 @@ export default function ChatWidget() {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   const inChat = messages.length > 0;
-  const showInput = category !== null; // input visible once any category is chosen
+  const isBugFlow = category === 'bug';
+  // Show the text input for all categories except bug-pre-submit (bug has its own chat input once in-chat)
+  const showInput = category !== null && category !== 'bug'
+    || (isBugFlow && inChat);
+
+  /** Enter the bug-report category: show the AI's opening question immediately. */
+  function enterBugFlow() {
+    setCategory('bug');
+    setBugStep('awaiting_description');
+    setMessages([{
+      role: 'assistant',
+      content: "I'm sorry you ran into an issue! Please describe the problem:\n\n• **What page** were you on?\n• **What were you trying to do?**\n• **What happened** (error message, unexpected behavior, wrong data, etc.)?\n\nThe more detail you share, the faster the team can investigate.",
+    }]);
+    setTimeout(() => inputRef.current?.focus(), 100);
+  }
+
+  /** Submit the bug report to the backend, then show a confirmation message. */
+  async function submitBugReport(description: string) {
+    setBugSubmitting(true);
+    setMessages(prev => [...prev, { role: 'user', content: description }]);
+    setInput('');
+
+    try {
+      await apiFetch('/api/bug-reports', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description }),
+      });
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "✅ **Bug report saved.** Thank you for flagging this — the development team will review it and follow up. If the issue is urgent, you can also reach out to your system administrator directly.\n\nIs there anything else I can help you with?",
+      }]);
+      setBugStep('submitted');
+    } catch {
+      setMessages(prev => [...prev, {
+        role: 'assistant',
+        content: "⚠️ Sorry, I wasn't able to save the report right now. Please try again or contact your system administrator directly.",
+      }]);
+    } finally {
+      setBugSubmitting(false);
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+  }
 
   async function sendMessage(text: string, promptKey?: string) {
     const trimmed = text.trim();
-    if (!trimmed || isPending) return;
+    if (!trimmed || isPending || bugSubmitting) return;
+
+    // If we're in the bug flow awaiting description, route to submitBugReport
+    if (isBugFlow && bugStep === 'awaiting_description') {
+      await submitBugReport(trimmed);
+      return;
+    }
+    // After submitted, treat further messages as normal free-form chat (Tier 4)
+    if (isBugFlow && bugStep === 'submitted') {
+      promptKey = undefined;
+    }
 
     setMessages(prev => [...prev, { role: 'user', content: trimmed }]);
     setInput('');
@@ -259,7 +347,6 @@ export default function ChatWidget() {
 
   function handleSubmit(e?: FormEvent) {
     e?.preventDefault();
-    // Free-typed → no promptKey (Tier 4)
     sendMessage(input);
   }
 
@@ -272,6 +359,7 @@ export default function ChatWidget() {
     setCategory(null);
     setInput('');
     setError(null);
+    setBugStep('idle');
   }
 
   // ─── Render ───────────────────────────────────────────────────────────────
@@ -309,7 +397,7 @@ export default function ChatWidget() {
           <div className="flex items-center gap-2">
             {category !== null && !inChat && (
               <button
-                onClick={() => setCategory(null)}
+                onClick={() => { setCategory(null); setBugStep('idle'); }}
                 className="p-1 -ml-1 rounded-full hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-400 hover:text-slate-600 transition-colors"
                 aria-label="Back"
               >
@@ -353,8 +441,13 @@ export default function ChatWidget() {
                 {CATEGORIES.map(cat => (
                   <button
                     key={cat.id}
-                    onClick={() => setCategory(cat.id)}
-                    className="flex items-center gap-3 w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 text-left text-sm font-medium text-[var(--page-fg)] hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-safira-blue/40 transition-all"
+                    onClick={() => cat.id === 'bug' ? enterBugFlow() : setCategory(cat.id)}
+                    className={[
+                      'flex items-center gap-3 w-full px-4 py-3 rounded-xl border text-left text-sm font-medium transition-all',
+                      cat.id === 'bug'
+                        ? 'border-red-200 dark:border-red-800 text-red-700 dark:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 hover:border-red-300'
+                        : 'border-slate-200 dark:border-slate-700 text-[var(--page-fg)] hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-safira-blue/40',
+                    ].join(' ')}
                   >
                     <span className="text-lg">{cat.emoji}</span>
                     {cat.label}
@@ -374,13 +467,22 @@ export default function ChatWidget() {
             </div>
           )}
 
-          {/* ── Category prompt chips ───────────────────────────────────────── */}
-          {!inChat && category !== null && category !== 'other' && (
+          {/* ── Category prompt chips (resident / donor / social / help) ────── */}
+          {!inChat && category !== null && category !== 'other' && category !== 'bug' && (
             <div className="flex flex-col gap-2 h-full">
-              <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
-                Choose a starting point, or type your own question below:
-              </p>
-              {CATEGORY_PROMPTS[category].map(p => (
+              {category === 'help' ? (
+                <div className="flex items-center gap-2 mb-1">
+                  <HelpCircle size={14} className="text-slate-400" />
+                  <p className="text-xs text-slate-500 dark:text-slate-400">
+                    Choose a topic or type your own question below:
+                  </p>
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 dark:text-slate-400 mb-1">
+                  Choose a starting point, or type your own question below:
+                </p>
+              )}
+              {CATEGORY_PROMPTS[category as 'resident' | 'donor' | 'social' | 'help'].map(p => (
                 <button
                   key={p.promptKey}
                   onClick={() => sendMessage(p.message, p.promptKey)}
@@ -412,12 +514,12 @@ export default function ChatWidget() {
                 </div>
               ))}
 
-              {isPending && (
+              {(isPending || bugSubmitting) && (
                 <div className="flex justify-start">
                   <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl rounded-bl-sm px-3.5 py-2.5">
                     <div className="flex items-center gap-1.5 text-slate-400">
                       <Loader2 size={13} className="animate-spin" />
-                      <span className="text-xs">Thinking…</span>
+                      <span className="text-xs">{isBugFlow && bugStep === 'awaiting_description' ? 'Saving report…' : 'Thinking…'}</span>
                     </div>
                   </div>
                 </div>
@@ -426,6 +528,25 @@ export default function ChatWidget() {
               {error && (
                 <div className="text-xs text-red-500 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg px-3 py-2">
                   {error}
+                </div>
+              )}
+
+              {/* Bug flow: after submission show a "report another" shortcut */}
+              {isBugFlow && bugStep === 'submitted' && (
+                <div className="flex justify-center mt-1">
+                  <button
+                    onClick={() => {
+                      setBugStep('awaiting_description');
+                      setMessages(prev => [...prev, {
+                        role: 'assistant',
+                        content: "Sure! Describe the next issue and I'll log it for you.",
+                      }]);
+                    }}
+                    className="flex items-center gap-1.5 text-xs text-slate-500 hover:text-red-600 transition-colors px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-red-200"
+                  >
+                    <Bug size={11} />
+                    Report another issue
+                  </button>
                 </div>
               )}
 
@@ -445,9 +566,13 @@ export default function ChatWidget() {
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask a question…"
+              placeholder={
+                isBugFlow && bugStep === 'awaiting_description'
+                  ? 'Describe the issue…'
+                  : 'Ask a question…'
+              }
               rows={1}
-              disabled={isPending}
+              disabled={isPending || bugSubmitting}
               className={[
                 'flex-1 resize-none rounded-xl border px-3 py-2 text-sm',
                 'bg-slate-50 dark:bg-slate-800',
@@ -460,12 +585,14 @@ export default function ChatWidget() {
             />
             <button
               type="submit"
-              disabled={!input.trim() || isPending}
-              aria-label="Send"
+              disabled={!input.trim() || isPending || bugSubmitting}
+              aria-label={isBugFlow && bugStep === 'awaiting_description' ? 'Submit bug report' : 'Send'}
               className={[
                 'p-2.5 rounded-xl flex-shrink-0 transition-all',
-                'bg-safira-blue text-white',
-                'hover:bg-safira-blue-dark active:scale-95',
+                isBugFlow && bugStep === 'awaiting_description'
+                  ? 'bg-red-500 hover:bg-red-600 text-white'
+                  : 'bg-safira-blue text-white hover:bg-safira-blue-dark',
+                'active:scale-95',
                 'disabled:opacity-40 disabled:cursor-not-allowed disabled:active:scale-100',
               ].join(' ')}
             >

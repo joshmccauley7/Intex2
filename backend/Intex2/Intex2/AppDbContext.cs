@@ -19,5 +19,5 @@ public class AppDbContext : DbContext
     public DbSet<EducationRecord> EducationRecords => Set<EducationRecord>();
     public DbSet<SocialMediaPost> SocialMediaPosts => Set<SocialMediaPost>();
     public DbSet<InterventionPlan> InterventionPlans => Set<InterventionPlan>();
-    public DbSet<IncidentReport> IncidentReports => Set<IncidentReport>();
+    public DbSet<BugReport> BugReports => Set<BugReport>();
 }
