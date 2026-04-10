@@ -1,14 +1,22 @@
 import { Outlet, NavLink } from 'react-router-dom'
 import { useState } from 'react'
-import { Users, Home, FileText, MapPin, LogOut, LayoutDashboard, UserCog, Share2, Menu, X } from 'lucide-react'
+import { Users, Home, FileText, MapPin, LogOut, LayoutDashboard, UserCog, Share2, Menu, X, MessageSquare, Heart, HelpCircle } from 'lucide-react'
 import { useAuth } from '../../context/AuthContext'
 import SiteNav from '../../components/layout/SiteNav'
 import ConfirmDialog from '../../components/ui/ConfirmDialog'
+import ChatWidget from '../../components/ui/ChatWidget'
 
 export default function AdminLayout() {
   const { session, logout } = useAuth()
   const [logoutConfirmOpen, setLogoutConfirmOpen] = useState(false)
   const [mobileNavOpen, setMobileNavOpen] = useState(false)
+  const [chatOpen, setChatOpen] = useState(false)
+  const [chatCategory, setChatCategory] = useState<'resident' | 'donor' | 'social' | 'other' | undefined>(undefined)
+
+  function openChat(cat?: 'resident' | 'donor' | 'social' | 'other') {
+    setChatCategory(cat)
+    setChatOpen(true)
+  }
 
   const navClass = ({ isActive }: { isActive: boolean }) =>
     `flex items-center gap-3 px-4 py-3 text-sm font-medium rounded-lg transition-colors ${
@@ -55,8 +63,37 @@ export default function AdminLayout() {
           </NavLink>
         </nav>
 
-        {/* User + Sign out */}
-        <div className="p-3 border-t border-slate-700 space-y-1">
+        {/* AI Helper + User + Sign out */}
+        <div className="p-3 border-t border-slate-700 space-y-2">
+          <div className="rounded-lg overflow-hidden ring-2 ring-safira-blue shadow-lg shadow-safira-blue/40">
+            <button
+              onClick={() => openChat()}
+              className="w-full flex items-center gap-2.5 px-3 py-3 bg-safira-blue hover:bg-safira-blue-dark transition-colors"
+            >
+              <MessageSquare size={15} strokeWidth={2} className="text-white shrink-0" />
+              <div className="text-left">
+                <p className="text-sm font-semibold text-white leading-tight">AI Helper</p>
+                <p className="text-[11px] text-blue-100/80 leading-tight mt-0.5">What can I help you with?</p>
+              </div>
+            </button>
+            <div className="grid grid-cols-2 divide-x divide-y divide-slate-700 border border-t-0 border-slate-700 rounded-b-lg overflow-hidden">
+              {([
+                { id: 'resident', label: 'Residents', icon: <Home size={12} /> },
+                { id: 'donor',    label: 'Donors',    icon: <Heart size={12} /> },
+                { id: 'social',   label: 'Social',    icon: <Share2 size={12} /> },
+                { id: 'other',    label: 'Other',     icon: <HelpCircle size={12} /> },
+              ] as const).map(cat => (
+                <button
+                  key={cat.id}
+                  onClick={() => openChat(cat.id)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-slate-800 text-slate-300 hover:text-white hover:bg-safira-blue/20 text-xs font-medium transition-colors"
+                >
+                  {cat.icon}
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+          </div>
           {session.userName && (
             <p className="px-4 py-2 text-xs text-slate-400 truncate">
               Signed in as <span className="text-white font-medium">{session.userName}</span>
@@ -180,6 +217,8 @@ export default function AdminLayout() {
           await logout()
         }}
       />
+
+      <ChatWidget open={chatOpen} onClose={() => setChatOpen(false)} initialCategory={chatCategory} />
     </div>
   )
 }

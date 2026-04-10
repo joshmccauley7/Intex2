@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, Fragment } from 'react';
 import type { FormEvent, ReactNode } from 'react';
-import { MessageSquare, X, Send, Loader2, Bot, ChevronLeft, Pencil } from 'lucide-react';
+import { X, Send, Loader2, Bot, ChevronLeft, Pencil } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { apiFetch } from '../../api';
 
@@ -252,10 +252,17 @@ function CollapsibleMessage({ content }: { content: string }) {
 
 // ─── Component ────────────────────────────────────────────────────────────────
 
-export default function ChatWidget() {
+interface ChatWidgetProps {
+  open: boolean;
+  onClose: () => void;
+  initialCategory?: Exclude<Category, null>;
+}
+
+export default function ChatWidget({ open, onClose, initialCategory }: ChatWidgetProps) {
   const { isAdmin, isLoading } = useAuth();
-  const [isOpen, setIsOpen]       = useState(false);
-  const [category, setCategory]   = useState<Category>(null);
+  const isOpen = open;
+  const setIsOpen = (v: boolean) => { if (!v) onClose(); };
+  const [category, setCategory]   = useState<Category>(initialCategory ?? null);
   const [input, setInput]         = useState('');
   const [messages, setMessages]   = useState<Message[]>([]);
   const [isPending, setIsPending] = useState(false);
@@ -328,6 +335,16 @@ export default function ChatWidget() {
 
   // ── All hooks before early return ─────────────────────────────────────────
 
+  // When opened with a pre-selected category, jump straight to prompts
+  useEffect(() => {
+    if (isOpen && initialCategory) {
+      setCategory(initialCategory);
+      setMessages([]);
+      setInput('');
+      setError(null);
+    }
+  }, [isOpen, initialCategory]);
+
   useEffect(() => {
     if (isOpen) messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, isOpen]);
@@ -386,7 +403,7 @@ export default function ChatWidget() {
 
   function handleReset() {
     setMessages([]);
-    setCategory(null);
+    setCategory(initialCategory ?? null);
     setInput('');
     setError(null);
   }
@@ -394,22 +411,6 @@ export default function ChatWidget() {
   // ─── Render ───────────────────────────────────────────────────────────────
   return (
     <>
-      {/* ── Floating trigger button ─────────────────────────────────────── */}
-      <button
-        onClick={() => setIsOpen(prev => !prev)}
-        aria-label="Open AI Helper"
-        className={[
-          'fixed bottom-5 left-5 z-[200]',
-          'flex items-center gap-1.5 rounded-full px-3.5 py-2 shadow-lg',
-          'bg-safira-blue text-white',
-          'hover:bg-safira-blue-dark active:scale-95 transition-all duration-150',
-          isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100',
-        ].join(' ')}
-      >
-        <MessageSquare size={16} strokeWidth={2} />
-        <span className="text-xs font-semibold tracking-wide whitespace-nowrap">AI Helper</span>
-      </button>
-
       {/* ── Chat panel ──────────────────────────────────────────────────── */}
       {isOpen && (
       <div
