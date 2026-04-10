@@ -9,7 +9,7 @@ import SiteFooter from '../components/layout/SiteFooter';
 export default function LoginPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { refreshSession, isAdmin } = useAuth();
+  const { refreshSession } = useAuth();
 
   const returnTo = searchParams.get('returnTo');
 
@@ -24,12 +24,12 @@ export default function LoginPage() {
     setError(null);
     setLoading(true);
     try {
-      await loginUser(userName, password, rememberMe);
+      const session = await loginUser(userName, password, rememberMe);
       await refreshSession();
 
       if (returnTo) {
         navigate(returnTo, { replace: true });
-      } else if (isAdmin) {
+      } else if (session.roles.includes('admin')) {
         navigate('/admin/dashboard', { replace: true });
       } else {
         navigate('/', { replace: true });
